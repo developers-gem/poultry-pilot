@@ -1,0 +1,41 @@
+import { z } from "zod";
+
+/** Stable, machine-readable error codes. Clients branch on `code`, never on `message`. */
+export const ERROR_CODES = {
+  VALIDATION_FAILED: 400,
+  INVALID_JSON: 400,
+  UNAUTHENTICATED: 401,
+  INVALID_CREDENTIALS: 401,
+  TOKEN_EXPIRED: 401,
+  TOKEN_REUSED: 401,
+  FORBIDDEN: 403,
+  NOT_FOUND: 404,
+  EMAIL_TAKEN: 409,
+  ALREADY_MEMBER: 409,
+  VERSION_CONFLICT: 409,
+  IDEMPOTENCY_KEY_REUSED: 422,
+  IDEMPOTENCY_IN_PROGRESS: 409,
+  LAST_OWNER: 422,
+  INVALID_STATE_TRANSITION: 422,
+  INSUFFICIENT_BIRDS: 422,
+  INSUFFICIENT_STOCK: 422,
+  FLOCK_CLOSED: 422,
+  OVERPAYMENT: 422,
+  UNKNOWN_COMMAND: 422,
+  INVITE_INVALID: 422,
+  RATE_LIMITED: 429,
+  INTERNAL: 500,
+  NOT_IMPLEMENTED: 501,
+} as const;
+
+export type ErrorCode = keyof typeof ERROR_CODES;
+
+export const ErrorEnvelope = z.object({
+  error: z.object({
+    code: z.string(),
+    message: z.string(),
+    details: z.unknown().optional(),
+    requestId: z.string().optional(),
+  }),
+});
+export type ErrorEnvelope = z.infer<typeof ErrorEnvelope>;
