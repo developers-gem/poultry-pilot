@@ -20,19 +20,23 @@ export const CreateFarmRequest = z.object({
   countryCode: CountryCode.optional(),
 });
 
-export const UpdateFarmRequest = z
+/**
+ * PUT /farms/:farmId replaces the farm's editable fields. Optional fields left out are cleared.
+ * `version` must match the stored version (optimistic concurrency); a mismatch returns 409.
+ */
+export const ReplaceFarmRequest = z
   .object({
-    name: NonEmptyText(120).optional(),
+    name: NonEmptyText(120),
     description: OptionalText(2000),
     countryCode: CountryCode.optional(),
     locationLabel: OptionalText(200),
     location: GeoPoint.optional(),
-    timezone: IanaTimezone.optional(),
-    unitSystem: UnitSystem.optional(),
-    fcrIncludesMortalityWeight: z.boolean().optional(),
-    workerEditWindowDays: z.number().int().min(0).max(7).optional(),
+    timezone: IanaTimezone,
     /** Currency changes are allowed only while the farm has no ledger entries (enforced server-side). */
-    currency: CurrencyCode.optional(),
+    currency: CurrencyCode,
+    unitSystem: UnitSystem,
+    fcrIncludesMortalityWeight: z.boolean(),
+    workerEditWindowDays: z.number().int().min(0).max(7),
     version: z.number().int().nonnegative(),
   })
   .strict();
@@ -52,14 +56,12 @@ export const FarmView = z.object({
   myPermissions: z.array(z.string()).optional(),
 });
 
-export const InviteMemberRequest = z.object({
-  email: Email,
-  role: Role,
-});
+/** Adds a member by email. They join when they accept the emailed invitation. */
+export const AddMemberRequest = z.object({ email: Email, role: Role }).strict();
 
 export const AcceptInviteRequest = z.object({ token: z.string().min(20).max(500) });
 
-export const ChangeRoleRequest = z.object({ role: Role });
+export const UpdateMemberRequest = z.object({ role: Role }).strict();
 
 export const MembershipView = z.object({
   id: z.string(),
@@ -69,5 +71,7 @@ export const MembershipView = z.object({
   fullName: z.string().optional(),
   role: Role,
   status: MembershipStatus,
+  invitedAt: z.string().optional(),
+  joinedAt: z.string().optional(),
   createdAt: z.string(),
 });

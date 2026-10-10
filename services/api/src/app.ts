@@ -8,6 +8,7 @@ import type { Container } from "./container.js";
 import { authenticate, errorHandler, idempotency, notFoundHandler, requestId } from "./http/middleware/core.js";
 import { authRoutes } from "./http/routes/auth.routes.js";
 import { farmRoutes } from "./http/routes/farm.routes.js";
+import { meRoutes } from "./http/routes/me.routes.js";
 import { syncRoutes } from "./http/routes/sync.routes.js";
 import { systemRoutes } from "./http/routes/system.routes.js";
 
@@ -62,11 +63,12 @@ export function createApp(c: Container): Express {
   v1.use(systemRoutes(c.health, { version: c.config.version, environment: c.config.environment, startedAt: c.startedAt }, { openapi: c.config.openapiEnabled }));
   v1.use(limited(c.config.rateLimitPerMinute));
   v1.use(express.json({ limit: c.config.bodyLimit }));
-  v1.use("/auth", authRoutes(c.auth, c.accessTokens, limited(c.config.authRateLimitPerMinute)));
+  v1.use("/auth", authRoutes(c.auth, limited(c.config.authRateLimitPerMinute)));
 
   // Business modules mount here, each behind authentication and Idempotency-Key support.
   // Mounted per prefix (not on the whole router) so unknown paths return 404, not 401.
-  const secured = [authenticate(c.accessTokens), idempotency(c.repos.idempotency)];
+  const secured = [authenticate(c.auth), idempotency(c.repos.idempotency)];
+  v1.use("/me", ...secured, meRoutes(c.auth));
   v1.use("/farms", ...secured, farmRoutes(c.farms, c.audit));
   v1.use("/sync", ...secured, syncRoutes(c.sync, c.farms));
 

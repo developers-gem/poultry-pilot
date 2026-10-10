@@ -1,6 +1,6 @@
 import { permissionsFor, type Role } from "@poultrypilot/constants";
-import type { FarmView, MembershipView, UserView } from "@poultrypilot/types";
-import type { FarmRecord, MembershipRecord, UserRecord } from "../ports/records.js";
+import type { FarmView, MembershipView, SessionView, UserView } from "@poultrypilot/types";
+import type { FarmRecord, MembershipRecord, SessionRecord, UserRecord } from "../ports/records.js";
 
 /** Mapping from records to API shapes. Secrets (hashes, tokens) never leave this boundary. */
 
@@ -9,6 +9,8 @@ export const toUserView = (u: UserRecord): UserView => ({
   email: u.email,
   fullName: u.fullName,
   emailVerified: u.emailVerified,
+  hasPassword: !!u.passwordHash,
+  googleLinked: !!u.googleSub,
   createdAt: u.createdAt.toISOString(),
 });
 
@@ -34,5 +36,19 @@ export const toMembershipView = (m: MembershipRecord, user?: UserRecord | null):
   ...(user?.fullName ? { fullName: user.fullName } : {}),
   role: m.role,
   status: m.status,
+  ...(m.invitedAt ? { invitedAt: m.invitedAt.toISOString() } : {}),
+  ...(m.joinedAt ? { joinedAt: m.joinedAt.toISOString() } : {}),
   createdAt: m.createdAt.toISOString(),
+});
+
+export const toSessionView = (x: SessionRecord, currentId?: string): SessionView => ({
+  id: x.id,
+  ...(x.deviceName ? { deviceName: x.deviceName } : {}),
+  platform: x.platform,
+  ...(x.userAgent ? { userAgent: x.userAgent } : {}),
+  ...(x.ipAddress ? { ipAddress: x.ipAddress } : {}),
+  createdAt: x.createdAt.toISOString(),
+  lastUsedAt: x.lastUsedAt.toISOString(),
+  expiresAt: x.expiresAt.toISOString(),
+  current: x.id === currentId,
 });

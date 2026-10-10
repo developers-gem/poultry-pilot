@@ -35,3 +35,15 @@ Each is cheap to change until the phase named.
 | D16 | Startup order | HTTP starts before MongoDB connects, so `/health` can report "degraded" during startup; the process exits if MongoDB never connects within the retry budget |
 | D17 | Shared types for Flutter | Hand-written Dart models for now; generate a Dart client from `packages/contracts/openapi.json` once business endpoints exist |
 | D18 | Local verification without Docker | FerretDB (MongoDB wire protocol) was used in the build environment to exercise connection, ping, failure and recovery; CI runs the same tests against real MongoDB 7 |
+
+## Added with authentication and tenancy
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| D19 | Role values | Stored lowercase (`farm_manager`), like every other enum; display names are a UI concern |
+| D20 | Session revocation | Checked on every request via the `sid` claim, so sign-outs are immediate; one indexed read per request |
+| D21 | Brute-force protection | Per-IP rate limit on auth routes plus per-account lockout after 10 failures for 15 minutes; reset unlocks |
+| D22 | Who can invite | Requires a verified email on the inviter (limits invitation spam from throwaway accounts) |
+| D23 | Farm update semantics | `PUT` replaces all editable fields; omitted optional fields are cleared; `version` required |
+| D24 | Non-member responses | 404 everywhere, identical to a missing farm, including for pending invitees and removed members |
+| D25 | Mobile token storage | Refresh token in the platform keystore; web may move to an HttpOnly cookie later without API changes |

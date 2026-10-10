@@ -4,9 +4,10 @@ import type {
   FarmRecord,
   IdempotencyRecord,
   MembershipRecord,
-  PasswordResetRecord,
+  OneTimeTokenRecord,
   ProcessedMutationRecord,
   RefreshTokenRecord,
+  SessionRecord,
   SyncChangeRecord,
   UserRecord,
 } from "../../ports/records.js";
@@ -17,9 +18,10 @@ import {
   FarmModel,
   IdempotencyModel,
   MembershipModel,
-  PasswordResetModel,
+  OneTimeTokenModel,
   ProcessedMutationModel,
   RefreshTokenModel,
+  SessionModel,
   SyncChangeModel,
   UserModel,
 } from "./models.js";
@@ -89,6 +91,27 @@ export function createMongoRepositories(connection = mongoose.connection): Repos
         return fromDoc<UserRecord | null>(doc);
       },
     },
+    sessions: {
+      async create(rec, tx) {
+        await SessionModel.create([toDoc(rec)], s(tx));
+      },
+      findById: (id, tx) => findOne<SessionRecord>(SessionModel, { _id: id }, tx),
+      async listForUser(userId, tx) {
+        const docs = await SessionModel.find({ userId }, null, s(tx)).sort({ lastUsedAt: -1 }).lean();
+        return docs.map((d) => fromDoc<SessionRecord>(d));
+      },
+      async touch(id, at, tx) {
+        await SessionModel.updateOne({ _id: id }, { $set: { lastUsedAt: at } }, s(tx));
+      },
+      async revoke(id, at, reason, tx) {
+        await SessionModel.updateOne({ _id: id, revokedAt: { $exists: false } }, { $set: { revokedAt: at, revokedReason: reason } }, s(tx));
+      },
+      async revokeAllForUser(userId, at, reason, exceptId, tx) {
+        const filter: Record<string, unknown> = { userId, revokedAt: { $exists: false }, ...(exceptId ? { _id: { $ne: exceptId } } : {}) };
+        const res = await SessionModel.updateMany(filter, { $set: { revokedAt: at, revokedReason: reason } }, s(tx));
+        return res.modifiedCount;
+      },
+    },
     refreshTokens: {
       async create(rec, tx) {
         await RefreshTokenModel.create([toDoc(rec)], s(tx));
@@ -97,20 +120,17 @@ export function createMongoRepositories(connection = mongoose.connection): Repos
       async update(id, patch, tx) {
         await RefreshTokenModel.updateOne({ _id: id }, toUpdate(patch), s(tx));
       },
-      async revokeFamily(familyId, at, tx) {
-        await RefreshTokenModel.updateMany({ familyId, revokedAt: { $exists: false } }, { $set: { revokedAt: at } }, s(tx));
-      },
-      async revokeAllForUser(userId, at, tx) {
-        await RefreshTokenModel.updateMany({ userId, revokedAt: { $exists: false } }, { $set: { revokedAt: at } }, s(tx));
-      },
     },
-    passwordResets: {
+    oneTimeTokens: {
       async create(rec, tx) {
-        await PasswordResetModel.create([toDoc(rec)], s(tx));
+        await OneTimeTokenModel.create([toDoc(rec)], s(tx));
       },
-      findByHash: (h, tx) => findOne<PasswordResetRecord>(PasswordResetModel, { tokenHash: h }, tx),
+      findByHash: (h, tx) => findOne<OneTimeTokenRecord>(OneTimeTokenModel, { tokenHash: h }, tx),
       async markUsed(id, at, tx) {
-        await PasswordResetModel.updateOne({ _id: id }, { $set: { usedAt: at } }, s(tx));
+        await OneTimeTokenModel.updateOne({ _id: id }, { $set: { usedAt: at } }, s(tx));
+      },
+      async invalidateForUser(userId, purpose, at, tx) {
+        await OneTimeTokenModel.updateMany({ userId, purpose, usedAt: { $exists: false } }, { $set: { usedAt: at } }, s(tx));
       },
     },
     farms: {

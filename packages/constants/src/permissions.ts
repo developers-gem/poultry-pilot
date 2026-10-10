@@ -44,17 +44,39 @@ export const ACTIONS = [
 export type Action = (typeof ACTIONS)[number];
 
 const ALL: readonly Action[] = ACTIONS;
+const except = (...remove: Action[]) => new Set(ALL.filter((a) => !remove.includes(a)));
 
+const WORKER: Action[] = [
+  "farm.read",
+  "production.read",
+  "production.record",
+  "production.edit_own_recent",
+  "health.read",
+  "health.record_observation",
+  "biosecurity.read",
+  "biosecurity.record",
+  "content.read",
+];
+
+/**
+ * What each role may do. Member-management actions are further limited by ROLE_RANK:
+ * nobody can add, change or remove someone at or above their own rank (owners excepted).
+ */
 export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Action>> = {
   owner: new Set(ALL),
-  manager: new Set<Action>([
+  admin: except("farm.delete"),
+  farm_manager: new Set<Action>([
     "farm.read",
     "member.read",
+    "member.invite",
+    "member.change_role",
+    "member.remove",
     "audit.read",
     "production.read",
     "production.record",
     "production.edit_own_recent",
     "production.edit_any",
+    "production.delete",
     "flock.manage",
     "flock.sell",
     "health.read",
@@ -70,26 +92,8 @@ export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Action>> = {
     "payment.record",
     "content.read",
   ]),
-  worker: new Set<Action>([
-    "farm.read",
-    "production.read",
-    "production.record",
-    "production.edit_own_recent",
-    "health.read",
-    "health.record_observation",
-    "biosecurity.read",
-    "biosecurity.record",
-    "content.read",
-  ]),
-  veterinarian: new Set<Action>([
-    "farm.read",
-    "production.read",
-    "health.read",
-    "health.record_observation",
-    "health.manage",
-    "biosecurity.read",
-    "content.read",
-  ]),
+  supervisor: new Set<Action>([...WORKER, "member.read", "production.edit_any", "biosecurity.manage"]),
+  worker: new Set<Action>(WORKER),
   accountant: new Set<Action>([
     "farm.read",
     "production.read",
@@ -100,6 +104,15 @@ export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Action>> = {
     "payment.record",
     "content.read",
   ]),
+  vet: new Set<Action>([
+    "farm.read",
+    "production.read",
+    "health.read",
+    "health.record_observation",
+    "health.manage",
+    "biosecurity.read",
+    "content.read",
+  ]),
 };
 
 export function can(role: Role, action: Action): boolean {
@@ -108,4 +121,29 @@ export function can(role: Role, action: Action): boolean {
 
 export function permissionsFor(role: Role): Action[] {
   return ACTIONS.filter((a) => ROLE_PERMISSIONS[role].has(a));
+}
+
+/** Authority for member management. Specialist roles (accountant, vet) sit between supervisor and worker. */
+export const ROLE_RANK: Record<Role, number> = {
+  owner: 100,
+  admin: 80,
+  farm_manager: 60,
+  supervisor: 40,
+  accountant: 30,
+  vet: 30,
+  worker: 20,
+};
+
+/**
+ * Can `actor` give someone the role `role`, or act on a member who currently holds `role`?
+ * Owners can manage anyone, including other owners. Everyone else only manages strictly lower ranks,
+ * so a farm manager cannot create an admin, and an admin cannot remove an owner.
+ */
+export function canManageRole(actor: Role, role: Role): boolean {
+  return actor === "owner" || ROLE_RANK[actor] > ROLE_RANK[role];
+}
+
+/** Roles `actor` may assign, highest first. Clients use this to fill the role picker. */
+export function assignableRoles(actor: Role): Role[] {
+  return (Object.keys(ROLE_RANK) as Role[]).filter((r) => canManageRole(actor, r));
 }

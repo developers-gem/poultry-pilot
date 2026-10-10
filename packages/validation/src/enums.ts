@@ -22,3 +22,5 @@ export const ContentKind = z.enum(C.CONTENT_KINDS);
 export const Role = z.enum(C.ROLES);
 export const MembershipStatus = z.enum(C.MEMBERSHIP_STATUSES);
 export const UnitSystem = z.enum(C.UNIT_SYSTEMS);
+export const UserStatus = z.enum(C.USER_STATUSES);
+export const SessionPlatform = z.enum(C.SESSION_PLATFORMS);

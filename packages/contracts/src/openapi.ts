@@ -23,16 +23,27 @@ const S = {
   ErrorEnvelope: registry.register("ErrorEnvelope", V.ErrorEnvelope),
   HealthResponse: registry.register("HealthResponse", V.HealthResponse),
   LivenessResponse: registry.register("LivenessResponse", V.LivenessResponse),
+  DeviceInfo: registry.register("DeviceInfo", V.DeviceInfo),
   RegisterRequest: registry.register("RegisterRequest", V.RegisterRequest),
   LoginRequest: registry.register("LoginRequest", V.LoginRequest),
+  GoogleLoginRequest: registry.register("GoogleLoginRequest", V.GoogleLoginRequest),
   RefreshRequest: registry.register("RefreshRequest", V.RefreshRequest),
+  LogoutRequest: registry.register("LogoutRequest", V.LogoutRequest),
+  VerifyEmailRequest: registry.register("VerifyEmailRequest", V.VerifyEmailRequest),
+  ForgotPasswordRequest: registry.register("ForgotPasswordRequest", V.ForgotPasswordRequest),
+  ResetPasswordRequest: registry.register("ResetPasswordRequest", V.ResetPasswordRequest),
+  ChangePasswordRequest: registry.register("ChangePasswordRequest", V.ChangePasswordRequest),
   TokenPair: registry.register("TokenPair", V.TokenPair),
   UserView: registry.register("UserView", V.UserView),
+  SessionView: registry.register("SessionView", V.SessionView),
+  MeResponse: registry.register("MeResponse", V.MeResponse),
   FarmView: registry.register("FarmView", V.FarmView),
   CreateFarmRequest: registry.register("CreateFarmRequest", V.CreateFarmRequest),
-  UpdateFarmRequest: registry.register("UpdateFarmRequest", V.UpdateFarmRequest),
+  ReplaceFarmRequest: registry.register("ReplaceFarmRequest", V.ReplaceFarmRequest),
   MembershipView: registry.register("MembershipView", V.MembershipView),
-  InviteMemberRequest: registry.register("InviteMemberRequest", V.InviteMemberRequest),
+  AddMemberRequest: registry.register("AddMemberRequest", V.AddMemberRequest),
+  UpdateMemberRequest: registry.register("UpdateMemberRequest", V.UpdateMemberRequest),
+  AcceptInviteRequest: registry.register("AcceptInviteRequest", V.AcceptInviteRequest),
   SyncPushRequest: registry.register("SyncPushRequest", V.SyncPushRequest),
   SyncChange: registry.register("SyncChange", V.SyncChange),
 };
@@ -71,78 +82,57 @@ registry.registerPath({
 });
 
 // ---- auth -----------------------------------------------------------------
-registry.registerPath({
-  method: "post",
-  path: `${API_PREFIX}/auth/register`,
-  tags: ["Auth"],
-  summary: "Create an account and its first farm",
-  request: { body: { content: { "application/json": { schema: S.RegisterRequest } } } },
-  responses: {
-    201: json(z.object({ user: S.UserView, farm: S.FarmView, tokens: S.TokenPair }), "Registered"),
-    400: errors[400],
-    409: json(S.ErrorEnvelope, "Email already registered"),
-    429: errors[429],
-  },
+const post = (path: string, summary: string, request: Parameters<typeof registry.registerPath>[0]["request"], responses: Parameters<typeof registry.registerPath>[0]["responses"], auth = false) =>
+  registry.registerPath({ method: "post", path: `${API_PREFIX}${path}`, tags: [path.startsWith("/auth") ? "Auth" : "Farms"], summary, ...(request ? { request } : {}), responses, ...(auth ? { security: secured } : {}) });
+const bodyOf = <T extends z.ZodTypeAny>(schema: T) => ({ body: { content: { "application/json": { schema } } } });
+const signedIn = z.object({ user: S.UserView, tokens: S.TokenPair });
+
+post("/auth/register", "Create an account and its first farm; sends a verification email", bodyOf(S.RegisterRequest), {
+  201: json(z.object({ user: S.UserView, farm: S.FarmView, tokens: S.TokenPair }), "Registered and signed in"),
+  400: errors[400],
+  409: json(S.ErrorEnvelope, "Email already registered"),
+  429: errors[429],
 });
-registry.registerPath({
-  method: "post",
-  path: `${API_PREFIX}/auth/login`,
-  tags: ["Auth"],
-  request: { body: { content: { "application/json": { schema: S.LoginRequest } } } },
-  responses: { 200: json(z.object({ user: S.UserView, tokens: S.TokenPair }), "Signed in"), 401: errors[401], 429: errors[429] },
+post("/auth/verify-email", "Confirm an email address with the emailed token", bodyOf(S.VerifyEmailRequest), { 200: json(z.object({ user: S.UserView }), "Verified"), 422: json(S.ErrorEnvelope, "Invalid or expired token") });
+post("/auth/resend-verification", "Send a new verification email", undefined, { 202: json(z.object({ sent: z.boolean() }), "Sent, or already verified"), 401: errors[401] }, true);
+post("/auth/login", "Sign in with email and password; starts a session", bodyOf(S.LoginRequest), {
+  200: json(signedIn, "Signed in"),
+  401: errors[401],
+  403: json(S.ErrorEnvelope, "Account disabled"),
+  429: json(S.ErrorEnvelope, "Rate limited or account temporarily locked"),
 });
-registry.registerPath({
-  method: "post",
-  path: `${API_PREFIX}/auth/refresh`,
-  tags: ["Auth"],
-  summary: "Rotate a refresh token",
-  request: { body: { content: { "application/json": { schema: S.RefreshRequest } } } },
-  responses: { 200: json(S.TokenPair, "New token pair"), 401: errors[401] },
+post("/auth/google", "Sign in with a Google ID token", bodyOf(S.GoogleLoginRequest), {
+  200: json(signedIn.extend({ created: z.boolean(), needsFarm: z.boolean() }), "Signed in"),
+  401: errors[401],
+  501: json(S.ErrorEnvelope, "Google sign-in not configured"),
 });
-registry.registerPath({
-  method: "get",
-  path: `${API_PREFIX}/auth/me`,
-  tags: ["Auth"],
-  security: secured,
-  responses: { 200: json(S.UserView, "Current user"), 401: errors[401] },
-});
+post("/auth/refresh", "Rotate a refresh token; reuse of an old token ends the session", bodyOf(S.RefreshRequest), { 200: json(S.TokenPair, "New token pair"), 401: errors[401] });
+post("/auth/logout", "End the current session (bearer token) or the session of a refresh token", bodyOf(S.LogoutRequest), { 204: { description: "Signed out" } });
+post("/auth/forgot-password", "Email a password reset link; never reveals whether the account exists", bodyOf(S.ForgotPasswordRequest), { 202: json(z.object({ message: z.string() }), "Accepted"), 429: errors[429] });
+post("/auth/reset-password", "Set a new password with an emailed token; signs out every session", bodyOf(S.ResetPasswordRequest), { 204: { description: "Password reset" }, 422: json(S.ErrorEnvelope, "Invalid or expired token") });
+post("/auth/change-password", "Change password; signs out every other session", bodyOf(S.ChangePasswordRequest), {
+  200: json(z.object({ otherSessionsSignedOut: z.number() }), "Changed"),
+  401: errors[401],
+  422: json(S.ErrorEnvelope, "Current password incorrect or unchanged"),
+}, true);
+
+// ---- me -------------------------------------------------------------------
+registry.registerPath({ method: "get", path: `${API_PREFIX}/me`, tags: ["Me"], security: secured, summary: "Signed-in user, current session and farm memberships", responses: { 200: json(S.MeResponse, "Current user"), 401: errors[401] } });
+registry.registerPath({ method: "get", path: `${API_PREFIX}/me/sessions`, tags: ["Me"], security: secured, summary: "Signed-in devices", responses: { 200: json(z.object({ items: z.array(S.SessionView) }), "Active sessions"), 401: errors[401] } });
+registry.registerPath({ method: "delete", path: `${API_PREFIX}/me/sessions`, tags: ["Me"], security: secured, summary: "Sign out every other device", responses: { 200: json(z.object({ revoked: z.number() }), "Revoked"), 401: errors[401] } });
+registry.registerPath({ method: "delete", path: `${API_PREFIX}/me/sessions/{sessionId}`, tags: ["Me"], security: secured, summary: "Sign out one device", request: { params: z.object({ sessionId: V.Id }) }, responses: { 204: { description: "Revoked" }, 401: errors[401], 404: errors[404] } });
 
 // ---- farms ----------------------------------------------------------------
-registry.registerPath({
-  method: "get",
-  path: `${API_PREFIX}/farms`,
-  tags: ["Farms"],
-  security: secured,
-  responses: { 200: json(z.object({ items: z.array(S.FarmView) }), "Farms I belong to"), 401: errors[401] },
-});
-registry.registerPath({
-  method: "post",
-  path: `${API_PREFIX}/farms`,
-  tags: ["Farms"],
-  security: secured,
-  request: { headers: idempotencyHeader, body: { content: { "application/json": { schema: S.CreateFarmRequest } } } },
-  responses: { 201: json(S.FarmView, "Farm created"), 400: errors[400], 401: errors[401] },
-});
-registry.registerPath({
-  method: "patch",
-  path: `${API_PREFIX}/farms/{farmId}`,
-  tags: ["Farms"],
-  security: secured,
-  request: { params: farmParams, headers: idempotencyHeader, body: { content: { "application/json": { schema: S.UpdateFarmRequest } } } },
-  responses: {
-    200: json(S.FarmView, "Updated"),
-    ...errors,
-    409: json(S.ErrorEnvelope, "Version conflict"),
-  },
-});
-registry.registerPath({
-  method: "post",
-  path: `${API_PREFIX}/farms/{farmId}/members`,
-  tags: ["Farms"],
-  security: secured,
-  request: { params: farmParams, headers: idempotencyHeader, body: { content: { "application/json": { schema: S.InviteMemberRequest } } } },
-  responses: { 201: json(S.MembershipView, "Invitation sent"), ...errors },
-});
+const memberParams = z.object({ farmId: V.Id, memberId: V.Id });
+registry.registerPath({ method: "get", path: `${API_PREFIX}/farms`, tags: ["Farms"], security: secured, responses: { 200: json(z.object({ items: z.array(S.FarmView) }), "Farms I belong to"), 401: errors[401] } });
+registry.registerPath({ method: "post", path: `${API_PREFIX}/farms`, tags: ["Farms"], security: secured, request: { headers: idempotencyHeader, ...bodyOf(S.CreateFarmRequest) }, responses: { 201: json(S.FarmView, "Farm created; you are its owner"), 400: errors[400], 401: errors[401] } });
+registry.registerPath({ method: "get", path: `${API_PREFIX}/farms/{farmId}`, tags: ["Farms"], security: secured, request: { params: farmParams }, responses: { 200: json(S.FarmView, "Farm with your role and permissions"), 401: errors[401], 404: errors[404] } });
+registry.registerPath({ method: "put", path: `${API_PREFIX}/farms/{farmId}`, tags: ["Farms"], security: secured, summary: "Replace editable farm fields (optimistic concurrency via version)", request: { params: farmParams, headers: idempotencyHeader, ...bodyOf(S.ReplaceFarmRequest) }, responses: { 200: json(S.FarmView, "Updated"), ...errors, 409: json(S.ErrorEnvelope, "Version conflict") } });
+registry.registerPath({ method: "get", path: `${API_PREFIX}/farms/{farmId}/members`, tags: ["Members"], security: secured, request: { params: farmParams }, responses: { 200: json(z.object({ items: z.array(S.MembershipView) }), "Members and pending invitations"), ...errors } });
+registry.registerPath({ method: "post", path: `${API_PREFIX}/farms/{farmId}/members`, tags: ["Members"], security: secured, summary: "Invite someone by email with a role below your own", request: { params: farmParams, headers: idempotencyHeader, ...bodyOf(S.AddMemberRequest) }, responses: { 201: json(S.MembershipView, "Invitation sent"), ...errors, 409: json(S.ErrorEnvelope, "Already a member") } });
+registry.registerPath({ method: "put", path: `${API_PREFIX}/farms/{farmId}/members/{memberId}`, tags: ["Members"], security: secured, summary: "Change a member's role", request: { params: memberParams, ...bodyOf(S.UpdateMemberRequest) }, responses: { 200: json(S.MembershipView, "Role changed"), ...errors, 422: json(S.ErrorEnvelope, "Would leave the farm without an owner") } });
+registry.registerPath({ method: "delete", path: `${API_PREFIX}/farms/{farmId}/members/{memberId}`, tags: ["Members"], security: secured, summary: "Remove a member, cancel an invitation, or leave the farm (your own id)", request: { params: memberParams }, responses: { 204: { description: "Removed" }, ...errors, 422: json(S.ErrorEnvelope, "Would leave the farm without an owner") } });
+post("/farms/invitations/accept", "Accept an emailed farm invitation", bodyOf(S.AcceptInviteRequest), { 200: json(S.MembershipView, "Joined"), 401: errors[401], 422: json(S.ErrorEnvelope, "Invalid or expired invitation") }, true);
 
 // ---- sync -----------------------------------------------------------------
 registry.registerPath({

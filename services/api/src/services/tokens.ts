@@ -10,16 +10,18 @@ export interface AccessTokenConfig {
 
 export interface AccessClaims {
   sub: string;
+  /** Session id; checked on every request so a revoked session stops working immediately. */
+  sid: string;
   jti: string;
 }
 
 export function createAccessTokens(cfg: AccessTokenConfig) {
   const key = new TextEncoder().encode(cfg.secret);
   return {
-    async sign(userId: string, now: Date): Promise<{ token: string; expiresAt: Date }> {
+    async sign(userId: string, sessionId: string, now: Date): Promise<{ token: string; expiresAt: Date }> {
       const iat = Math.floor(now.getTime() / 1000);
       const exp = iat + cfg.ttlSeconds;
-      const token = await new SignJWT({})
+      const token = await new SignJWT({ sid: sessionId })
         .setProtectedHeader({ alg: "HS256", typ: "JWT" })
         .setSubject(userId)
         .setJti(newId())
@@ -38,8 +40,9 @@ export function createAccessTokens(cfg: AccessTokenConfig) {
           algorithms: ["HS256"],
           ...(now ? { currentDate: now } : {}),
         });
-        if (!payload.sub || !payload.jti) throw new AppError("UNAUTHENTICATED", "Invalid access token");
-        return { sub: payload.sub, jti: payload.jti };
+        const sid = payload["sid"];
+        if (!payload.sub || !payload.jti || typeof sid !== "string") throw new AppError("UNAUTHENTICATED", "Invalid access token");
+        return { sub: payload.sub, sid, jti: payload.jti };
       } catch (e) {
         if (e instanceof joseErrors.JWTExpired) throw new AppError("TOKEN_EXPIRED", "Access token expired");
         if (e instanceof AppError) throw e;

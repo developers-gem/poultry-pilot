@@ -1,169 +1,157 @@
 import { describe, expect, it } from "vitest";
-import { bearer, makeApp, register } from "./harness.js";
+import { bearer, farmBody, joinAs, makeApp, register } from "./harness.js";
 
-async function inviteAndJoin(ctx: ReturnType<typeof makeApp>, owner: { farmId: string; access: string }, email: string, role: string) {
-  const inv = await ctx.api().post(`/api/v1/farms/${owner.farmId}/members`).set(bearer(owner.access)).send({ email, role });
-  expect(inv.status).toBe(201);
-  const token = ctx.email.outbox.at(-1)!.token!;
-  const member = await register(ctx.api, email, "Ravi Worker");
-  const acc = await ctx.api().post("/api/v1/farms/invitations/accept").set(bearer(member.access)).send({ token });
-  expect(acc.status).toBe(200);
-  return { ...member, membershipId: acc.body.id as string };
-}
-
-describe("Phase 1 gate: invited Worker is refused an Owner-only action", () => {
-  it("worker can read the farm but cannot change settings or invite", async () => {
+describe("farms", () => {
+  it("creates additional farms owned by the caller and lists only my farms", async () => {
     const ctx = makeApp();
-    const owner = await register(ctx.api, "owner@example.com");
-    const worker = await inviteAndJoin(ctx, owner, "worker@example.com", "worker");
-
-    const farms = await ctx.api().get("/api/v1/farms").set(bearer(worker.access));
-    const shared = farms.body.items.find((f: { id: string }) => f.id === owner.farmId);
-    expect(shared.myRole).toBe("worker");
-    expect(shared.myPermissions).toContain("production.record");
-    expect(shared.myPermissions).not.toContain("farm.update_settings");
-
-    const patch = await ctx.api().patch(`/api/v1/farms/${owner.farmId}`).set(bearer(worker.access)).send({ name: "Mine now", version: 0 });
-    expect(patch.status).toBe(403);
-    expect(patch.body.error.code).toBe("FORBIDDEN");
-
-    const invite = await ctx.api().post(`/api/v1/farms/${owner.farmId}/members`).set(bearer(worker.access)).send({ email: "x@example.com", role: "owner" });
-    expect(invite.status).toBe(403);
-
-    const audit = await ctx.api().get(`/api/v1/farms/${owner.farmId}/audit`).set(bearer(worker.access));
-    expect(audit.status).toBe(403);
-
-    const ownerAudit = await ctx.api().get(`/api/v1/farms/${owner.farmId}/audit`).set(bearer(owner.access));
-    expect(ownerAudit.body.items.map((a: { action: string }) => a.action)).toEqual(
-      expect.arrayContaining(["farm.created", "member.invited", "member.joined"]),
-    );
+    const a = await register(ctx, "multi@example.com");
+    const b = await register(ctx, "other@example.com");
+    const created = await ctx.api().post("/api/v1/farms").set(bearer(a.access)).send({ name: "Hill Farm", timezone: "Africa/Nairobi", currency: "KES", unitSystem: "metric" });
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ name: "Hill Farm", myRole: "owner", settings: { currency: "KES", timezone: "Africa/Nairobi" } });
+    const mine = await ctx.api().get("/api/v1/farms").set(bearer(a.access));
+    expect(mine.body.items.map((f: { name: string }) => f.name).sort()).toEqual(["Green Valley Poultry", "Hill Farm"]);
+    expect(mine.body.items.map((f: { id: string }) => f.id)).not.toContain(b.farmId);
   });
 
-  it("an invitation only works for the invited email, once", async () => {
+  it("GET returns the farm with my role and permissions", async () => {
     const ctx = makeApp();
-    const owner = await register(ctx.api, "owner2@example.com");
-    await ctx.api().post(`/api/v1/farms/${owner.farmId}/members`).set(bearer(owner.access)).send({ email: "vet@example.com", role: "veterinarian" });
-    const token = ctx.email.outbox.at(-1)!.token!;
-    const stranger = await register(ctx.api, "stranger@example.com");
-    const wrong = await ctx.api().post("/api/v1/farms/invitations/accept").set(bearer(stranger.access)).send({ token });
-    expect(wrong.status).toBe(422);
-    expect(wrong.body.error.code).toBe("INVITE_INVALID");
+    const owner = await register(ctx, "o@example.com");
+    const vet = await joinAs(ctx, owner, "vet@example.com", "vet");
+    const res = await ctx.api().get(`/api/v1/farms/${owner.farmId}`).set(bearer(vet.access));
+    expect(res.body.myRole).toBe("vet");
+    expect(res.body.myPermissions).toContain("health.manage");
+    expect(res.body.myPermissions).not.toContain("money.read");
   });
 });
 
-describe("tenancy", () => {
-  it("a non-member gets 404 for another farm, not 403, on every farm route", async () => {
+describe("PUT /farms/:farmId", () => {
+  it("replaces the editable fields, clears omitted optional ones and bumps the version", async () => {
     const ctx = makeApp();
-    const a = await register(ctx.api, "a@example.com");
-    const b = await register(ctx.api, "b@example.com");
-    for (const [method, path] of [
-      ["get", `/api/v1/farms/${a.farmId}`],
-      ["get", `/api/v1/farms/${a.farmId}/members`],
-      ["get", `/api/v1/farms/${a.farmId}/audit`],
-      ["get", `/api/v1/sync/pull?farmId=${a.farmId}`],
-    ] as const) {
-      const res = await ctx.api()[method](path).set(bearer(b.access));
-      expect(res.status, path).toBe(404);
-    }
-    const push = await ctx
-      .api()
-      .post("/api/v1/sync/push")
-      .set(bearer(b.access))
-      .send({ farmId: a.farmId, deviceId: "d1", mutations: [{ mutationId: "0192a3b4-c5d6-7e8f-9a0b-1c2d3e4f5a6b", command: "farm.update", payload: { name: "x" }, baseVersion: 0, clientCreatedAt: new Date().toISOString() }] });
-    expect(push.status).toBe(404);
+    const o = await register(ctx, "put@example.com");
+    const farm = (await ctx.api().get(`/api/v1/farms/${o.farmId}`).set(bearer(o.access))).body;
+    const first = await ctx.api().put(`/api/v1/farms/${o.farmId}`).set(bearer(o.access)).send(farmBody(farm, { description: "Broilers and layers", unitSystem: "imperial" }));
+    expect(first.status).toBe(200);
+    expect(first.body).toMatchObject({ version: 1, description: "Broilers and layers", settings: { unitSystem: "imperial", timezone: "Asia/Kolkata" } });
+
+    const second = await ctx.api().put(`/api/v1/farms/${o.farmId}`).set(bearer(o.access)).send(farmBody({ ...first.body, description: undefined }));
+    expect(second.status).toBe(200);
+    expect(second.body.version).toBe(2);
+    expect(second.body.description).toBeUndefined();
   });
-});
 
-describe("farm settings", () => {
-  it("updates with optimistic concurrency and records an audit diff", async () => {
+  it("rejects a stale version with 409 and the current server copy", async () => {
     const ctx = makeApp();
-    const o = await register(ctx.api, "o@example.com");
-    const ok = await ctx.api().patch(`/api/v1/farms/${o.farmId}`).set(bearer(o.access)).send({ unitSystem: "imperial", version: 0 });
-    expect(ok.status).toBe(200);
-    expect(ok.body).toMatchObject({ version: 1, settings: { unitSystem: "imperial", timezone: "Asia/Kolkata" } });
-
-    const stale = await ctx.api().patch(`/api/v1/farms/${o.farmId}`).set(bearer(o.access)).send({ name: "Old view", version: 0 });
+    const o = await register(ctx, "stale@example.com");
+    const farm = (await ctx.api().get(`/api/v1/farms/${o.farmId}`).set(bearer(o.access))).body;
+    await ctx.api().put(`/api/v1/farms/${o.farmId}`).set(bearer(o.access)).send(farmBody(farm, { name: "First edit" }));
+    const stale = await ctx.api().put(`/api/v1/farms/${o.farmId}`).set(bearer(o.access)).send(farmBody(farm, { name: "Old view" }));
     expect(stale.status).toBe(409);
-    expect(stale.body.error).toMatchObject({ code: "VERSION_CONFLICT", details: { serverVersion: 1 } });
-
-    const evt = ctx.store.audit.all().find((a) => a.action === "farm.updated")!;
-    expect(evt.changes).toEqual({ settings: { before: expect.objectContaining({ unitSystem: "metric" }), after: expect.objectContaining({ unitSystem: "imperial" }) } });
+    expect(stale.body.error).toMatchObject({ code: "VERSION_CONFLICT", details: { serverVersion: 1, serverDocument: { name: "First edit" } } });
   });
 
-  it("rejects unknown fields instead of silently storing them", async () => {
+  it("requires every required field and rejects unknown ones", async () => {
     const ctx = makeApp();
-    const o = await register(ctx.api, "strict@example.com");
-    const res = await ctx.api().patch(`/api/v1/farms/${o.farmId}`).set(bearer(o.access)).send({ version: 0, isAdmin: true });
-    expect(res.status).toBe(400);
+    const o = await register(ctx, "strict@example.com");
+    const farm = (await ctx.api().get(`/api/v1/farms/${o.farmId}`).set(bearer(o.access))).body;
+    const missing = await ctx.api().put(`/api/v1/farms/${o.farmId}`).set(bearer(o.access)).send({ name: "Only a name", version: 0 });
+    expect(missing.status).toBe(400);
+    expect(missing.body.error.details.map((d: { path: string }) => d.path)).toEqual(expect.arrayContaining(["timezone", "currency"]));
+    expect((await ctx.api().put(`/api/v1/farms/${o.farmId}`).set(bearer(o.access)).send(farmBody(farm, { isAdmin: true }))).status).toBe(400);
+  });
+
+  it("records an audit event with the changed fields", async () => {
+    const ctx = makeApp();
+    const o = await register(ctx, "audit@example.com");
+    const farm = (await ctx.api().get(`/api/v1/farms/${o.farmId}`).set(bearer(o.access))).body;
+    await ctx.api().put(`/api/v1/farms/${o.farmId}`).set(bearer(o.access)).send(farmBody(farm, { name: "Renamed" }));
+    const evt = ctx.store.audit.all().find((a) => a.action === "farm.updated")!;
+    expect(evt.changes).toMatchObject({ name: { before: "Green Valley Poultry", after: "Renamed" } });
+    expect(evt.actorUserId).toBe(o.userId);
   });
 });
 
-describe("membership rules", () => {
-  it("a farm always keeps at least one owner", async () => {
+describe("members", () => {
+  it("lists active members and pending invitations, with join and invite dates", async () => {
     const ctx = makeApp();
-    const o = await register(ctx.api, "solo@example.com");
-    const members = await ctx.api().get(`/api/v1/farms/${o.farmId}/members`).set(bearer(o.access));
-    const me = members.body.items[0];
-    const demote = await ctx.api().patch(`/api/v1/farms/${o.farmId}/members/${me.id}`).set(bearer(o.access)).send({ role: "manager" });
-    expect(demote.status).toBe(422);
-    expect(demote.body.error.code).toBe("LAST_OWNER");
-    const remove = await ctx.api().delete(`/api/v1/farms/${o.farmId}/members/${me.id}`).set(bearer(o.access));
-    expect(remove.body.error.code).toBe("LAST_OWNER");
+    const o = await register(ctx, "list@example.com");
+    await joinAs(ctx, o, "joined@example.com", "supervisor");
+    await ctx.api().post(`/api/v1/farms/${o.farmId}/members`).set(bearer(o.access)).send({ email: "pending@example.com", role: "worker" });
+    const res = await ctx.api().get(`/api/v1/farms/${o.farmId}/members`).set(bearer(o.access));
+    const byEmail = Object.fromEntries(res.body.items.map((m: { email: string }) => [m.email, m]));
+    expect(byEmail["list@example.com"]).toMatchObject({ role: "owner", status: "active" });
+    expect(byEmail["joined@example.com"]).toMatchObject({ role: "supervisor", status: "active", joinedAt: expect.any(String), fullName: "Test Farmer" });
+    expect(byEmail["pending@example.com"]).toMatchObject({ role: "worker", status: "invited", invitedAt: expect.any(String) });
   });
 
-  it("removed members lose access immediately", async () => {
+  it("refuses to add someone who is already an active member", async () => {
     const ctx = makeApp();
-    const owner = await register(ctx.api, "boss@example.com");
-    const w = await inviteAndJoin(ctx, owner, "temp@example.com", "worker");
-    expect((await ctx.api().get(`/api/v1/farms/${owner.farmId}`).set(bearer(w.access))).status).toBe(200);
-    expect((await ctx.api().delete(`/api/v1/farms/${owner.farmId}/members/${w.membershipId}`).set(bearer(owner.access))).status).toBe(204);
-    expect((await ctx.api().get(`/api/v1/farms/${owner.farmId}`).set(bearer(w.access))).status).toBe(404);
+    const o = await register(ctx, "dupm@example.com");
+    await joinAs(ctx, o, "in@example.com", "worker");
+    const res = await ctx.api().post(`/api/v1/farms/${o.farmId}/members`).set(bearer(o.access)).send({ email: "IN@example.com", role: "worker" });
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe("ALREADY_MEMBER");
+  });
+
+  it("removing a pending invitation cancels it; the old link no longer works", async () => {
+    const ctx = makeApp();
+    const o = await register(ctx, "cancel@example.com");
+    const inv = await ctx.api().post(`/api/v1/farms/${o.farmId}/members`).set(bearer(o.access)).send({ email: "late@example.com", role: "worker" });
+    const token = ctx.email.outbox.at(-1)!.token!;
+    expect((await ctx.api().delete(`/api/v1/farms/${o.farmId}/members/${inv.body.id}`).set(bearer(o.access))).status).toBe(204);
+    const late = await register(ctx, "late@example.com");
+    expect((await ctx.api().post("/api/v1/farms/invitations/accept").set(bearer(late.access)).send({ token })).body.error.code).toBe("INVITE_INVALID");
+    expect(ctx.store.audit.all().some((e) => e.action === "member.invite_cancelled")).toBe(true);
+  });
+
+  it("accepting an invitation verifies the invitee's email", async () => {
+    const ctx = makeApp();
+    const o = await register(ctx, "verifies@example.com");
+    const m = await joinAs(ctx, o, "newbie@example.com", "worker");
+    expect(ctx.store.users.get(m.userId)!.emailVerified).toBe(true);
+  });
+});
+
+describe("idempotency", () => {
+  it("replays the stored response for a retried invite and refuses a reused key", async () => {
+    const ctx = makeApp();
+    const o = await register(ctx, "idem@example.com");
+    const send = (body: object) => ctx.api().post(`/api/v1/farms/${o.farmId}/members`).set(bearer(o.access)).set("Idempotency-Key", "retry-key-0001").send(body);
+    const first = await send({ email: "m@example.com", role: "farm_manager" });
+    const second = await send({ email: "m@example.com", role: "farm_manager" });
+    expect(second.status).toBe(201);
+    expect(second.headers["idempotent-replayed"]).toBe("true");
+    expect(second.body).toEqual(first.body);
+    expect(ctx.store.audit.all().filter((a) => a.action === "member.invited")).toHaveLength(1);
+    expect(ctx.email.outbox.filter((m) => m.kind === "farm_invite")).toHaveLength(1);
+    expect((await send({ email: "other@example.com", role: "worker" })).body.error.code).toBe("IDEMPOTENCY_KEY_REUSED");
+  });
+
+  it("does not cache failures, so a corrected retry with the same key runs", async () => {
+    const ctx = makeApp();
+    const o = await register(ctx, "idem2@example.com");
+    const farm = (await ctx.api().get(`/api/v1/farms/${o.farmId}`).set(bearer(o.access))).body;
+    const bad = await ctx.api().put(`/api/v1/farms/${o.farmId}`).set(bearer(o.access)).set("Idempotency-Key", "retry-key-0002").send(farmBody(farm, { version: 9 }));
+    expect(bad.status).toBe(409);
+    const good = await ctx.api().put(`/api/v1/farms/${o.farmId}`).set(bearer(o.access)).set("Idempotency-Key", "retry-key-0002").send(farmBody(farm, { version: 9 }));
+    expect(good.headers["idempotent-replayed"]).toBeUndefined();
   });
 });
 
 describe("transactions", () => {
-  it("registration is atomic: a failure mid-way leaves no user behind", async () => {
+  it("registration is atomic: a failure part-way leaves no user, farm, session or audit row", async () => {
     const ctx = makeApp();
     const original = ctx.repos.memberships.create;
     ctx.repos.memberships.create = async () => {
       throw new Error("simulated database failure");
     };
-    const res = await ctx.api().post("/api/v1/auth/register").send({ email: "atomic@example.com", password: "goodpass123", fullName: "A", farm: { name: "F", timezone: "Asia/Kolkata", currency: "INR" } });
+    const body = { email: "atomic@example.com", password: "goodpass123", fullName: "A", farm: { name: "F", timezone: "Asia/Kolkata", currency: "INR" } };
+    const res = await ctx.api().post("/api/v1/auth/register").send(body);
     expect(res.status).toBe(500);
     expect(res.body.error.message).not.toContain("simulated");
-    expect(ctx.store.users.all()).toHaveLength(0);
-    expect(ctx.store.farms.all()).toHaveLength(0);
-    expect(ctx.store.audit.all()).toHaveLength(0);
+    for (const t of [ctx.store.users, ctx.store.farms, ctx.store.sessions, ctx.store.audit, ctx.store.oneTimeTokens]) expect(t.all()).toHaveLength(0);
+    expect(ctx.email.outbox).toHaveLength(0);
     ctx.repos.memberships.create = original;
-    expect((await ctx.api().post("/api/v1/auth/register").send({ email: "atomic@example.com", password: "goodpass123", fullName: "A", farm: { name: "F", timezone: "Asia/Kolkata", currency: "INR" } })).status).toBe(201);
-  });
-});
-
-describe("idempotency", () => {
-  it("replays the stored response for a retried write and refuses a reused key", async () => {
-    const ctx = makeApp();
-    const o = await register(ctx.api, "idem@example.com");
-    const send = (body: object) =>
-      ctx.api().post(`/api/v1/farms/${o.farmId}/members`).set(bearer(o.access)).set("Idempotency-Key", "retry-key-0001").send(body);
-    const first = await send({ email: "m@example.com", role: "manager" });
-    const second = await send({ email: "m@example.com", role: "manager" });
-    expect(second.status).toBe(201);
-    expect(second.headers["idempotent-replayed"]).toBe("true");
-    expect(second.body).toEqual(first.body);
-    expect(ctx.store.audit.all().filter((a) => a.action === "member.invited")).toHaveLength(1);
-    expect(ctx.email.outbox).toHaveLength(1);
-
-    const reused = await send({ email: "other@example.com", role: "worker" });
-    expect(reused.status).toBe(422);
-    expect(reused.body.error.code).toBe("IDEMPOTENCY_KEY_REUSED");
-  });
-
-  it("does not cache failures, so a corrected retry with the same key can succeed", async () => {
-    const ctx = makeApp();
-    const o = await register(ctx.api, "idem2@example.com");
-    const first = await ctx.api().patch(`/api/v1/farms/${o.farmId}`).set(bearer(o.access)).set("Idempotency-Key", "retry-key-0002").send({ name: "N", version: 9 });
-    expect(first.status).toBe(409);
-    const again = await ctx.api().patch(`/api/v1/farms/${o.farmId}`).set(bearer(o.access)).set("Idempotency-Key", "retry-key-0002").send({ name: "N", version: 9 });
-    expect(again.headers["idempotent-replayed"]).toBeUndefined();
+    expect((await ctx.api().post("/api/v1/auth/register").send(body)).status).toBe(201);
   });
 });

@@ -4,7 +4,7 @@ export interface EmailMessage {
   to: string;
   subject: string;
   text: string;
-  kind: "password_reset" | "farm_invite" | "email_verification";
+  kind: "password_reset" | "password_changed" | "farm_invite" | "email_verification";
   /** Raw token, for adapters that template links. Never logged. */
   token?: string;
 }

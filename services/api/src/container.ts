@@ -1,4 +1,4 @@
-import { UpdateFarmRequest } from "@poultrypilot/validation";
+import { ReplaceFarmRequest } from "@poultrypilot/validation";
 import type { Logger } from "pino";
 import { AppError } from "./lib/errors.js";
 import { systemClock, type Clock } from "./lib/util.js";
@@ -22,6 +22,9 @@ export interface ContainerConfig {
   jwtIssuer: string;
   accessTtlSeconds: number;
   refreshTtlDays: number;
+  sessionMaxDays: number;
+  maxFailedLogins: number;
+  lockMinutes: number;
   appBaseUrl: string;
   corsOrigins: string[];
   authRateLimitPerMinute: number;
@@ -53,6 +56,9 @@ export function buildContainer(d: ContainerDeps) {
     email: d.email,
     ...(d.google ? { google: d.google } : {}),
     refreshTtlDays: d.config.refreshTtlDays,
+    sessionMaxDays: d.config.sessionMaxDays,
+    maxFailedLogins: d.config.maxFailedLogins,
+    lockMinutes: d.config.lockMinutes,
     appBaseUrl: d.config.appBaseUrl,
   });
   const farms = createFarmService({ repos: d.repos, clock, audit, sync, email: d.email, auth, appBaseUrl: d.config.appBaseUrl });
@@ -60,10 +66,10 @@ export function buildContainer(d: ContainerDeps) {
   // Offline commands. Each maps to the same service method the REST route uses.
   sync.register("farm.update", {
     action: "farm.update_settings",
-    schema: UpdateFarmRequest.omit({ version: true }),
+    schema: ReplaceFarmRequest.omit({ version: true }),
     async run(ctx, payload, meta) {
       if (meta.baseVersion === undefined) throw new AppError("VALIDATION_FAILED", "baseVersion is required for farm.update");
-      const out = await farms.update(ctx, { ...payload, version: meta.baseVersion });
+      const out = await farms.replace(ctx, { ...payload, version: meta.baseVersion });
       return { entityId: out.id, version: out.version };
     },
   });

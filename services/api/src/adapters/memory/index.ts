@@ -3,9 +3,10 @@ import type {
   FarmRecord,
   IdempotencyRecord,
   MembershipRecord,
-  PasswordResetRecord,
+  OneTimeTokenRecord,
   ProcessedMutationRecord,
   RefreshTokenRecord,
+  SessionRecord,
   SyncChangeRecord,
   UserRecord,
 } from "../../ports/records.js";
@@ -42,8 +43,9 @@ class Table<T> {
 
 export interface MemoryStore {
   users: Table<UserRecord>;
+  sessions: Table<SessionRecord>;
   refreshTokens: Table<RefreshTokenRecord>;
-  passwordResets: Table<PasswordResetRecord>;
+  oneTimeTokens: Table<OneTimeTokenRecord>;
   farms: Table<FarmRecord>;
   memberships: Table<MembershipRecord>;
   audit: Table<AuditEventRecord>;
@@ -56,8 +58,9 @@ export interface MemoryStore {
 export function createMemoryRepositories(): { repos: Repositories; store: MemoryStore } {
   const store: MemoryStore = {
     users: new Table(),
+    sessions: new Table(),
     refreshTokens: new Table(),
-    passwordResets: new Table(),
+    oneTimeTokens: new Table(),
     farms: new Table(),
     memberships: new Table(),
     audit: new Table(),
@@ -68,8 +71,9 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
   };
   const transactional = [
     store.users,
+    store.sessions,
     store.refreshTokens,
-    store.passwordResets,
+    store.oneTimeTokens,
     store.farms,
     store.memberships,
     store.audit,
@@ -119,6 +123,35 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
         return clone(next);
       },
     },
+    sessions: {
+      async create(rec) {
+        store.sessions.put(rec.id, rec);
+      },
+      async findById(id) {
+        return store.sessions.get(id);
+      },
+      async listForUser(userId) {
+        return store.sessions.all().filter((x) => x.userId === userId);
+      },
+      async touch(id, at) {
+        const cur = store.sessions.get(id);
+        if (cur) store.sessions.put(id, { ...cur, lastUsedAt: at });
+      },
+      async revoke(id, at, reason) {
+        const cur = store.sessions.get(id);
+        if (cur && !cur.revokedAt) store.sessions.put(id, { ...cur, revokedAt: at, revokedReason: reason });
+      },
+      async revokeAllForUser(userId, at, reason, exceptId) {
+        let n = 0;
+        for (const x of store.sessions.all()) {
+          if (x.userId === userId && !x.revokedAt && x.id !== exceptId) {
+            store.sessions.put(x.id, { ...x, revokedAt: at, revokedReason: reason });
+            n++;
+          }
+        }
+        return n;
+      },
+    },
     refreshTokens: {
       async create(rec) {
         store.refreshTokens.put(rec.id, rec);
@@ -130,25 +163,21 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
         const cur = store.refreshTokens.get(id);
         if (cur) store.refreshTokens.put(id, { ...cur, ...patch });
       },
-      async revokeFamily(familyId, at) {
-        for (const r of store.refreshTokens.all())
-          if (r.familyId === familyId && !r.revokedAt) store.refreshTokens.put(r.id, { ...r, revokedAt: at });
-      },
-      async revokeAllForUser(userId, at) {
-        for (const r of store.refreshTokens.all())
-          if (r.userId === userId && !r.revokedAt) store.refreshTokens.put(r.id, { ...r, revokedAt: at });
-      },
     },
-    passwordResets: {
+    oneTimeTokens: {
       async create(rec) {
-        store.passwordResets.put(rec.id, rec);
+        store.oneTimeTokens.put(rec.id, rec);
       },
       async findByHash(h) {
-        return store.passwordResets.all().find((r) => r.tokenHash === h) ?? null;
+        return store.oneTimeTokens.all().find((r) => r.tokenHash === h) ?? null;
       },
       async markUsed(id, at) {
-        const cur = store.passwordResets.get(id);
-        if (cur) store.passwordResets.put(id, { ...cur, usedAt: at });
+        const cur = store.oneTimeTokens.get(id);
+        if (cur) store.oneTimeTokens.put(id, { ...cur, usedAt: at });
+      },
+      async invalidateForUser(userId, purpose, at) {
+        for (const r of store.oneTimeTokens.all())
+          if (r.userId === userId && r.purpose === purpose && !r.usedAt) store.oneTimeTokens.put(r.id, { ...r, usedAt: at });
       },
     },
     farms: {

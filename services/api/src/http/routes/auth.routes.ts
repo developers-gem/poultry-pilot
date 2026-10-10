@@ -1,50 +1,65 @@
 import {
+  ChangePasswordRequest,
+  ForgotPasswordRequest,
   GoogleLoginRequest,
   LoginRequest,
-  PasswordResetConfirm,
-  PasswordResetRequest,
+  LogoutRequest,
   RefreshRequest,
   RegisterRequest,
+  ResetPasswordRequest,
+  VerifyEmailRequest,
 } from "@poultrypilot/validation";
 import { Router, type Request, type RequestHandler } from "express";
-import type { AuthService } from "../../services/auth.service.js";
-import type { AccessTokens } from "../../services/tokens.js";
-import { authenticate, validate } from "../middleware/core.js";
+import type { AuthService, ClientMeta } from "../../services/auth.service.js";
+import { authenticate, authenticateOptional, validate } from "../middleware/core.js";
 
-const meta = (req: Request) => ({
+export const clientMeta = (req: Request): ClientMeta => ({
   requestId: req.requestId,
   ...(req.header("user-agent") ? { userAgent: req.header("user-agent")! } : {}),
   ...(req.ip ? { ip: req.ip } : {}),
+  ...((req.body as { device?: ClientMeta["device"] } | undefined)?.device ? { device: (req.body as { device: ClientMeta["device"] }).device } : {}),
 });
 
-export function authRoutes(auth: AuthService, tokens: AccessTokens, limiter: RequestHandler): Router {
+/**
+ * /api/v1/auth — public endpoints are rate limited per IP (`limiter`); password checks are additionally
+ * limited per account by the lockout in AuthService.login.
+ */
+export function authRoutes(auth: AuthService, limiter: RequestHandler): Router {
   const r = Router();
+  const authed = authenticate(auth);
+
   r.post("/register", limiter, validate("body", RegisterRequest), async (req, res) => {
-    res.status(201).json(await auth.register(req.body, meta(req)));
+    res.status(201).json(await auth.register(req.body, clientMeta(req)));
+  });
+  r.post("/verify-email", limiter, validate("body", VerifyEmailRequest), async (req, res) => {
+    res.json({ user: await auth.verifyEmail(req.body.token, clientMeta(req)) });
+  });
+  r.post("/resend-verification", limiter, authed, async (req, res) => {
+    res.status(202).json(await auth.resendVerification(req.auth!.userId));
   });
   r.post("/login", limiter, validate("body", LoginRequest), async (req, res) => {
-    res.json(await auth.login(req.body.email, req.body.password, meta(req)));
+    res.json(await auth.login(req.body.email, req.body.password, clientMeta(req)));
   });
   r.post("/google", limiter, validate("body", GoogleLoginRequest), async (req, res) => {
-    res.json(await auth.loginWithGoogle(req.body.idToken, meta(req)));
+    res.json(await auth.loginWithGoogle(req.body.idToken, clientMeta(req)));
   });
   r.post("/refresh", limiter, validate("body", RefreshRequest), async (req, res) => {
-    res.json(await auth.refresh(req.body.refreshToken, meta(req)));
+    res.json(await auth.refresh(req.body.refreshToken, clientMeta(req)));
   });
-  r.post("/logout", validate("body", RefreshRequest), async (req, res) => {
-    await auth.logout(req.body.refreshToken);
+  r.post("/logout", authenticateOptional(auth), validate("body", LogoutRequest), async (req, res) => {
+    await auth.logout({ ...(req.body.refreshToken ? { refreshToken: req.body.refreshToken } : {}), ...(req.auth ? { principal: req.auth } : {}) }, clientMeta(req));
     res.status(204).end();
   });
-  r.post("/password-reset", limiter, validate("body", PasswordResetRequest), async (req, res) => {
-    await auth.requestPasswordReset(req.body.email);
+  r.post("/forgot-password", limiter, validate("body", ForgotPasswordRequest), async (req, res) => {
+    await auth.forgotPassword(req.body.email);
     res.status(202).json({ message: "If an account exists for that email, a reset link has been sent." });
   });
-  r.post("/password-reset/confirm", limiter, validate("body", PasswordResetConfirm), async (req, res) => {
-    await auth.confirmPasswordReset(req.body.token, req.body.newPassword, meta(req));
+  r.post("/reset-password", limiter, validate("body", ResetPasswordRequest), async (req, res) => {
+    await auth.resetPassword(req.body.token, req.body.newPassword, clientMeta(req));
     res.status(204).end();
   });
-  r.get("/me", authenticate(tokens), async (req, res) => {
-    res.json(await auth.me(req.auth!.userId));
+  r.post("/change-password", limiter, authed, validate("body", ChangePasswordRequest), async (req, res) => {
+    res.json(await auth.changePassword(req.auth!, req.body.currentPassword, req.body.newPassword, clientMeta(req)));
   });
   return r;
 }

@@ -67,8 +67,11 @@ export const BIOSECURITY_ENTRY_TYPES = [
 ] as const;
 export const ALERT_SEVERITIES = ["info", "warning", "critical"] as const;
 export const CONTENT_KINDS = ["lesson", "article", "glossary_term", "news", "disease_notice"] as const;
-export const ROLES = ["owner", "manager", "worker", "veterinarian", "accountant"] as const;
+/** Farm roles, highest authority first. Display names: Owner, Admin, Farm manager, Supervisor, Worker, Accountant, Vet. */
+export const ROLES = ["owner", "admin", "farm_manager", "supervisor", "worker", "accountant", "vet"] as const;
 export const MEMBERSHIP_STATUSES = ["invited", "active", "revoked"] as const;
+export const USER_STATUSES = ["active", "disabled"] as const;
+export const SESSION_PLATFORMS = ["web", "android", "ios", "other"] as const;
 export const UNIT_SYSTEMS = ["metric", "imperial"] as const;
 
 export type Species = (typeof SPECIES)[number];
@@ -90,4 +93,6 @@ export type AlertSeverity = (typeof ALERT_SEVERITIES)[number];
 export type ContentKind = (typeof CONTENT_KINDS)[number];
 export type Role = (typeof ROLES)[number];
 export type MembershipStatus = (typeof MEMBERSHIP_STATUSES)[number];
+export type UserStatus = (typeof USER_STATUSES)[number];
+export type SessionPlatform = (typeof SESSION_PLATFORMS)[number];
 export type UnitSystem = (typeof UNIT_SYSTEMS)[number];

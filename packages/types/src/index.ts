@@ -24,6 +24,8 @@ export type {
   Role,
   MembershipStatus,
   UnitSystem,
+  UserStatus,
+  SessionPlatform,
   ErrorCode,
   Action,
 } from "@poultrypilot/constants";

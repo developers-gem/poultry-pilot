@@ -3,9 +3,10 @@ import type {
   FarmRecord,
   IdempotencyRecord,
   MembershipRecord,
-  PasswordResetRecord,
+  OneTimeTokenRecord,
   ProcessedMutationRecord,
   RefreshTokenRecord,
+  SessionRecord,
   SyncChangeRecord,
   UserRecord,
 } from "./records.js";
@@ -30,18 +31,28 @@ export interface UsersRepo {
   update(id: string, patch: Partial<UserRecord>, tx?: Tx): Promise<UserRecord | null>;
 }
 
+export interface SessionsRepo {
+  create(rec: SessionRecord, tx?: Tx): Promise<void>;
+  findById(id: string, tx?: Tx): Promise<SessionRecord | null>;
+  listForUser(userId: string, tx?: Tx): Promise<SessionRecord[]>;
+  touch(id: string, at: Date, tx?: Tx): Promise<void>;
+  revoke(id: string, at: Date, reason: NonNullable<SessionRecord["revokedReason"]>, tx?: Tx): Promise<void>;
+  /** Revokes every active session of a user, optionally keeping one (the caller's own). */
+  revokeAllForUser(userId: string, at: Date, reason: NonNullable<SessionRecord["revokedReason"]>, exceptId?: string, tx?: Tx): Promise<number>;
+}
+
 export interface RefreshTokensRepo {
   create(rec: RefreshTokenRecord, tx?: Tx): Promise<void>;
   findByHash(tokenHash: string, tx?: Tx): Promise<RefreshTokenRecord | null>;
   update(id: string, patch: Partial<RefreshTokenRecord>, tx?: Tx): Promise<void>;
-  revokeFamily(familyId: string, at: Date, tx?: Tx): Promise<void>;
-  revokeAllForUser(userId: string, at: Date, tx?: Tx): Promise<void>;
 }
 
-export interface PasswordResetsRepo {
-  create(rec: PasswordResetRecord, tx?: Tx): Promise<void>;
-  findByHash(tokenHash: string, tx?: Tx): Promise<PasswordResetRecord | null>;
+export interface OneTimeTokensRepo {
+  create(rec: OneTimeTokenRecord, tx?: Tx): Promise<void>;
+  findByHash(tokenHash: string, tx?: Tx): Promise<OneTimeTokenRecord | null>;
   markUsed(id: string, at: Date, tx?: Tx): Promise<void>;
+  /** Invalidates every unused token of a purpose for a user (e.g. older reset links once one is used). */
+  invalidateForUser(userId: string, purpose: OneTimeTokenRecord["purpose"], at: Date, tx?: Tx): Promise<void>;
 }
 
 export interface FarmsRepo {
@@ -95,8 +106,9 @@ export interface LedgerProbe {
 export interface Repositories {
   tx: TxRunner;
   users: UsersRepo;
+  sessions: SessionsRepo;
   refreshTokens: RefreshTokensRepo;
-  passwordResets: PasswordResetsRepo;
+  oneTimeTokens: OneTimeTokensRepo;
   farms: FarmsRepo;
   memberships: MembershipsRepo;
   audit: AuditRepo;

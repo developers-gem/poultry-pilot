@@ -32,6 +32,9 @@ const Env = z
     JWT_ISSUER: z.string().default("poultrypilot-api"),
     ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(900),
     REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).max(180).default(30),
+    SESSION_MAX_DAYS: z.coerce.number().int().min(1).max(365).default(90),
+    LOGIN_MAX_FAILED_ATTEMPTS: z.coerce.number().int().min(3).max(100).default(10),
+    LOGIN_LOCK_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
 
     CORS_ORIGINS: csv("http://localhost:5173"),
     RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(300),

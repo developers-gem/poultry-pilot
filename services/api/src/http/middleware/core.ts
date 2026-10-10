@@ -1,15 +1,15 @@
-import { can, type Action } from "@poultrypilot/constants";
+import { can, type Action, type Role } from "@poultrypilot/constants";
 import { DomainError } from "../../domain/index.js";
 import type { ErrorRequestHandler, NextFunction, Request, RequestHandler, Response } from "express";
 import type { Logger } from "pino";
 import { ZodError, type ZodTypeAny } from "zod";
-import { AppError, forbidden } from "../../lib/errors.js";
+import { AppError, forbidden, notFound } from "../../lib/errors.js";
 import { newId, sha256 } from "../../lib/util.js";
 import type { IdempotencyRepo } from "../../ports/repositories.js";
 import type { RequestContext } from "../../services/context.js";
 import type { FarmService } from "../../services/farm.service.js";
 import { VersionConflict } from "../../services/sync.service.js";
-import type { AccessTokens } from "../../services/tokens.js";
+import type { AuthService } from "../../services/auth.service.js";
 import "../types.js";
 
 export const requestId: RequestHandler = (req, res, next) => {
@@ -21,26 +21,40 @@ export const requestId: RequestHandler = (req, res, next) => {
 
 export const ctxOf = (req: Request): RequestContext => ({
   userId: req.auth!.userId,
+  sessionId: req.auth!.sessionId,
   requestId: req.requestId,
   ...(req.header("x-device-id") ? { deviceId: req.header("x-device-id")!.slice(0, 100) } : {}),
 });
 
-export function authenticate(tokens: AccessTokens): RequestHandler {
+/**
+ * 1. authenticate — a valid access token whose session is still active and whose user is not disabled.
+ *    The session check runs on every request, so signing out a device takes effect immediately.
+ */
+export function authenticate(auth: Pick<AuthService, "authenticateAccess">): RequestHandler {
   return async (req, _res, next) => {
     const h = req.header("authorization");
     if (!h?.startsWith("Bearer ")) return next(new AppError("UNAUTHENTICATED", "Sign in required"));
-    const claims = await tokens.verify(h.slice(7));
-    req.auth = { userId: claims.sub };
+    req.auth = await auth.authenticateAccess(h.slice(7));
+    next();
+  };
+}
+
+/** Like authenticate, but lets anonymous requests through (used by logout, which accepts a refresh token instead). */
+export function authenticateOptional(auth: Pick<AuthService, "authenticateAccess">): RequestHandler {
+  return async (req, _res, next) => {
+    const h = req.header("authorization");
+    if (h?.startsWith("Bearer ")) req.auth = await auth.authenticateAccess(h.slice(7));
     next();
   };
 }
 
 /**
- * Loads the caller's membership for the farm in the URL (or body, for sync push) and
- * attaches a FarmContext. Every farm route goes through this — tenancy cannot be skipped.
+ * 2. requireFarm — the caller is an ACTIVE member of the farm named in the URL (or body/query for sync).
+ *    Non-members get 404, never 403, so the existence of a farm id is not revealed.
  */
-export function farmAccess(farms: FarmService, from: "params" | "body" | "query" = "params"): RequestHandler {
+export function requireFarm(farms: Pick<FarmService, "resolveContext">, from: "params" | "body" | "query" = "params"): RequestHandler {
   return async (req, _res, next) => {
+    if (!req.auth) return next(new AppError("INTERNAL", "authenticate must run before requireFarm"));
     const src = (from === "params" ? req.params : from === "body" ? req.body : req.query) as Record<string, unknown> | undefined;
     const farmId = typeof src?.["farmId"] === "string" ? (src["farmId"] as string).toLowerCase() : "";
     if (!farmId) return next(new AppError("VALIDATION_FAILED", "farmId is required"));
@@ -49,10 +63,36 @@ export function farmAccess(farms: FarmService, from: "params" | "body" | "query"
   };
 }
 
+/** 3a. requireRole — the caller's role on this farm is one of `roles`. Prefer requirePermission for features. */
+export function requireRole(...roles: Role[]): RequestHandler {
+  return (req, _res, next) => {
+    if (!req.farmCtx) return next(new AppError("INTERNAL", "requireFarm must run before requireRole"));
+    if (!roles.includes(req.farmCtx.role)) return next(forbidden(`This needs one of these roles: ${roles.join(", ")}`));
+    next();
+  };
+}
+
+/** 3b. requirePermission — the caller's role grants `action` (see ROLE_PERMISSIONS). */
 export function requirePermission(action: Action): RequestHandler {
   return (req, _res, next) => {
-    if (!req.farmCtx) return next(new AppError("INTERNAL", "farmAccess must run before requirePermission"));
+    if (!req.farmCtx) return next(new AppError("INTERNAL", "requireFarm must run before requirePermission"));
     if (!can(req.farmCtx.role, action)) return next(forbidden(`Your role (${req.farmCtx.role}) cannot perform ${action}`));
+    next();
+  };
+}
+
+/**
+ * 4. requireFarmResource — the record named in the URL belongs to the caller's farm.
+ *    The loader receives the farm id from requireFarm and must query WITHIN that farm, so an id from another
+ *    farm is simply not found (404). The loaded record is passed to the handler as req.resources[name].
+ */
+export function requireFarmResource<T>(name: string, param: string, loader: (farmId: string, id: string) => Promise<T | null>, label = name): RequestHandler {
+  return async (req, _res, next) => {
+    if (!req.farmCtx) return next(new AppError("INTERNAL", "requireFarm must run before requireFarmResource"));
+    const id = req.params[param];
+    const rec = typeof id === "string" ? await loader(req.farmCtx.farmId, id.toLowerCase()) : null;
+    if (!rec) return next(notFound(label));
+    req.resources = { ...req.resources, [name]: rec };
     next();
   };
 }

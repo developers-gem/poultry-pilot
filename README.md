@@ -117,4 +117,25 @@ Only `*.example` files are committed. Real values go in:
 | Graceful shutdown | `services/api/src/server.ts` |
 | OpenAPI contract | `packages/contracts/src/openapi.ts` |
 
-Phase 1 auth, farm membership, RBAC, audit and sync endpoints are also present. Business modules (flocks, production, feed, health, money, market) are not implemented yet.
+## Authentication and farms
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| POST | `/api/v1/auth/register` | Account + first farm + session; sends a verification email |
+| POST | `/api/v1/auth/verify-email`, `/auth/resend-verification` | Email verification |
+| POST | `/api/v1/auth/login`, `/auth/google` | Starts a session; per-account lockout after repeated failures |
+| POST | `/api/v1/auth/refresh` | Rotates the refresh token; reuse ends the session |
+| POST | `/api/v1/auth/logout` | Ends the current session |
+| POST | `/api/v1/auth/forgot-password`, `/auth/reset-password` | Emailed single-use reset link; signs out all devices |
+| POST | `/api/v1/auth/change-password` | Signs out other devices |
+| GET | `/api/v1/me` | User, current session, farm memberships with permissions |
+| GET / DELETE | `/api/v1/me/sessions`, `/me/sessions/:sessionId` | Signed-in devices |
+| GET / POST | `/api/v1/farms` | My farms / create a farm (you become owner) |
+| GET / PUT | `/api/v1/farms/:farmId` | PUT replaces editable fields; requires `version` |
+| GET / POST | `/api/v1/farms/:farmId/members` | Members and invitations / invite by email |
+| PUT / DELETE | `/api/v1/farms/:farmId/members/:memberId` | Change role / remove, cancel invitation, or leave |
+| POST | `/api/v1/farms/invitations/accept` | Accept an emailed invitation |
+
+Roles: owner, admin, farm_manager, supervisor, worker, accountant, vet. Every farm route checks: signed in → active member of that farm → role permits the action → the record belongs to that farm. Full design, permission table and hierarchy rules: `docs/auth.md`.
+
+Business modules (flocks, production, feed, health, money, market) are not implemented yet.
