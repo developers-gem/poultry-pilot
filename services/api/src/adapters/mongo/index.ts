@@ -24,7 +24,15 @@ import {
   SessionModel,
   SyncChangeModel,
   UserModel,
+  HouseModel,
+  FlockModel,
+  FlockEventModel,
+  DailyRecordModel,
+  BirdWeightModel,
+  FeedConsumptionModel,
+  WaterRecordModel,
 } from "./models/index.js";
+import { createMongoFarmRepo } from "./farm-repo.js";
 
 /**
  * MongoDB repositories. Requires a replica set (Atlas, or `mongod --replSet`) for transactions.
@@ -233,5 +241,12 @@ export function createMongoRepositories(connection = mongoose.connection): Repos
         return false; // Phase 3: query ledger_entries
       },
     },
+    houses: createMongoFarmRepo(HouseModel, { softDelete: true, versioned: true }),
+    flocks: createMongoFarmRepo(FlockModel, { softDelete: true, versioned: true }),
+    flockEvents: createMongoFarmRepo(FlockEventModel, { softDelete: false, versioned: false }),
+    dailyRecords: createMongoFarmRepo(DailyRecordModel, { softDelete: true, versioned: true }),
+    birdWeights: createMongoFarmRepo(BirdWeightModel, { softDelete: true, versioned: true }),
+    feedConsumption: createMongoFarmRepo(FeedConsumptionModel, { softDelete: true, versioned: true }),
+    waterRecords: createMongoFarmRepo(WaterRecordModel, { softDelete: true, versioned: true }),
   };
 }

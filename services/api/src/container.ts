@@ -1,4 +1,5 @@
-import { ReplaceFarmRequest } from "@poultrypilot/validation";
+import { CullRequest, DailyRecordRequest, Id, LocalDate, MortalityRequest, ReplaceFarmRequest, WeighingRequest } from "@poultrypilot/validation";
+import { z } from "zod";
 import type { Logger } from "pino";
 import { AppError } from "./lib/errors.js";
 import { systemClock, type Clock } from "./lib/util.js";
@@ -8,6 +9,8 @@ import type { Repositories } from "./ports/repositories.js";
 import { createAuditService } from "./services/audit.service.js";
 import { createAuthService } from "./services/auth.service.js";
 import { createFarmService } from "./services/farm.service.js";
+import { createFlockService } from "./services/flock.service.js";
+import { createHouseService } from "./services/house.service.js";
 import { createSyncService } from "./services/sync.service.js";
 import { createAccessTokens } from "./services/tokens.js";
 
@@ -74,7 +77,48 @@ export function buildContainer(d: ContainerDeps) {
     },
   });
 
-  return { ...d, clock, startedAt: clock.now(), accessTokens, audit, sync, auth, farms };
+  const houses = createHouseService({ repos: d.repos, clock, audit, sync });
+  const flocks = createFlockService({ repos: d.repos, clock, audit, sync });
+
+  // Offline field-recording commands (Flutter outbox). Same service methods, same rules, as REST.
+  // Handlers receive the parsed (output) value, with defaults applied.
+  const DailyRecordCommand = z.object({ flockId: Id, date: LocalDate, record: DailyRecordRequest });
+  const MortalityCommand = z.object({ flockId: Id }).and(MortalityRequest);
+  const CullCommand = z.object({ flockId: Id }).and(CullRequest);
+  sync.register("daily_record.put", {
+    action: "production.record",
+    schema: DailyRecordCommand,
+    async run(ctx, raw, meta) {
+      const p = raw as z.output<typeof DailyRecordCommand>;
+      const out = await flocks.putDailyRecord(ctx, p.flockId, p.date, { ...p.record, ...(meta.baseVersion !== undefined ? { version: meta.baseVersion } : {}) });
+      return { ...(out.id ? { entityId: out.id } : {}), ...(out.version !== null ? { version: out.version } : {}) };
+    },
+  });
+  sync.register("flock.mortality", {
+    action: "production.record",
+    schema: MortalityCommand,
+    async run(ctx, raw) {
+      const { flockId, ...r } = raw as z.output<typeof MortalityCommand>;
+      return { entityId: (await flocks.recordMortality(ctx, flockId, r)).id };
+    },
+  });
+  sync.register("flock.cull", {
+    action: "production.record",
+    schema: CullCommand,
+    async run(ctx, raw) {
+      const { flockId, ...r } = raw as z.output<typeof CullCommand>;
+      return { entityId: (await flocks.recordCull(ctx, flockId, r)).id };
+    },
+  });
+  sync.register("flock.weighing", {
+    action: "production.record",
+    schema: z.object({ flockId: Id, weighing: WeighingRequest }),
+    async run(ctx, p) {
+      return { entityId: (await flocks.weigh(ctx, p.flockId, p.weighing)).id };
+    },
+  });
+
+  return { ...d, clock, startedAt: clock.now(), accessTokens, audit, sync, auth, farms, houses, flocks };
 }
 
 export type Container = ReturnType<typeof buildContainer>;

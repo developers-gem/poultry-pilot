@@ -2,7 +2,7 @@ import {
   EGG_GRADES,
   EGG_MOVEMENT_TYPES,
   FLOCK_EVENT_TYPES,
-  FLOCK_PURPOSES,
+  FLOCK_TYPES,
   FLOCK_STATUSES,
   HOUSE_TYPES,
   MORTALITY_CAUSES,
@@ -34,11 +34,13 @@ export const HouseModel = defineCollection({
 const PopulationSchema = new Schema(
   {
     placed: int({ required: true }),
+    transferredIn: int({ required: true }),
     mortality: int({ required: true }),
     culled: int({ required: true }),
     sold: int({ required: true }),
     transferredOut: int({ required: true }),
-    alive: int({ required: true, min: -1_000_000 }),
+    adjustments: int({ required: true, min: -10_000_000 }),
+    alive: int({ required: true }),
     asOf: localDate({ required: true }),
   },
   { _id: false },
@@ -49,32 +51,48 @@ export const FlockModel = defineCollection({
   collection: "flocks",
   domain: D,
   ownership: "farm",
-  description: "A batch of birds managed together from placement to closure (broiler batch, layer flock, breeder flock).",
+  description:
+    "A group of birds managed together from placement to closure: broiler batch, layer or breeder flock, chick-rearing group, or a custom poultry type.",
   fields: {
+    houseId: ref("House", { required: true }),
     name: str({ required: true, max: 120 }),
+    flockCode: str({ required: true, max: 40 }),
+    type: enumOf(FLOCK_TYPES, { required: true }),
+    customTypeName: str({ max: 60 }),
     species: enumOf(SPECIES, { required: true, default: "chicken" }),
-    purpose: enumOf(FLOCK_PURPOSES, { required: true }),
     breed: str({ max: 120 }),
-    houseId: ref("House"),
+    strain: str({ max: 120 }),
+    source: str({ max: 200 }),
     status: enumOf(FLOCK_STATUSES, { required: true, default: "planned" }),
     hatchDate: localDate(),
-    plannedPlacementDate: localDate(),
+    /** Initial placement, copied from the placement event when the flock is placed. Immutable afterwards. */
     placementDate: localDate(),
-    targetEndDate: localDate(),
+    placementCount: int({ min: 1 }),
+    deadOnArrival: int(),
+    ageDaysAtPlacement: int({ max: 2000 }),
+    startingWeightG: num({ max: 50_000 }),
+    chickCost: money(),
+    targetSaleDate: localDate(),
     closedDate: localDate(),
-    productionProfileKey: str({ max: 60 }),
+    splitFromFlockId: ref("Flock"),
+    mergedIntoFlockId: ref("Flock"),
     hatcheryBatchId: ref("HatcheryBatch"),
     notes: text(2000),
     /**
-     * Derived snapshot of birds by cause, maintained by FlockService in the same transaction as every
-     * flock_event and daily_record change. Rebuildable from those collections; never edited directly.
+     * Derived snapshot of the ledger, maintained by FlockService in the same transaction as every flock_event.
+     * Rebuildable from flock_events; never edited directly.
      */
     population: { type: PopulationSchema },
   },
   indexes: [
     { fields: { farmId: 1, status: 1, placementDate: -1 }, why: "Flock list and dashboard: active (or closed) flocks of a farm, newest first" },
-    { fields: { farmId: 1, houseId: 1, status: 1 }, why: "House occupancy: is there an active flock in this house (placement capacity check)" },
+    { fields: { farmId: 1, houseId: 1, status: 1 }, why: "House occupancy and capacity check for placements and transfers" },
+    { fields: { farmId: 1, flockCode: 1 }, options: { unique: true, ...LIVE }, why: "Flock codes are unique within a farm; lookup by code" },
   ],
+  configure: (schema) =>
+    schema.pre("validate", function () {
+      if (this.get("type") === "custom" && !this.get("customTypeName")) this.invalidate("customTypeName", "Name the custom poultry type");
+    }),
 });
 
 export const FlockEventModel = defineCollection({
@@ -84,29 +102,39 @@ export const FlockEventModel = defineCollection({
   ownership: "farm",
   appendOnly: true,
   description:
-    "Population-changing events other than daily mortality and culls: placement, transfer, sale, depopulation, status change. Append-only; a mistake is corrected by an event with reversalOf.",
+    "The flock ledger: every placement, death, cull, transfer, split, merge, adjustment, sale and weighing. A flock's bird count is the sum of these. Append-only; mistakes are corrected with a reversal event.",
   fields: {
     flockId: ref("Flock", { required: true }),
     type: enumOf(FLOCK_EVENT_TYPES, { required: true }),
     date: localDate({ required: true }),
-    birds: int({ min: 0 }),
+    birds: int({ min: 1 }),
     deadOnArrival: int(),
-    ageDaysAtPlacement: int({ max: 2000 }),
-    source: str({ max: 200 }),
-    chickLotId: ref("ChickLot"),
-    counterpartFlockId: ref("Flock"),
-    toHouseId: ref("House"),
+    /** Adjustment only: signed. */
+    delta: int({ min: -10_000_000 }),
+    cause: enumOf(MORTALITY_CAUSES),
     totalLiveWeightKg: num(),
-    orderId: ref("Order"),
-    buyerId: ref("Buyer"),
+    averageWeightG: num({ max: 50_000 }),
+    sampleSize: int({ min: 1 }),
+    birdWeightId: ref("BirdWeight"),
+    /** Sale revenue. */
     total: money(),
+    /** Placement purchase cost, or acquisition cost moved with transferred birds. */
     cost: money(),
+    counterpartFlockId: ref("Flock"),
+    fromHouseId: ref("House"),
+    toHouseId: ref("House"),
+    /** Links the two halves of a transfer, split or merge. */
+    groupId: { type: String },
+    dailyRecordId: ref("DailyRecord"),
+    buyerId: ref("Buyer"),
+    orderId: ref("Order"),
     fromStatus: enumOf(FLOCK_STATUSES),
     toStatus: enumOf(FLOCK_STATUSES),
+    reason: str({ max: 500 }),
     reversalOf: ref("FlockEvent"),
     note: text(1000),
   },
-  indexes: [{ fields: { farmId: 1, flockId: 1, date: 1 }, why: "Population timeline of one flock (rebuild snapshot, lifecycle view)" }],
+  indexes: [{ fields: { farmId: 1, flockId: 1, date: 1 }, why: "A flock's ledger: population, calculations, day views, event history" }],
 });
 
 export const DailyRecordModel = defineCollection({
@@ -115,18 +143,10 @@ export const DailyRecordModel = defineCollection({
   domain: D,
   ownership: "farm",
   description:
-    "One record per flock per farm-local day: deaths by cause, culls and house conditions. Eggs, feed and water have their own collections and reference the same flock and date.",
+    "One record per flock per farm-local day: house conditions and notes. The day's deaths and culls are flock_events linked by dailyRecordId; feed and water are feed_consumption and water_records for the same flock and date.",
   fields: {
     flockId: ref("Flock", { required: true }),
-    houseId: ref("House"),
     date: localDate({ required: true }),
-    mortality: {
-      type: [new Schema({ cause: enumOf(MORTALITY_CAUSES, { required: true }), count: int({ required: true, min: 1 }) }, { _id: false })],
-      default: [],
-    },
-    /** Sum of mortality[].count, computed on save from the same document (cannot drift). */
-    mortalityTotal: int({ default: 0 }),
-    culls: int({ default: 0 }),
     temperatureMinC: num({ min: -60, max: 70 }),
     temperatureMaxC: num({ min: -60, max: 70 }),
     humidityPercent: num({ max: 100 }),
@@ -137,11 +157,6 @@ export const DailyRecordModel = defineCollection({
     { fields: { farmId: 1, flockId: 1, date: 1 }, options: { unique: true, ...LIVE }, why: "One record per flock per day; also serves a flock's date-range history" },
     { fields: { farmId: 1, date: 1 }, why: "Dashboard and nightly alert job: all flocks' records for a day; missing-record detection" },
   ],
-  configure: (schema) =>
-    schema.pre("validate", function () {
-      const m = (this.get("mortality") ?? []) as { count: number }[];
-      this.set("mortalityTotal", m.reduce((t, x) => t + x.count, 0));
-    }),
 });
 
 export const BirdWeightModel = defineCollection({
@@ -238,6 +253,7 @@ export const WaterRecordModel = defineCollection({
     date: localDate({ required: true }),
     litres: num({ required: true, max: 10_000_000 }),
     meterReading: num(),
+    dailyRecordId: ref("DailyRecord"),
     medicated: { type: Boolean, default: false },
     healthRecordId: ref("HealthRecord"),
     notes: text(500),

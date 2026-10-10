@@ -3,7 +3,8 @@ import * as C from "@poultrypilot/constants";
 
 /** Zod enum schemas generated from the readonly tuples in @poultrypilot/constants. */
 export const Species = z.enum(C.SPECIES);
-export const FlockPurpose = z.enum(C.FLOCK_PURPOSES);
+export const FlockType = z.enum(C.FLOCK_TYPES);
+export const FlockEventType = z.enum(C.FLOCK_EVENT_TYPES);
 export const FlockStatus = z.enum(C.FLOCK_STATUSES);
 export const HouseType = z.enum(C.HOUSE_TYPES);
 export const MortalityCause = z.enum(C.MORTALITY_CAUSES);

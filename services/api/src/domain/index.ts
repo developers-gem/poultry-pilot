@@ -10,3 +10,4 @@ export * from "./feed.js";
 export * from "./recurring.js";
 export * from "./ledger.js";
 export * from "./alerts.js";
+export * from "./flock-metrics.js";

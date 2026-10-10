@@ -61,3 +61,15 @@ Each is cheap to change until the phase named.
 | D32 | Mortality causes | "culled" removed from causes; culls are a separate count on `daily_records` |
 | D33 | Unknown fields | Schemas use `strict: "throw"` so code that writes an undeclared field fails in tests |
 | D34 | Data dictionary | Generated from the schemas; a test fails when it is stale |
+
+## Added with the flock engine
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| D35 | Where deaths and culls live | `flock_events` is the single ledger for every bird-count change, including mortality and culls; daily records post them as linked events (supersedes D27's mortality fields on daily_records) |
+| D36 | Flock types | `broiler`, `layer`, `breeder`, `chick`, `custom` (+ `customTypeName`); replaces the earlier purpose list |
+| D37 | Transfers | Stored as paired out/in events with a shared `groupId`; acquisition cost per bird moves with the birds; feed cost stays with the flock that ate it |
+| D38 | Impossible operations | Birds alive ≥ 0 at the end of every day from the event's date onward; birds available on a date = minimum alive over that date and all later dates |
+| D39 | Concurrency | Every flock command updates the flock document with its expected version, so concurrent commands on one flock cannot both pass the bird check |
+| D40 | Corrections | Reversal events for placement, death, cull, adjustment, sale and weighing; paired and structural events are corrected by the opposite movement; daily-record entries by editing the record |
+| D41 | Sale buyer | `buyerId` omitted until the buyers module can confirm the buyer belongs to the farm (avoids the cross-farm reference gap from the audit) |

@@ -30,12 +30,18 @@ const member = (farmId: string, over: Partial<MembershipRecord> = {}): Membershi
   id: newId(), farmId, userId: newId(), email: `${newId()}@example.com`, role: "worker", status: "active", createdBy: "u-1", createdAt: now, updatedAt: now, version: 0, ...over,
 });
 
-function contract(name: string, setup: () => Promise<{ repos: Repositories; reset: () => Promise<void>; teardown?: () => Promise<void> }>) {
+/** What the server under test supports. FerretDB (local check without Docker) lacks partial indexes. */
+interface Caps {
+  partialUniqueIndexes: boolean;
+}
+
+function contract(name: string, setup: () => Promise<{ repos: Repositories; reset: () => Promise<void>; teardown?: () => Promise<void>; caps: Caps }>) {
   describe(`repository contract: ${name}`, () => {
     let repos: Repositories;
     let reset: () => Promise<void>;
     let teardown: (() => Promise<void>) | undefined;
-    beforeAll(async () => ({ repos, reset, teardown } = await setup()));
+    let caps: Caps;
+    beforeAll(async () => ({ repos, reset, teardown, caps } = await setup()));
     beforeEach(async () => reset());
     afterAll(async () => teardown?.());
 
@@ -112,6 +118,45 @@ function contract(name: string, setup: () => Promise<{ repos: Repositories; rese
       expect((await repos.memberships.findActiveForUser("u-9")).map((m) => m.id)).toEqual([invited.id]);
     });
 
+    it("farm repositories: scoped reads, versioned updates, unique keys among live records, soft delete", async () => {
+      const farmA = newId();
+      const farmB = newId();
+      const flock = (code: string, farmId = farmA) => ({
+        id: newId(), farmId, houseId: "h1", name: code, flockCode: code, type: "broiler" as const, species: "chicken" as const, status: "active" as const,
+        createdBy: "u1", createdAt: now, updatedAt: now, version: 0,
+      });
+      const a = flock("B1");
+      await repos.flocks.insert(a);
+      await repos.flocks.insert(flock("B1", farmB)); // same code, other farm: allowed
+      if (caps.partialUniqueIndexes) await expect(repos.flocks.insert(flock("B1"))).rejects.toMatchObject({ code: 11000 });
+      expect(await repos.flocks.findById(farmB, a.id)).toBeNull();
+
+      const v1 = await repos.flocks.update(farmA, a.id, { name: "Renamed", breed: "Cobb" }, { expectedVersion: 0 });
+      expect(v1).toMatchObject({ name: "Renamed", version: 1 });
+      expect(await repos.flocks.update(farmA, a.id, { name: "Stale" }, { expectedVersion: 0 })).toBeNull();
+      expect((await repos.flocks.update(farmA, a.id, { breed: undefined }))?.breed).toBeUndefined();
+
+      await repos.flocks.update(farmA, a.id, { deletedAt: later, deletedBy: "u1" });
+      expect(await repos.flocks.findById(farmA, a.id)).toBeNull();
+      expect(await repos.flocks.find(farmA)).toEqual([]);
+      if (caps.partialUniqueIndexes) await repos.flocks.insert(flock("B1")); // code free again once the old flock is deleted
+    });
+
+    it("farm repositories: find with equality, one-of, date range, sort and limit", async () => {
+      const farmId = newId();
+      const ev = (date: string, type: "mortality" | "cull", flockId = "f1") => ({ id: newId(), farmId, flockId, type, date, birds: 1, createdBy: "u1", createdAt: now, updatedAt: now });
+      await repos.flockEvents.insertMany([ev("2026-10-03", "mortality"), ev("2026-10-01", "cull"), ev("2026-10-02", "mortality"), ev("2026-10-02", "mortality", "f2")]);
+      const f1 = await repos.flockEvents.find(farmId, { where: { flockId: "f1" }, sort: [{ field: "date", dir: 1 }] });
+      expect(f1.map((e) => e.date)).toEqual(["2026-10-01", "2026-10-02", "2026-10-03"]);
+      expect(await repos.flockEvents.find(farmId, { where: { type: ["cull"] } })).toHaveLength(1);
+      expect(await repos.flockEvents.find(farmId, { range: { field: "date", from: "2026-10-02", to: "2026-10-02" } })).toHaveLength(2);
+      expect(await repos.flockEvents.find(farmId, { sort: [{ field: "date", dir: -1 }], limit: 1 })).toEqual([expect.objectContaining({ date: "2026-10-03" })]);
+
+      const rec = { id: newId(), farmId, flockId: "f1", date: "2026-10-02", createdBy: "u1", createdAt: now, updatedAt: now, version: 0 };
+      await repos.dailyRecords.insert(rec);
+      if (caps.partialUniqueIndexes) await expect(repos.dailyRecords.insert({ ...rec, id: newId() })).rejects.toMatchObject({ code: 11000 });
+    });
+
     it("sync: per-farm sequences are independent and changes list in order", async () => {
       const [a, b] = [newId(), newId()];
       expect([await repos.sync.nextSeq(a), await repos.sync.nextSeq(a), await repos.sync.nextSeq(b)]).toEqual([1, 2, 1]);
@@ -126,7 +171,7 @@ function contract(name: string, setup: () => Promise<{ repos: Repositories; rese
 contract("memory", async () => {
   let current = createMemoryRepositories();
   const proxy = new Proxy({} as Repositories, { get: (_t, k) => current.repos[k as keyof Repositories] });
-  return { repos: proxy, reset: async () => void (current = createMemoryRepositories()) };
+  return { repos: proxy, reset: async () => void (current = createMemoryRepositories()), caps: { partialUniqueIndexes: true } };
 });
 
 const uri = process.env["MONGODB_TEST_URI"];
@@ -136,12 +181,14 @@ if (uri) {
     await mongo.connect();
     // Create indexes one by one. FerretDB (used for local checks without Docker) lacks TTL, partial, 2dsphere and text indexes;
     // skip only "not implemented" options so unique indexes are still enforced. Real MongoDB creates all.
+    let partialUniqueIndexes = true;
     for (const model of Object.values(mongoose.models)) {
       for (const [fields, options] of model.schema.indexes()) {
         try {
           await model.collection.createIndex(fields as Record<string, 1 | -1>, options as Record<string, unknown>);
         } catch (err) {
           if (!/not implemented|can.t find index/i.test((err as Error).message)) throw err;
+          if ((options as { partialFilterExpression?: unknown }).partialFilterExpression) partialUniqueIndexes = false;
         }
       }
     }
@@ -152,6 +199,7 @@ if (uri) {
         for (const m of Object.values(mongoose.models)) await m.collection.deleteMany({});
       },
       teardown: () => mongo.disconnect(),
+      caps: { partialUniqueIndexes },
     };
   });
 }

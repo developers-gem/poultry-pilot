@@ -4,8 +4,27 @@
  */
 
 // production
-/** Population-changing events other than daily mortality and culls (those live on daily_records). */
-export const FLOCK_EVENT_TYPES = ["placement", "transfer_in", "transfer_out", "sale", "depopulation", "status_change"] as const;
+/**
+ * The flock ledger. Every change to a flock's bird count is one of these events; transfers, splits and merges
+ * are stored as a pair (…_out on the source flock, …_in on the destination) sharing a groupId.
+ * "transfer_house" moves the whole flock to another house without changing its count.
+ */
+export const FLOCK_EVENT_TYPES = [
+  "placement",
+  "mortality",
+  "cull",
+  "transfer_out",
+  "transfer_in",
+  "transfer_house",
+  "split_out",
+  "split_in",
+  "merge_out",
+  "merge_in",
+  "adjustment",
+  "sale",
+  "weighing",
+  "status_change",
+] as const;
 export const EGG_MOVEMENT_TYPES = ["collected", "sold", "broken", "used", "spoiled", "adjustment", "reversal"] as const;
 
 // feed & inventory

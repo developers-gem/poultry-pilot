@@ -6,7 +6,8 @@
  */
 
 export const SPECIES = ["chicken", "duck", "turkey", "quail", "guinea_fowl"] as const;
-export const FLOCK_PURPOSES = ["broiler", "layer", "breeder", "pullet", "dual_purpose"] as const;
+/** What a flock is kept for. "chick" = rearing young birds before they join a laying or breeding flock; "custom" needs customTypeName. */
+export const FLOCK_TYPES = ["broiler", "layer", "breeder", "chick", "custom"] as const;
 export const FLOCK_STATUSES = ["planned", "active", "closed", "cancelled"] as const;
 export const HOUSE_TYPES = ["broiler", "layer", "brooder", "breeder", "hatchery", "mixed"] as const;
 /** Causes of death. Culls are recorded separately (daily_records.culls), so "culled" is not a cause. */
@@ -76,7 +77,7 @@ export const SESSION_PLATFORMS = ["web", "android", "ios", "other"] as const;
 export const UNIT_SYSTEMS = ["metric", "imperial"] as const;
 
 export type Species = (typeof SPECIES)[number];
-export type FlockPurpose = (typeof FLOCK_PURPOSES)[number];
+export type FlockType = (typeof FLOCK_TYPES)[number];
 export type FlockStatus = (typeof FLOCK_STATUSES)[number];
 export type HouseType = (typeof HOUSE_TYPES)[number];
 export type MortalityCause = (typeof MORTALITY_CAUSES)[number];

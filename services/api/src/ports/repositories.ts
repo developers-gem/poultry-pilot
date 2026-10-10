@@ -9,6 +9,13 @@ import type {
   SessionRecord,
   SyncChangeRecord,
   UserRecord,
+  HouseRecord,
+  FlockRecord,
+  FlockEventRecord,
+  DailyRecordRecord,
+  BirdWeightRecord,
+  FeedConsumptionRecord,
+  WaterRecordRecord,
 } from "./records.js";
 
 /**
@@ -103,6 +110,28 @@ export interface LedgerProbe {
   hasEntries(farmId: string, tx?: Tx): Promise<boolean>;
 }
 
+/**
+ * Generic farm-scoped repository. Every method takes farmId; soft-deleted records are invisible.
+ * insert/update throw an error with code 11000 when a unique key is violated (same as MongoDB).
+ */
+export interface FarmQuery<T> {
+  /** Equality per field; an array value means "one of". */
+  where?: { [K in keyof T]?: T[K] | T[K][] };
+  /** Inclusive range on a string field (farm-local dates). */
+  range?: { field: keyof T & string; from?: string; to?: string };
+  sort?: { field: keyof T & string; dir: 1 | -1 }[];
+  limit?: number;
+}
+
+export interface FarmRepo<T extends { id: string; farmId: string }> {
+  findById(farmId: string, id: string, tx?: Tx): Promise<T | null>;
+  find(farmId: string, query?: FarmQuery<T>, tx?: Tx): Promise<T[]>;
+  insert(rec: T, tx?: Tx): Promise<void>;
+  insertMany(recs: T[], tx?: Tx): Promise<void>;
+  /** Applies the patch; bumps `version` on versioned collections. Returns null if missing, deleted, or the version differs. */
+  update(farmId: string, id: string, patch: Partial<T>, opts?: { expectedVersion?: number }, tx?: Tx): Promise<T | null>;
+}
+
 export interface Repositories {
   tx: TxRunner;
   users: UsersRepo;
@@ -115,4 +144,12 @@ export interface Repositories {
   idempotency: IdempotencyRepo;
   sync: SyncRepo;
   ledgerProbe: LedgerProbe;
+  houses: FarmRepo<HouseRecord>;
+  flocks: FarmRepo<FlockRecord>;
+  /** Append-only: never updated. */
+  flockEvents: FarmRepo<FlockEventRecord>;
+  dailyRecords: FarmRepo<DailyRecordRecord>;
+  birdWeights: FarmRepo<BirdWeightRecord>;
+  feedConsumption: FarmRepo<FeedConsumptionRecord>;
+  waterRecords: FarmRepo<WaterRecordRecord>;
 }

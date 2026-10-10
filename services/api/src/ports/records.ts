@@ -154,3 +154,136 @@ export interface ProcessedMutationRecord {
   receivedAt: Date;
   at: Date;
 }
+
+// ---- flock engine ----------------------------------------------------------
+
+export interface MoneyValue {
+  amountMinor: number;
+  currency: string;
+}
+
+/** Fields every farm-owned record carries. */
+export interface FarmOwned {
+  id: string;
+  farmId: string;
+  createdBy: string;
+  updatedBy?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Editable extends FarmOwned {
+  version: number;
+  deletedAt?: Date;
+  deletedBy?: string;
+}
+
+export interface HouseRecord extends Editable {
+  name: string;
+  type: import("@poultrypilot/types").HouseType;
+  capacityBirds?: number;
+  floorAreaM2?: number;
+  status: "active" | "inactive";
+  notes?: string;
+}
+
+export interface FlockPopulationSnapshot {
+  placed: number;
+  transferredIn: number;
+  mortality: number;
+  culled: number;
+  sold: number;
+  transferredOut: number;
+  adjustments: number;
+  alive: number;
+  asOf: string;
+}
+
+export interface FlockRecord extends Editable {
+  houseId: string;
+  name: string;
+  flockCode: string;
+  type: import("@poultrypilot/types").FlockType;
+  customTypeName?: string;
+  species: import("@poultrypilot/types").Species;
+  breed?: string;
+  strain?: string;
+  source?: string;
+  status: import("@poultrypilot/types").FlockStatus;
+  hatchDate?: string;
+  placementDate?: string;
+  placementCount?: number;
+  deadOnArrival?: number;
+  ageDaysAtPlacement?: number;
+  startingWeightG?: number;
+  chickCost?: MoneyValue;
+  targetSaleDate?: string;
+  closedDate?: string;
+  splitFromFlockId?: string;
+  mergedIntoFlockId?: string;
+  notes?: string;
+  population?: FlockPopulationSnapshot;
+}
+
+export interface FlockEventRecord extends FarmOwned {
+  flockId: string;
+  type: import("@poultrypilot/types").FlockEventType;
+  date: string;
+  birds?: number;
+  deadOnArrival?: number;
+  delta?: number;
+  cause?: import("@poultrypilot/types").MortalityCause;
+  totalLiveWeightKg?: number;
+  averageWeightG?: number;
+  sampleSize?: number;
+  birdWeightId?: string;
+  total?: MoneyValue;
+  cost?: MoneyValue;
+  counterpartFlockId?: string;
+  fromHouseId?: string;
+  toHouseId?: string;
+  groupId?: string;
+  dailyRecordId?: string;
+  buyerId?: string;
+  fromStatus?: import("@poultrypilot/types").FlockStatus;
+  toStatus?: import("@poultrypilot/types").FlockStatus;
+  reason?: string;
+  reversalOf?: string;
+  note?: string;
+}
+
+export interface DailyRecordRecord extends Editable {
+  flockId: string;
+  date: string;
+  temperatureMinC?: number;
+  temperatureMaxC?: number;
+  humidityPercent?: number;
+  lightingHours?: number;
+  notes?: string;
+}
+
+export interface BirdWeightRecord extends Editable {
+  flockId: string;
+  date: string;
+  weightsG: number[];
+  stats?: { count: number; meanG: number; minG: number; maxG: number; sdG: number; cvPercent: number; uniformityPercent: number };
+  note?: string;
+}
+
+export interface FeedConsumptionRecord extends Editable {
+  flockId: string;
+  feedItemId?: string;
+  date: string;
+  quantityKg: number;
+  dailyRecordId?: string;
+  cost?: MoneyValue;
+  notes?: string;
+}
+
+export interface WaterRecordRecord extends Editable {
+  flockId: string;
+  date: string;
+  litres: number;
+  dailyRecordId?: string;
+  notes?: string;
+}

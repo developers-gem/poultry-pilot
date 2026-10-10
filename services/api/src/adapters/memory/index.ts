@@ -11,6 +11,8 @@ import type {
   UserRecord,
 } from "../../ports/records.js";
 import type { Repositories, Tx, TxRunner } from "../../ports/repositories.js";
+import type { BirdWeightRecord, DailyRecordRecord, FeedConsumptionRecord, FlockEventRecord, FlockRecord, HouseRecord, WaterRecordRecord } from "../../ports/records.js";
+import { createMemFarmRepo } from "./farm-repo.js";
 
 /**
  * In-memory repositories for tests and local experiments.
@@ -53,6 +55,13 @@ export interface MemoryStore {
   syncChanges: Table<SyncChangeRecord>;
   syncCounters: Table<number>;
   processed: Table<ProcessedMutationRecord>;
+  houses: Table<HouseRecord>;
+  flocks: Table<FlockRecord>;
+  flockEvents: Table<FlockEventRecord>;
+  dailyRecords: Table<DailyRecordRecord>;
+  birdWeights: Table<BirdWeightRecord>;
+  feedConsumption: Table<FeedConsumptionRecord>;
+  waterRecords: Table<WaterRecordRecord>;
 }
 
 export function createMemoryRepositories(): { repos: Repositories; store: MemoryStore } {
@@ -68,6 +77,13 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
     syncChanges: new Table(),
     syncCounters: new Table(),
     processed: new Table(),
+    houses: new Table(),
+    flocks: new Table(),
+    flockEvents: new Table(),
+    dailyRecords: new Table(),
+    birdWeights: new Table(),
+    feedConsumption: new Table(),
+    waterRecords: new Table(),
   };
   const transactional = [
     store.users,
@@ -80,6 +96,13 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
     store.syncChanges,
     store.syncCounters,
     store.processed,
+    store.houses,
+    store.flocks,
+    store.flockEvents,
+    store.dailyRecords,
+    store.birdWeights,
+    store.feedConsumption,
+    store.waterRecords,
   ] as Table<unknown>[];
 
   let depth = 0;
@@ -291,6 +314,13 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
         return false;
       },
     },
+    houses: createMemFarmRepo(store.houses, { softDelete: true, versioned: true, unique: [["farmId", "name"]] }),
+    flocks: createMemFarmRepo(store.flocks, { softDelete: true, versioned: true, unique: [["farmId", "flockCode"]] }),
+    flockEvents: createMemFarmRepo(store.flockEvents, { softDelete: false, versioned: false }),
+    dailyRecords: createMemFarmRepo(store.dailyRecords, { softDelete: true, versioned: true, unique: [["farmId", "flockId", "date"]] }),
+    birdWeights: createMemFarmRepo(store.birdWeights, { softDelete: true, versioned: true }),
+    feedConsumption: createMemFarmRepo(store.feedConsumption, { softDelete: true, versioned: true }),
+    waterRecords: createMemFarmRepo(store.waterRecords, { softDelete: true, versioned: true, unique: [["farmId", "flockId", "date"]] }),
   };
   return { repos, store };
 }

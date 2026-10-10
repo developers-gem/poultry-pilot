@@ -145,4 +145,8 @@ Roles: owner, admin, farm_manager, supervisor, worker, accountant, vet. Every fa
 - `docs/data-model.md` — conventions, ownership, source-of-truth vs derived fields, what each action writes, retention, relationship diagrams, prototype table mapping.
 - `docs/data-dictionary.md` — every field, enum, index (with the query it serves) and reference. Generated: `pnpm --filter @poultrypilot/api docs:data-dictionary`.
 
-The business module services and endpoints (flocks, production, feed, health, money, market) are not implemented yet; their collections are.
+## Flock engine
+
+Houses and flocks under `/api/v1/farms/:farmId`: flock CRUD, placement, mortality, culls, transfers (house or flock), splits, merges, sales, adjustments, weighings, closure, reversals, and daily records (`PUT …/flocks/:flockId/daily-records/:date`). Every bird-count change is an event in an append-only ledger; impossible operations (selling or losing more birds than exist on any day, over-capacity houses, future dates) are refused. `GET …/flocks/:flockId/metrics` returns bird count, mortality and survival rates, average weight and daily gain, feed, FCR, live weight, revenue, cost, profit, margin and cost per bird. Rules and formulas: `docs/flock-engine.md`.
+
+Feed stock, health, money and market services are not implemented yet; their collections are.

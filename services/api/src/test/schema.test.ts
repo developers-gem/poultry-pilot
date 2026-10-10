@@ -160,10 +160,11 @@ describe("document validation", () => {
     expect(Object.keys(bad!.errors)).toEqual(expect.arrayContaining(["date", "amount.amountMinor"]));
   });
 
-  it("computes mortalityTotal from the record's own mortality entries", async () => {
-    const d = new M.DailyRecordModel({ ...base, flockId: "fl-1", date: "2026-10-06", mortality: [{ cause: "unknown", count: 3 }, { cause: "heat_stress", count: 2 }] });
-    await d.validate();
-    expect(d.get("mortalityTotal")).toBe(5);
+  it("a custom flock type needs a name", async () => {
+    const f = new M.FlockModel({ ...base, houseId: "h-1", name: "Geese 1", flockCode: "G1", type: "custom" });
+    await expect(f.validate()).rejects.toThrow(/custom poultry type/);
+    f.set("customTypeName", "Geese");
+    await expect(f.validate()).resolves.toBeUndefined();
   });
 
   it("computes weigh-session statistics with the domain function", async () => {

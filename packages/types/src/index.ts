@@ -5,7 +5,8 @@
  */
 export type {
   Species,
-  FlockPurpose,
+  FlockType,
+  FlockEventType,
   FlockStatus,
   HouseType,
   MortalityCause,

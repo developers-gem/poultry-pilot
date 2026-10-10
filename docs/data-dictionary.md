@@ -3,7 +3,7 @@
 > Generated from the Mongoose schemas in `services/api/src/adapters/mongo/models`. Do not edit by hand:
 > run `pnpm --filter @poultrypilot/api docs:data-dictionary`. A test fails if this file is out of date.
 
-52 collections, 85 secondary indexes (plus the default `_id` index on each). Design rules and relationships: `docs/data-model.md`.
+52 collections, 86 secondary indexes (plus the default `_id` index on each). Design rules and relationships: `docs/data-model.md`.
 
 | Collection | Domain | Ownership | Indexes | Purpose |
 | --- | --- | --- | --- | --- |
@@ -14,9 +14,9 @@
 | [`farms`](#farms) | Identity and tenancy | tenant | 0 | The tenant |
 | [`farm_members`](#farm_members) | Identity and tenancy | farm | 4 | A user's role on a farm, or a pending invitation by email |
 | [`houses`](#houses) | Production | farm | 1 | A shed, pen or brooder room |
-| [`flocks`](#flocks) | Production | farm | 2 | A batch of birds managed together from placement to closure (broiler batch, layer flock, breeder flock) |
-| [`flock_events`](#flock_events) | Production | farm, append-only | 1 | Population-changing events other than daily mortality and culls: placement, transfer, sale, depopulation, status change |
-| [`daily_records`](#daily_records) | Production | farm | 2 | One record per flock per farm-local day: deaths by cause, culls and house conditions |
+| [`flocks`](#flocks) | Production | farm | 3 | A group of birds managed together from placement to closure: broiler batch, layer or breeder flock, chick-rearing group, or a custom poultry type |
+| [`flock_events`](#flock_events) | Production | farm, append-only | 1 | The flock ledger: every placement, death, cull, transfer, split, merge, adjustment, sale and weighing |
+| [`daily_records`](#daily_records) | Production | farm | 2 | One record per flock per farm-local day: house conditions and notes |
 | [`bird_weights`](#bird_weights) | Production | farm | 1 | A weigh session: individual sample weights of one flock on one day, with statistics computed from those weights |
 | [`egg_records`](#egg_records) | Production | farm | 2 | Eggs collected from one flock on one day, by grade |
 | [`egg_inventory`](#egg_inventory) | Production | farm, append-only | 2 | Egg stock ledger |
@@ -245,7 +245,7 @@ A shed, pen or brooder room. Flocks are placed in houses; equipment and cleaning
 
 ### flocks
 
-A batch of birds managed together from placement to closure (broiler batch, layer flock, breeder flock).
+A group of birds managed together from placement to closure: broiler batch, layer or breeder flock, chick-rearing group, or a custom poultry type.
 
 - **Model:** `Flock`
 - **Ownership:** Farm — every query must include farmId
@@ -253,37 +253,51 @@ A batch of birds managed together from placement to closure (broiler batch, laye
 
 | Field | Type | Required | Constraints | References |
 | --- | --- | --- | --- | --- |
+| `houseId` | String | yes |  | `House` |
 | `name` | String | yes | ≤ 120 chars |  |
+| `flockCode` | String | yes | ≤ 40 chars |  |
+| `type` | String | yes | one of: `broiler`, `layer`, `breeder`, `chick`, `custom` |  |
+| `customTypeName` | String |  | ≤ 60 chars |  |
 | `species` | String | yes | one of: `chicken`, `duck`, `turkey`, `quail`, `guinea_fowl`; default `"chicken"` |  |
-| `purpose` | String | yes | one of: `broiler`, `layer`, `breeder`, `pullet`, `dual_purpose` |  |
 | `breed` | String |  | ≤ 120 chars |  |
-| `houseId` | String |  |  | `House` |
+| `strain` | String |  | ≤ 120 chars |  |
+| `source` | String |  | ≤ 200 chars |  |
 | `status` | String | yes | one of: `planned`, `active`, `closed`, `cancelled`; default `"planned"` |  |
 | `hatchDate` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
-| `plannedPlacementDate` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
 | `placementDate` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
-| `targetEndDate` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
+| `placementCount` | Number |  | min 1; integer |  |
+| `deadOnArrival` | Number |  | integer |  |
+| `ageDaysAtPlacement` | Number |  | max 2000; integer |  |
+| `startingWeightG` | Number |  | max 50000 |  |
+| `chickCost` | object |  |  |  |
+| `chickCost.amountMinor` | Number | yes | integer |  |
+| `chickCost.currency` | String | yes | pattern `/^[A-Z]{3}$/` |  |
+| `targetSaleDate` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
 | `closedDate` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
-| `productionProfileKey` | String |  | ≤ 60 chars |  |
+| `splitFromFlockId` | String |  |  | `Flock` |
+| `mergedIntoFlockId` | String |  |  | `Flock` |
 | `hatcheryBatchId` | String |  |  | `HatcheryBatch` |
 | `notes` | String |  | ≤ 2000 chars |  |
 | `population` | object |  |  |  |
 | `population.placed` | Number | yes | integer |  |
+| `population.transferredIn` | Number | yes | integer |  |
 | `population.mortality` | Number | yes | integer |  |
 | `population.culled` | Number | yes | integer |  |
 | `population.sold` | Number | yes | integer |  |
 | `population.transferredOut` | Number | yes | integer |  |
-| `population.alive` | Number | yes | min -1000000; integer |  |
+| `population.adjustments` | Number | yes | min -10000000; integer |  |
+| `population.alive` | Number | yes | integer |  |
 | `population.asOf` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
 
 | Index | Options | Serves |
 | --- | --- | --- |
 | farmId, status, placementDate ↓ |  | Flock list and dashboard: active (or closed) flocks of a farm, newest first |
-| farmId, houseId, status |  | House occupancy: is there an active flock in this house (placement capacity check) |
+| farmId, houseId, status |  | House occupancy and capacity check for placements and transfers |
+| farmId, flockCode | unique, live records only | Flock codes are unique within a farm; lookup by code |
 
 ### flock_events
 
-Population-changing events other than daily mortality and culls: placement, transfer, sale, depopulation, status change. Append-only; a mistake is corrected by an event with reversalOf.
+The flock ledger: every placement, death, cull, transfer, split, merge, adjustment, sale and weighing. A flock's bird count is the sum of these. Append-only; mistakes are corrected with a reversal event.
 
 - **Model:** `FlockEvent`
 - **Ownership:** Farm — every query must include farmId
@@ -293,36 +307,42 @@ Population-changing events other than daily mortality and culls: placement, tran
 | Field | Type | Required | Constraints | References |
 | --- | --- | --- | --- | --- |
 | `flockId` | String | yes |  | `Flock` |
-| `type` | String | yes | one of: `placement`, `transfer_in`, `transfer_out`, `sale`, `depopulation`, `status_change` |  |
+| `type` | String | yes | one of: `placement`, `mortality`, `cull`, `transfer_out`, `transfer_in`, `transfer_house`, `split_out`, `split_in`, `merge_out`, `merge_in`, `adjustment`, `sale`, `weighing`, `status_change` |  |
 | `date` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
-| `birds` | Number |  | integer |  |
+| `birds` | Number |  | min 1; integer |  |
 | `deadOnArrival` | Number |  | integer |  |
-| `ageDaysAtPlacement` | Number |  | max 2000; integer |  |
-| `source` | String |  | ≤ 200 chars |  |
-| `chickLotId` | String |  |  | `ChickLot` |
-| `counterpartFlockId` | String |  |  | `Flock` |
-| `toHouseId` | String |  |  | `House` |
+| `delta` | Number |  | min -10000000; integer |  |
+| `cause` | String |  | one of: `unknown`, `found_dead`, `predator`, `heat_stress`, `injury`, `suspected_disease`, `other` |  |
 | `totalLiveWeightKg` | Number |  |  |  |
-| `orderId` | String |  |  | `Order` |
-| `buyerId` | String |  |  | `Buyer` |
+| `averageWeightG` | Number |  | max 50000 |  |
+| `sampleSize` | Number |  | min 1; integer |  |
+| `birdWeightId` | String |  |  | `BirdWeight` |
 | `total` | object |  |  |  |
 | `total.amountMinor` | Number | yes | integer |  |
 | `total.currency` | String | yes | pattern `/^[A-Z]{3}$/` |  |
 | `cost` | object |  |  |  |
 | `cost.amountMinor` | Number | yes | integer |  |
 | `cost.currency` | String | yes | pattern `/^[A-Z]{3}$/` |  |
+| `counterpartFlockId` | String |  |  | `Flock` |
+| `fromHouseId` | String |  |  | `House` |
+| `toHouseId` | String |  |  | `House` |
+| `groupId` | String |  |  |  |
+| `dailyRecordId` | String |  |  | `DailyRecord` |
+| `buyerId` | String |  |  | `Buyer` |
+| `orderId` | String |  |  | `Order` |
 | `fromStatus` | String |  | one of: `planned`, `active`, `closed`, `cancelled` |  |
 | `toStatus` | String |  | one of: `planned`, `active`, `closed`, `cancelled` |  |
+| `reason` | String |  | ≤ 500 chars |  |
 | `reversalOf` | String |  |  | `FlockEvent` |
 | `note` | String |  | ≤ 1000 chars |  |
 
 | Index | Options | Serves |
 | --- | --- | --- |
-| farmId, flockId, date |  | Population timeline of one flock (rebuild snapshot, lifecycle view) |
+| farmId, flockId, date |  | A flock's ledger: population, calculations, day views, event history |
 
 ### daily_records
 
-One record per flock per farm-local day: deaths by cause, culls and house conditions. Eggs, feed and water have their own collections and reference the same flock and date.
+One record per flock per farm-local day: house conditions and notes. The day's deaths and culls are flock_events linked by dailyRecordId; feed and water are feed_consumption and water_records for the same flock and date.
 
 - **Model:** `DailyRecord`
 - **Ownership:** Farm — every query must include farmId
@@ -331,13 +351,7 @@ One record per flock per farm-local day: deaths by cause, culls and house condit
 | Field | Type | Required | Constraints | References |
 | --- | --- | --- | --- | --- |
 | `flockId` | String | yes |  | `Flock` |
-| `houseId` | String |  |  | `House` |
 | `date` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
-| `mortality` | array of objects |  |  |  |
-| `mortality[].cause` | String | yes | one of: `unknown`, `found_dead`, `predator`, `heat_stress`, `injury`, `suspected_disease`, `other` |  |
-| `mortality[].count` | Number | yes | min 1; integer |  |
-| `mortalityTotal` | Number |  | default `0`; integer |  |
-| `culls` | Number |  | default `0`; integer |  |
 | `temperatureMinC` | Number |  | min -60; max 70 |  |
 | `temperatureMaxC` | Number |  | min -60; max 70 |  |
 | `humidityPercent` | Number |  | max 100 |  |
@@ -444,6 +458,7 @@ Water drunk by one flock on one day (a leading indicator of illness and heat str
 | `date` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
 | `litres` | Number | yes | max 10000000 |  |
 | `meterReading` | Number |  |  |  |
+| `dailyRecordId` | String |  |  | `DailyRecord` |
 | `medicated` | Boolean |  | default `false` |  |
 | `healthRecordId` | String |  |  | `HealthRecord` |
 | `notes` | String |  | ≤ 500 chars |  |
@@ -522,9 +537,10 @@ Feed issued to a flock on a day, costed at the moving average at the time of iss
 | Field | Type | Required | Constraints | References |
 | --- | --- | --- | --- | --- |
 | `flockId` | String | yes |  | `Flock` |
-| `feedItemId` | String | yes |  | `FeedItem` |
+| `feedItemId` | String |  |  | `FeedItem` |
 | `date` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
 | `quantityKg` | Number | yes | min 0.001 |  |
+| `dailyRecordId` | String |  |  | `DailyRecord` |
 | `cost` | object |  |  |  |
 | `cost.amountMinor` | Number | yes | integer |  |
 | `cost.currency` | String | yes | pattern `/^[A-Z]{3}$/` |  |
@@ -533,7 +549,7 @@ Feed issued to a flock on a day, costed at the moving average at the time of iss
 | Index | Options | Serves |
 | --- | --- | --- |
 | farmId, flockId, date |  | FCR, daily feed per flock, feed-change alerts |
-| farmId, feedItemId, date |  | Days of cover per item and ledger replay |
+| farmId, feedItemId, date | partial: {"feedItemId":{"$exists":true}} | Days of cover per item and ledger replay |
 
 ## Inventory
 
@@ -1623,16 +1639,19 @@ Every reference between collections, derived from the schemas.
 | `farm_members` | `invitedBy` | `users` | many-to-one |
 | `farm_members` | `removedBy` | `users` | many-to-one |
 | `flocks` | `houseId` | `houses` | many-to-one |
+| `flocks` | `splitFromFlockId` | `flocks` | many-to-one |
+| `flocks` | `mergedIntoFlockId` | `flocks` | many-to-one |
 | `flocks` | `hatcheryBatchId` | `hatchery_batches` | many-to-one |
 | `flock_events` | `flockId` | `flocks` | many-to-one |
-| `flock_events` | `chickLotId` | `chicks` | many-to-one |
+| `flock_events` | `birdWeightId` | `bird_weights` | many-to-one |
 | `flock_events` | `counterpartFlockId` | `flocks` | many-to-one |
+| `flock_events` | `fromHouseId` | `houses` | many-to-one |
 | `flock_events` | `toHouseId` | `houses` | many-to-one |
-| `flock_events` | `orderId` | `orders` | many-to-one |
+| `flock_events` | `dailyRecordId` | `daily_records` | many-to-one |
 | `flock_events` | `buyerId` | `buyers` | many-to-one |
+| `flock_events` | `orderId` | `orders` | many-to-one |
 | `flock_events` | `reversalOf` | `flock_events` | many-to-one |
 | `daily_records` | `flockId` | `flocks` | many-to-one |
-| `daily_records` | `houseId` | `houses` | many-to-one |
 | `bird_weights` | `flockId` | `flocks` | many-to-one |
 | `bird_weights` | `scaleEquipmentId` | `equipment` | many-to-one |
 | `egg_records` | `flockId` | `flocks` | many-to-one |
@@ -1640,11 +1659,13 @@ Every reference between collections, derived from the schemas.
 | `egg_inventory` | `reversalOf` | `egg_inventory` | many-to-one |
 | `egg_inventory` | `sourceId` | EggRecord \| Order | many-to-one (Polymorphic by sourceType) |
 | `water_records` | `flockId` | `flocks` | many-to-one |
+| `water_records` | `dailyRecordId` | `daily_records` | many-to-one |
 | `water_records` | `healthRecordId` | `health_records` | many-to-one |
 | `feed_purchases` | `feedItemId` | `feed_items` | many-to-one |
 | `feed_purchases` | `expenseId` | `expenses` | many-to-one |
 | `feed_consumption` | `flockId` | `flocks` | many-to-one |
 | `feed_consumption` | `feedItemId` | `feed_items` | many-to-one |
+| `feed_consumption` | `dailyRecordId` | `daily_records` | many-to-one |
 | `inventory_items` | `medicineId` | `medicines` | many-to-one |
 | `inventory_transactions` | `itemId` | `inventory_items` | many-to-one |
 | `inventory_transactions` | `flockId` | `flocks` | many-to-one |

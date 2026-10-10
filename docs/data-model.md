@@ -46,8 +46,7 @@ Each fact has one home. Some values are also kept as **derived snapshots** for f
 
 | Derived value | Maintained by | Rebuilt from |
 | --- | --- | --- |
-| `flocks.population` (placed, mortality, culled, sold, alive) | FlockService | `flock_events` + `daily_records.mortality/culls` |
-| `daily_records.mortalityTotal` | the document itself on save | `daily_records.mortality[]` |
+| `flocks.population` (placed, transferred in, mortality, culled, sold, moved out, adjustments, alive) | FlockService | `flock_events` (the flock ledger) |
 | `bird_weights.stats` | the document itself on save (domain `weighSessionStats`) | `bird_weights.weightsG` |
 | `feed_items.stock` (kg, value) | FeedService | `feed_purchases` − `feed_consumption`, moving average |
 | `feed_consumption.cost` | FeedService at issue time | moving-average cost at that point in the ledger |
@@ -66,8 +65,10 @@ When a record changes, the service writes these in **one transaction** (MongoDB 
 
 | Action | Writes |
 | --- | --- |
-| Place chicks in a flock | `flock_events` (placement) → `flocks.population`; draws down `chicks.remaining` if from a lot; `expenses` for bought chicks |
-| Save a daily record | `daily_records` → `flocks.population` |
+| Place chicks in a flock | `flock_events` (placement) → `flocks.population`; draws down `chicks.remaining` if from a lot; `expenses` for bought chicks (with the money module) |
+| Save a daily record | `daily_records` + `flock_events` (mortality, cull; reversals of the record's previous ones) + `feed_consumption` + `water_records` → `flocks.population` |
+| Transfer, split or merge birds | paired `flock_events` on both flocks (with cost and weight) → both snapshots; a split creates the new `flocks` document; a merge closes the source |
+| Sell birds, adjust, weigh, close | `flock_events` → `flocks.population` (`bird_weights` for individual weights) |
 | Save an egg record | `egg_records` + `egg_inventory` (collected, and broken as a negative movement); editing it reverses and re-posts by `sourceId` |
 | Issue feed | `feed_consumption` (costed) → `feed_items.stock` |
 | Receive feed | `feed_purchases` → `feed_items.stock`; `expenses` (unpaid or paid) |
@@ -82,6 +83,8 @@ When a record changes, the service writes these in **one transaction** (MongoDB 
 | Move equipment | `equipment_movements` → `equipment.houseId` |
 | Alert job finds a problem | `alerts` (unique dedupKey) + `notifications` per recipient and channel |
 | Offline mutation pushed | `sync_operations` (outcome, exactly once) + whatever the command writes |
+
+> **Change with the flock engine (D35):** deaths and culls are `flock_events`, not fields on `daily_records`. A daily record posts them as events linked by `dailyRecordId`. The flock ledger is therefore the only place a bird-count change is stored. See [flock-engine.md](flock-engine.md).
 
 ## Corrections, deletion and retention
 
@@ -107,7 +110,6 @@ When a record changes, the service writes these in **one transaction** (MongoDB 
 
 | Embedded | Why |
 | --- | --- |
-| Mortality entries in `daily_records` | Always written and read with the day; at most a handful |
 | Sample weights in `bird_weights` | Read only with their session; capped at 2,000 |
 | Lines and status history in `orders` | Read with the order; capped at 50 lines |
 | Lessons in `training_courses` | Read with the course; a few per course |
@@ -217,7 +219,7 @@ Used by the data import (roadmap Phase 8).
 | `profiles` | `users`, `farms`, `farm_members` | One farm and an owner membership per profile |
 | `houses` | `houses` | |
 | `flocks` | `flocks`, `flock_events` | `chicks_received`/`bird_count` → placement event; sale columns → sale event |
-| `daily_logs` | `daily_records`, `egg_records`, `egg_inventory`, `feed_consumption` | Partial rows merged per flock and date; unassigned rows go to review |
+| `daily_logs` | `daily_records`, `flock_events` (mortality), `egg_records`, `egg_inventory`, `feed_consumption` | Partial rows merged per flock and date; deaths become mortality events; unassigned rows go to review |
 | `bird_weights` | `bird_weights` | Individual weights grouped into sessions by flock and date |
 | `feed_items` | `feed_items`, `feed_purchases` | Each purchase row becomes an item (by name) plus a purchase |
 | `health_records` | `health_records`, `vaccinations` | `record_type = vaccination` rows become vaccinations; `next_due` becomes a scheduled vaccination |

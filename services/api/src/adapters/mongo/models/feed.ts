@@ -67,15 +67,17 @@ export const FeedConsumptionModel = defineCollection({
   description: "Feed issued to a flock on a day, costed at the moving average at the time of issue. Sum per flock is the FCR numerator.",
   fields: {
     flockId: ref("Flock", { required: true }),
-    feedItemId: ref("FeedItem", { required: true }),
+    /** Optional until the feed stock module exists; then required for stock and costing. */
+    feedItemId: ref("FeedItem"),
     date: localDate({ required: true }),
     quantityKg: num({ required: true, min: 0.001 }),
+    dailyRecordId: ref("DailyRecord"),
     /** Derived from the feed item's moving-average cost when the issue was recorded. */
     cost: money(),
     notes: text(500),
   },
   indexes: [
     { fields: { farmId: 1, flockId: 1, date: 1 }, why: "FCR, daily feed per flock, feed-change alerts" },
-    { fields: { farmId: 1, feedItemId: 1, date: 1 }, why: "Days of cover per item and ledger replay" },
+    { fields: { farmId: 1, feedItemId: 1, date: 1 }, options: { partialFilterExpression: { feedItemId: { $exists: true } } }, why: "Days of cover per item and ledger replay" },
   ],
 });

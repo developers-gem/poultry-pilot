@@ -6,7 +6,7 @@ import {
   localDateOf,
   overallHatchOfSet,
   population,
-  type FlockEvent,
+  type LedgerEvent,
 } from "../../src/domain/index.js";
 import * as legacy from "./legacy.js";
 import * as fx from "./fixtures/broiler-farm.js";
@@ -64,12 +64,12 @@ describe("batchLifecycle — current behaviour of Batch 14", () => {
 describe("B18: dashboard bird count", () => {
   it("subtracts closed flocks' deaths and ignores sales", () => {
     expect(legacy.dashboardBirds(fx.flocks, fx.logs)).toBe(945); // prototype
-    const events: FlockEvent[] = [
-      { type: "placement", date: "2026-09-01", birdsReceived: 1000, deadOnArrival: 0 },
-      { type: "mortality", date: "2026-09-02", count: 12 },
-      { type: "mortality", date: "2026-09-20", count: 8 },
-      { type: "mortality", date: "2026-10-01", count: 5 },
-      { type: "sale", date: "2026-10-03", birds: 400, totalLiveWeightKg: 920 },
+    const events: LedgerEvent[] = [
+      { id: "p", type: "placement", date: "2026-09-01", birds: 1000, deadOnArrival: 0 },
+      { id: "m1", type: "mortality", date: "2026-09-02", birds: 12 },
+      { id: "m2", type: "mortality", date: "2026-09-20", birds: 8 },
+      { id: "m3", type: "mortality", date: "2026-10-01", birds: 5 },
+      { id: "s", type: "sale", date: "2026-10-03", birds: 400, totalLiveWeightKg: 920 },
     ];
     expect(population(events).alive).toBe(575); // corrected
   });

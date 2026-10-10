@@ -45,6 +45,16 @@ const S = {
   UpdateMemberRequest: registry.register("UpdateMemberRequest", V.UpdateMemberRequest),
   AcceptInviteRequest: registry.register("AcceptInviteRequest", V.AcceptInviteRequest),
   SyncPushRequest: registry.register("SyncPushRequest", V.SyncPushRequest),
+  HouseView: registry.register("HouseView", V.HouseView),
+  CreateHouseRequest: registry.register("CreateHouseRequest", V.CreateHouseRequest),
+  ReplaceHouseRequest: registry.register("ReplaceHouseRequest", V.ReplaceHouseRequest),
+  FlockView: registry.register("FlockView", V.FlockView),
+  FlockMetricsView: registry.register("FlockMetricsView", V.FlockMetricsView),
+  FlockEventView: registry.register("FlockEventView", V.FlockEventView),
+  DailyRecordView: registry.register("DailyRecordView", V.DailyRecordView),
+  CreateFlockRequest: registry.register("CreateFlockRequest", V.CreateFlockRequest),
+  ReplaceFlockRequest: registry.register("ReplaceFlockRequest", V.ReplaceFlockRequest),
+  DailyRecordRequest: registry.register("DailyRecordRequest", V.DailyRecordRequest),
   SyncChange: registry.register("SyncChange", V.SyncChange),
 };
 
@@ -133,6 +143,50 @@ registry.registerPath({ method: "post", path: `${API_PREFIX}/farms/{farmId}/memb
 registry.registerPath({ method: "put", path: `${API_PREFIX}/farms/{farmId}/members/{memberId}`, tags: ["Members"], security: secured, summary: "Change a member's role", request: { params: memberParams, ...bodyOf(S.UpdateMemberRequest) }, responses: { 200: json(S.MembershipView, "Role changed"), ...errors, 422: json(S.ErrorEnvelope, "Would leave the farm without an owner") } });
 registry.registerPath({ method: "delete", path: `${API_PREFIX}/farms/{farmId}/members/{memberId}`, tags: ["Members"], security: secured, summary: "Remove a member, cancel an invitation, or leave the farm (your own id)", request: { params: memberParams }, responses: { 204: { description: "Removed" }, ...errors, 422: json(S.ErrorEnvelope, "Would leave the farm without an owner") } });
 post("/farms/invitations/accept", "Accept an emailed farm invitation", bodyOf(S.AcceptInviteRequest), { 200: json(S.MembershipView, "Joined"), 401: errors[401], 422: json(S.ErrorEnvelope, "Invalid or expired invitation") }, true);
+
+// ---- houses and flocks ----------------------------------------------------
+{
+  const P = `${API_PREFIX}/farms/{farmId}`;
+  const houseParams = z.object({ farmId: V.Id, houseId: V.Id });
+  const flockParams = z.object({ farmId: V.Id, flockId: V.Id });
+  const route = (method: "get" | "post" | "put" | "delete", path: string, tag: string, summary: string, params: z.AnyZodObject, request: Record<string, unknown>, ok: Record<string, unknown>) =>
+    registry.registerPath({ method, path: `${P}${path}`, tags: [tag], summary, security: secured, request: { params, ...request }, responses: { ...ok, ...errors } } as never);
+  const items = <T extends z.ZodTypeAny>(t: T) => z.object({ items: z.array(t) });
+
+  route("get", "/houses", "Houses", "Houses of the farm", farmParams, {}, { 200: json(items(S.HouseView), "Houses") });
+  route("post", "/houses", "Houses", "Create a house", farmParams, bodyOf(S.CreateHouseRequest), { 201: json(S.HouseView, "Created") });
+  route("get", "/houses/{houseId}", "Houses", "One house", houseParams, {}, { 200: json(S.HouseView, "House") });
+  route("put", "/houses/{houseId}", "Houses", "Replace a house (capacity cannot drop below birds housed)", houseParams, bodyOf(S.ReplaceHouseRequest), { 200: json(S.HouseView, "Updated") });
+  route("delete", "/houses/{houseId}", "Houses", "Delete a house with no planned or active flocks", houseParams, {}, { 204: { description: "Deleted" } });
+
+  route("get", "/flocks", "Flocks", "Flocks, filtered by status, house or type", farmParams, { query: V.FlockListQuery }, { 200: json(items(S.FlockView), "Flocks") });
+  route("post", "/flocks", "Flocks", "Create a flock; with placement it starts active", farmParams, bodyOf(S.CreateFlockRequest), { 201: json(S.FlockView, "Created") });
+  route("get", "/flocks/{flockId}", "Flocks", "A flock with all calculations", flockParams, { query: V.MetricsQuery }, { 200: json(S.FlockView, "Flock") });
+  route("put", "/flocks/{flockId}", "Flocks", "Replace descriptive fields", flockParams, bodyOf(S.ReplaceFlockRequest), { 200: json(S.FlockView, "Updated") });
+  route("delete", "/flocks/{flockId}", "Flocks", "Delete a planned flock with no records", flockParams, {}, { 204: { description: "Deleted" } });
+  route("get", "/flocks/{flockId}/metrics", "Flocks", "Calculations as of a date, optionally valuing live birds at a reference price", flockParams, { query: V.MetricsQuery }, { 200: json(S.FlockMetricsView, "Metrics") });
+  route("get", "/flocks/{flockId}/events", "Flock events", "The flock ledger", flockParams, {}, { 200: json(items(S.FlockEventView), "Events") });
+
+  const commands: [string, string, z.ZodTypeAny, z.ZodTypeAny][] = [
+    ["placement", "Place birds in a planned flock", V.PlaceFlockRequest, S.FlockView],
+    ["mortality", "Record deaths", V.MortalityRequest, S.FlockEventView],
+    ["culls", "Record culled birds", V.CullRequest, S.FlockEventView],
+    ["transfers", "Move the flock to another house, or move birds into another flock", V.TransferRequest, z.object({ flock: S.FlockView, destination: S.FlockView.optional() })],
+    ["splits", "Move birds into a new flock", V.SplitRequest, z.object({ flock: S.FlockView, newFlock: S.FlockView })],
+    ["merge", "Move every bird into another flock and close this one", V.MergeRequest, z.object({ flock: S.FlockView, target: S.FlockView })],
+    ["sales", "Sell birds (never more than are available)", V.SaleRequest, S.FlockEventView],
+    ["adjustments", "Correct the bird count, with a reason", V.AdjustmentRequest, S.FlockEventView],
+    ["weighings", "Record a weighing", V.WeighingRequest, S.FlockEventView],
+  ];
+  for (const [path, summary, body, out] of commands) {
+    route("post", `/flocks/{flockId}/${path}`, "Flock events", summary, flockParams, bodyOf(body), { 201: json(out, "Recorded"), 422: json(S.ErrorEnvelope, "Not enough birds, wrong status, or over capacity") });
+  }
+  route("post", "/flocks/{flockId}/close", "Flocks", "Close a flock once every bird is accounted for", flockParams, bodyOf(V.CloseFlockRequest), { 200: json(S.FlockView, "Closed") });
+  route("post", "/flocks/{flockId}/events/{eventId}/reverse", "Flock events", "Reverse a wrong placement, death, cull, adjustment, sale or weighing", z.object({ farmId: V.Id, flockId: V.Id, eventId: V.Id }), bodyOf(V.ReverseEventRequest), { 201: json(S.FlockEventView, "Reversal recorded") });
+  route("get", "/flocks/{flockId}/daily-records", "Daily records", "Days with records, newest first", flockParams, { query: V.DateRangeQuery }, { 200: json(items(S.DailyRecordView), "Days") });
+  route("get", "/flocks/{flockId}/daily-records/{date}", "Daily records", "Everything recorded for one day", z.object({ farmId: V.Id, flockId: V.Id, date: V.LocalDate }), {}, { 200: json(S.DailyRecordView, "Day") });
+  route("put", "/flocks/{flockId}/daily-records/{date}", "Daily records", "Create or replace the day's record (deaths, culls, feed, water, conditions)", z.object({ farmId: V.Id, flockId: V.Id, date: V.LocalDate }), bodyOf(S.DailyRecordRequest), { 200: json(S.DailyRecordView, "Saved"), 409: json(S.ErrorEnvelope, "Changed by someone else") });
+}
 
 // ---- sync -----------------------------------------------------------------
 registry.registerPath({
