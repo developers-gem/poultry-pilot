@@ -152,44 +152,6 @@ export const CloseFlockRequest = z.object({ date: LocalDate, notes: note }).stri
 
 export const ReverseEventRequest = z.object({ reason: z.string().trim().min(3).max(500) }).strict();
 
-// ---- daily records ----------------------------------------------------------
-
-/**
- * PUT /flocks/:flockId/daily-records/:date — the full record for one flock and day. Mortality and culls are
- * posted as flock events linked to the record; saving again reverses the old ones and posts the new ones.
- */
-export const DailyRecordRequest = z
-  .object({
-    mortality: z.array(z.object({ cause: MortalityCause, count: PositiveCount }).strict()).max(10).default([]),
-    culls: Count.default(0),
-    feed: z
-      .array(
-        z
-          .object({
-            quantityKg: Kilograms.positive(),
-            feedItemId: Id.optional(),
-            /** Until the feed stock module costs feed automatically, the price can be given here. */
-            unitCostPerKg: Money.optional(),
-          })
-          .strict(),
-      )
-      .max(10)
-      .default([]),
-    waterLitres: z.number().nonnegative().max(10_000_000).optional(),
-    temperatureMinC: Celsius.optional(),
-    temperatureMaxC: Celsius.optional(),
-    humidityPercent: z.number().min(0).max(100).optional(),
-    lightingHours: z.number().min(0).max(24).optional(),
-    notes: OptionalText(2000),
-    /** Required when updating an existing record (optimistic concurrency). */
-    version: z.number().int().nonnegative().optional(),
-  })
-  .strict()
-  .refine((r) => r.temperatureMinC === undefined || r.temperatureMaxC === undefined || r.temperatureMinC <= r.temperatureMaxC, {
-    message: "Minimum temperature is above the maximum",
-    path: ["temperatureMinC"],
-  });
-
 export const DateRangeQuery = z.object({ from: LocalDate.optional(), to: LocalDate.optional() });
 
 export const MetricsQuery = z.object({
@@ -294,26 +256,4 @@ export const FlockEventView = z.object({
   reversed: z.boolean(),
   createdBy: z.string(),
   createdAt: z.string(),
-});
-
-export const DailyRecordView = z.object({
-  id: z.string().nullable(),
-  flockId: z.string(),
-  date: z.string(),
-  /** Every death recorded for the day, from the daily record and from separate mortality entries. */
-  mortality: z.array(z.object({ cause: MortalityCause, count: z.number(), eventId: z.string(), fromDailyRecord: z.boolean() })),
-  mortalityTotal: z.number(),
-  culls: z.number(),
-  feed: z.array(z.object({ id: z.string(), quantityKg: z.number(), feedItemId: z.string().optional(), cost: Money.optional() })),
-  feedKg: z.number(),
-  waterLitres: z.number().optional(),
-  temperatureMinC: z.number().optional(),
-  temperatureMaxC: z.number().optional(),
-  humidityPercent: z.number().optional(),
-  lightingHours: z.number().optional(),
-  notes: z.string().optional(),
-  birdsAliveEndOfDay: z.number(),
-  version: z.number().nullable(),
-  createdBy: z.string().optional(),
-  updatedAt: z.string().optional(),
 });

@@ -33,6 +33,8 @@ const member = (farmId: string, over: Partial<MembershipRecord> = {}): Membershi
 /** What the server under test supports. FerretDB (local check without Docker) lacks partial indexes. */
 interface Caps {
   partialUniqueIndexes: boolean;
+  /** FerretDB 1.x computes only the first accumulator of a $group stage; MongoDB computes all. */
+  multiAccumulatorGroup: boolean;
 }
 
 function contract(name: string, setup: () => Promise<{ repos: Repositories; reset: () => Promise<void>; teardown?: () => Promise<void>; caps: Caps }>) {
@@ -152,9 +154,44 @@ function contract(name: string, setup: () => Promise<{ repos: Repositories; rese
       expect(await repos.flockEvents.find(farmId, { range: { field: "date", from: "2026-10-02", to: "2026-10-02" } })).toHaveLength(2);
       expect(await repos.flockEvents.find(farmId, { sort: [{ field: "date", dir: -1 }], limit: 1 })).toEqual([expect.objectContaining({ date: "2026-10-03" })]);
 
-      const rec = { id: newId(), farmId, flockId: "f1", date: "2026-10-02", createdBy: "u1", createdAt: now, updatedAt: now, version: 0 };
+      const rec = { id: newId(), farmId, flockId: "f1", date: "2026-10-02", houseId: "h1", flockType: "broiler" as const, photos: [], createdBy: "u1", createdAt: now, updatedAt: now, version: 0 };
       await repos.dailyRecords.insert(rec);
       if (caps.partialUniqueIndexes) await expect(repos.dailyRecords.insert({ ...rec, id: newId() })).rejects.toMatchObject({ code: 11000 });
+    });
+
+    it("farm repositories: exists filter, keyset pagination, id filters and server-side aggregation", async () => {
+      const farmId = newId();
+      const ev = (date: string, type: "mortality" | "cull", birds: number, flockId: string, reversalOf?: string) => ({
+        id: newId(), farmId, flockId, type, date, birds, ...(reversalOf ? { reversalOf } : {}), createdBy: "u1", createdAt: now, updatedAt: now,
+      });
+      const a = ev("2026-10-01", "mortality", 5, "f1");
+      await repos.flockEvents.insertMany([a, ev("2026-10-01", "mortality", 3, "f1"), ev("2026-10-01", "cull", 2, "f2"), ev("2026-10-02", "mortality", 4, "f2"), ev("2026-10-03", "mortality", 5, "f1", a.id)]);
+      await repos.flockEvents.insert({ ...ev("2026-10-01", "mortality", 99, "f1"), farmId: newId() }); // another farm: never counted
+
+      expect(await repos.flockEvents.find(farmId, { exists: { reversalOf: true } })).toHaveLength(1);
+      expect(await repos.flockEvents.find(farmId, { exists: { reversalOf: false } })).toHaveLength(4);
+      expect(await repos.flockEvents.find(farmId, { where: { id: [a.id] } as never })).toEqual([expect.objectContaining({ id: a.id })]);
+
+      const rows = await repos.flockEvents.aggregate(farmId, { exists: { reversalOf: false }, range: { field: "date", to: "2026-10-01" } }, ["flockId", "type"], ["birds"]);
+      expect(rows.map((r) => `${r.key["flockId"]}:${r.key["type"]}`).sort()).toEqual(["f1:mortality", "f2:cull"]);
+      if (caps.multiAccumulatorGroup) {
+        const byKey = Object.fromEntries(rows.map((r) => [`${r.key["flockId"]}:${r.key["type"]}`, [r.sums["birds"], r.count]]));
+        expect(byKey).toEqual({ "f1:mortality": [8, 2], "f2:cull": [2, 1] });
+        const perDay = await repos.flockEvents.aggregate(farmId, { where: { type: ["mortality"] } as never }, ["date"], ["birds"]);
+        expect(Object.fromEntries(perDay.map((r) => [r.key["date"], r.sums["birds"]]))).toEqual({ "2026-10-01": 8, "2026-10-02": 4, "2026-10-03": 5 });
+      }
+
+      const rec = (date: string) => ({ id: newId(), farmId, flockId: newId(), date, houseId: "h1", flockType: "layer" as const, photos: [], createdBy: "u1", createdAt: now, updatedAt: now, version: 0 });
+      const recs = [rec("2026-10-03"), rec("2026-10-02"), rec("2026-10-02"), rec("2026-10-01")];
+      await repos.dailyRecords.insertMany(recs);
+      const sort = [{ field: "date" as const, dir: -1 as const }, { field: "id" as const, dir: -1 as const }];
+      const p1 = await repos.dailyRecords.find(farmId, { sort, limit: 2 });
+      const p2 = await repos.dailyRecords.find(farmId, { sort, limit: 2, after: { date: p1[1]!.date, id: p1[1]!.id } });
+      expect([...p1, ...p2].map((r) => r.id).sort()).toEqual(recs.map((r) => r.id).sort());
+      expect(new Set([...p1, ...p2].map((r) => r.id)).size).toBe(4);
+      expect(await repos.locateDailyRecord(recs[0]!.id)).toBe(farmId);
+      await repos.dailyRecords.update(farmId, recs[0]!.id, { deletedAt: later });
+      expect(await repos.locateDailyRecord(recs[0]!.id)).toBeNull();
     });
 
     it("sync: per-farm sequences are independent and changes list in order", async () => {
@@ -171,8 +208,18 @@ function contract(name: string, setup: () => Promise<{ repos: Repositories; rese
 contract("memory", async () => {
   let current = createMemoryRepositories();
   const proxy = new Proxy({} as Repositories, { get: (_t, k) => current.repos[k as keyof Repositories] });
-  return { repos: proxy, reset: async () => void (current = createMemoryRepositories()), caps: { partialUniqueIndexes: true } };
+  return { repos: proxy, reset: async () => void (current = createMemoryRepositories()), caps: { partialUniqueIndexes: true, multiAccumulatorGroup: true } };
 });
+
+/** Detects servers that compute only the first $group accumulator (FerretDB 1.x). */
+async function probeMultiAccumulator(): Promise<boolean> {
+  const c = mongoose.connection.collection("capability_probe");
+  await c.deleteMany({});
+  await c.insertMany([{ g: 1, n: 5 }, { g: 1, n: 3 }]);
+  const [row] = await c.aggregate([{ $group: { _id: "$g", count: { $sum: 1 }, n: { $sum: "$n" } } }]).toArray();
+  await c.drop().catch(() => undefined);
+  return row?.["count"] === 2 && row?.["n"] === 8;
+}
 
 const uri = process.env["MONGODB_TEST_URI"];
 if (uri) {
@@ -199,7 +246,7 @@ if (uri) {
         for (const m of Object.values(mongoose.models)) await m.collection.deleteMany({});
       },
       teardown: () => mongo.disconnect(),
-      caps: { partialUniqueIndexes },
+      caps: { partialUniqueIndexes, multiAccumulatorGroup: await probeMultiAccumulator() },
     };
   });
 }

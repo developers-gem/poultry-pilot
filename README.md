@@ -149,4 +149,8 @@ Roles: owner, admin, farm_manager, supervisor, worker, accountant, vet. Every fa
 
 Houses and flocks under `/api/v1/farms/:farmId`: flock CRUD, placement, mortality, culls, transfers (house or flock), splits, merges, sales, adjustments, weighings, closure, reversals, and daily records (`PUT …/flocks/:flockId/daily-records/:date`). Every bird-count change is an event in an append-only ledger; impossible operations (selling or losing more birds than exist on any day, over-capacity houses, future dates) are refused. `GET …/flocks/:flockId/metrics` returns bird count, mortality and survival rates, average weight and daily gain, feed, FCR, live weight, revenue, cost, profit, margin and cost per bird. Rules and formulas: `docs/flock-engine.md`.
 
+## Daily farm operations
+
+`POST/GET /api/v1/farms/:farmId/daily-records`, `GET/PUT/DELETE /api/v1/daily-records/:id`: one record per flock per day covering headcount, mortality, culls, feed, water, temperature, humidity, eggs, broken eggs, egg quality, average weight, health observations, notes and photos. Each section is written to its source collection in one transaction. `GET …/daily-records/sheet` loads a phone's entry screen in one call; `Prefer: return=minimal` keeps responses small; `GET …/dashboard/day` and `…/dashboard/trends` aggregate on the server. Photos: `POST /api/v1/farms/:farmId/media`. Details: `docs/daily-operations.md`.
+
 Feed stock, health, money and market services are not implemented yet; their collections are.

@@ -59,8 +59,21 @@ export type SaleRequest = z.infer<typeof V.SaleRequest>;
 export type AdjustmentRequest = z.infer<typeof V.AdjustmentRequest>;
 export type WeighingRequest = z.infer<typeof V.WeighingRequest>;
 export type CloseFlockRequest = z.infer<typeof V.CloseFlockRequest>;
-export type DailyRecordRequest = z.infer<typeof V.DailyRecordRequest>;
 export type FlockView = z.infer<typeof V.FlockView>;
 export type FlockEventView = z.infer<typeof V.FlockEventView>;
 export type FlockMetricsView = z.infer<typeof V.FlockMetricsView>;
+
+// daily operations
+export type DailyRecordFields = z.infer<typeof V.DailyRecordFields>;
+export type CreateDailyRecordRequest = z.infer<typeof V.CreateDailyRecordRequest>;
+export type UpdateDailyRecordRequest = z.infer<typeof V.UpdateDailyRecordRequest>;
+export type UpsertDailyRecordRequest = z.infer<typeof V.UpsertDailyRecordRequest>;
+export type DailyRecordListQuery = z.infer<typeof V.DailyRecordListQuery>;
+export type DailyRecordSummary = z.infer<typeof V.DailyRecordSummary>;
+export type DailyRecordListItem = z.infer<typeof V.DailyRecordListItem>;
 export type DailyRecordView = z.infer<typeof V.DailyRecordView>;
+export type DailyRecordMinimal = z.infer<typeof V.DailyRecordMinimal>;
+export type DailyEntrySheet = z.infer<typeof V.DailyEntrySheet>;
+export type MediaAssetView = z.infer<typeof V.MediaAssetView>;
+export type DashboardDayView = z.infer<typeof V.DashboardDayView>;
+export type TrendsView = z.infer<typeof V.TrendsView>;

@@ -103,3 +103,19 @@ export const CounterModel = defineCollection({
   description: "Atomic per-farm sequences (sync change seq, order numbers). _id = purpose:farmId.",
   fields: { value: int({ required: true, default: 0 }) },
 });
+
+export const MediaAssetModel = defineCollection({
+  model: "MediaAsset",
+  collection: "media_assets",
+  domain: D,
+  ownership: "farm",
+  description:
+    "A photo uploaded by a farm member (daily records, health records). The bytes live in object storage under storageKey; this document is the farm-scoped index and access check.",
+  fields: {
+    contentType: enumOf(["image/jpeg", "image/png", "image/webp"], { required: true }),
+    sizeBytes: int({ required: true, min: 1, max: 10_000_000 }),
+    sha256: str({ required: true, max: 64 }),
+    storageKey: str({ required: true, max: 300 }),
+  },
+  notes: ["Read by _id within the farm only; no secondary index. Linked from daily_records.photos[].assetId."],
+});

@@ -143,15 +143,46 @@ export const DailyRecordModel = defineCollection({
   domain: D,
   ownership: "farm",
   description:
-    "One record per flock per farm-local day: house conditions and notes. The day's deaths and culls are flock_events linked by dailyRecordId; feed and water are feed_consumption and water_records for the same flock and date.",
+    "One record per flock per farm-local day, entered from web or mobile. Holds conditions, headcount, notes and photo references; its other sections are written to their source collections and linked by dailyRecordId: deaths, culls and average weight (flock_events), feed (feed_consumption), water (water_records), eggs (egg_records), health observations (health_records).",
   fields: {
     flockId: ref("Flock", { required: true }),
     date: localDate({ required: true }),
+    /** The flock's house on this day (flocks can move), for filtering by house. */
+    houseId: ref("House", { required: true }),
+    /** Copied from the flock (immutable there), for filtering by type without a join. */
+    flockType: enumOf(FLOCK_TYPES, { required: true }),
+    /** Headcount taken in the house; compared with the ledger, never applied to it. */
+    observedBirdCount: int(),
     temperatureMinC: num({ min: -60, max: 70 }),
     temperatureMaxC: num({ min: -60, max: 70 }),
     humidityPercent: num({ max: 100 }),
     lightingHours: num({ max: 24 }),
     notes: text(2000),
+    photos: {
+      type: [new Schema({ assetId: ref("MediaAsset", { required: true }), caption: str({ max: 200 }) }, { _id: false })],
+      default: [],
+      validate: { validator: (v: unknown[]) => v.length <= 10, message: "At most 10 photos" },
+    },
+    /**
+     * Derived: totals of what this record wrote to its source collections, rewritten in the same transaction.
+     * Lets lists show a day at a glance without reading five collections. Dashboards aggregate the sources.
+     */
+    summary: {
+      type: new Schema(
+        {
+          mortality: int({ default: 0 }),
+          culls: int({ default: 0 }),
+          feedKg: num({ default: 0 }),
+          waterLitres: num(),
+          eggsCollected: int(),
+          eggsBroken: int(),
+          averageWeightG: num({ max: 50_000 }),
+          observations: int({ default: 0 }),
+          photos: int({ default: 0 }),
+        },
+        { _id: false },
+      ),
+    },
   },
   indexes: [
     { fields: { farmId: 1, flockId: 1, date: 1 }, options: { unique: true, ...LIVE }, why: "One record per flock per day; also serves a flock's date-range history" },
@@ -204,6 +235,9 @@ export const EggRecordModel = defineCollection({
     collected: int({ required: true }),
     byGrade: { type: Map, of: { type: Number, min: 0 }, default: undefined },
     broken: int({ default: 0 }),
+    averageEggWeightG: num({ max: 150 }),
+    qualityNotes: str({ max: 500 }),
+    dailyRecordId: ref("DailyRecord"),
     notes: text(1000),
   },
   indexes: [

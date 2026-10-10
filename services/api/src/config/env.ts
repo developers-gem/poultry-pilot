@@ -34,6 +34,8 @@ const Env = z
     REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).max(180).default(30),
     SESSION_MAX_DAYS: z.coerce.number().int().min(1).max(365).default(90),
     LOGIN_MAX_FAILED_ATTEMPTS: z.coerce.number().int().min(3).max(100).default(10),
+    /** Directory for uploaded photos in development. Production should use an S3-compatible adapter. */
+    MEDIA_DIR: z.string().default("./data/media"),
     LOGIN_LOCK_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
 
     CORS_ORIGINS: csv("http://localhost:5173"),

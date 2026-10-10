@@ -1,9 +1,12 @@
-import { CullRequest, DailyRecordRequest, Id, LocalDate, MortalityRequest, ReplaceFarmRequest, WeighingRequest } from "@poultrypilot/validation";
+import { CullRequest, Id, LocalDate, MortalityRequest, ReplaceFarmRequest, UpsertDailyRecordRequest, WeighingRequest } from "@poultrypilot/validation";
 import { z } from "zod";
 import type { Logger } from "pino";
 import { AppError } from "./lib/errors.js";
 import { systemClock, type Clock } from "./lib/util.js";
-import type { EmailSender, GoogleTokenVerifier, PasswordHasher } from "./ports/external.js";
+import type { EmailSender, GoogleTokenVerifier, MediaStorage, PasswordHasher } from "./ports/external.js";
+import { memoryMediaStorage } from "./adapters/storage.js";
+import { createDailyRecordService } from "./services/daily-record.service.js";
+import { createMediaService } from "./services/media.service.js";
 import type { HealthChecks } from "./ports/health.js";
 import type { Repositories } from "./ports/repositories.js";
 import { createAuditService } from "./services/audit.service.js";
@@ -41,6 +44,8 @@ export interface ContainerDeps {
   hasher: PasswordHasher;
   email: EmailSender;
   google?: GoogleTokenVerifier;
+  /** Photo storage. Defaults to in-memory (tests); server.ts passes local disk or S3. */
+  media?: MediaStorage;
   clock?: Clock;
 }
 
@@ -79,10 +84,12 @@ export function buildContainer(d: ContainerDeps) {
 
   const houses = createHouseService({ repos: d.repos, clock, audit, sync });
   const flocks = createFlockService({ repos: d.repos, clock, audit, sync });
+  const dailyRecords = createDailyRecordService({ repos: d.repos, clock, audit, sync, flocks });
+  const media = createMediaService({ repos: d.repos, clock, audit, storage: d.media ?? memoryMediaStorage() });
 
   // Offline field-recording commands (Flutter outbox). Same service methods, same rules, as REST.
   // Handlers receive the parsed (output) value, with defaults applied.
-  const DailyRecordCommand = z.object({ flockId: Id, date: LocalDate, record: DailyRecordRequest });
+  const DailyRecordCommand = z.object({ flockId: Id, date: LocalDate, record: UpsertDailyRecordRequest });
   const MortalityCommand = z.object({ flockId: Id }).and(MortalityRequest);
   const CullCommand = z.object({ flockId: Id }).and(CullRequest);
   sync.register("daily_record.put", {
@@ -90,8 +97,8 @@ export function buildContainer(d: ContainerDeps) {
     schema: DailyRecordCommand,
     async run(ctx, raw, meta) {
       const p = raw as z.output<typeof DailyRecordCommand>;
-      const out = await flocks.putDailyRecord(ctx, p.flockId, p.date, { ...p.record, ...(meta.baseVersion !== undefined ? { version: meta.baseVersion } : {}) });
-      return { ...(out.id ? { entityId: out.id } : {}), ...(out.version !== null ? { version: out.version } : {}) };
+      const out = await dailyRecords.upsertByFlockDate(ctx, p.flockId, p.date, { ...p.record, ...(meta.baseVersion !== undefined ? { version: meta.baseVersion } : {}) }, { minimal: true });
+      return { entityId: out.id!, version: out.version! };
     },
   });
   sync.register("flock.mortality", {
@@ -118,7 +125,7 @@ export function buildContainer(d: ContainerDeps) {
     },
   });
 
-  return { ...d, clock, startedAt: clock.now(), accessTokens, audit, sync, auth, farms, houses, flocks };
+  return { ...d, clock, startedAt: clock.now(), accessTokens, audit, sync, auth, farms, houses, flocks, dailyRecords, media };
 }
 
 export type Container = ReturnType<typeof buildContainer>;

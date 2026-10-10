@@ -1,4 +1,4 @@
-import type { FarmQuery, FarmRepo, Tx } from "../../ports/repositories.js";
+import type { AggregateRow, FarmQuery, FarmRepo, Tx } from "../../ports/repositories.js";
 
 /**
  * In-memory farm-scoped repository with the same semantics as the MongoDB one: farm scoping,
@@ -14,6 +14,13 @@ function matches<T>(rec: T, q: FarmQuery<T> | undefined): boolean {
   for (const [k, v] of Object.entries(q?.where ?? {})) {
     const actual = (rec as Record<string, unknown>)[k];
     if (Array.isArray(v) ? !v.includes(actual) : actual !== v) return false;
+  }
+  for (const [k, want] of Object.entries(q?.exists ?? {})) {
+    if (((rec as Record<string, unknown>)[k] !== undefined) !== want) return false;
+  }
+  if (q?.after) {
+    const r = rec as unknown as { date: string; id: string };
+    if (!(r.date < q.after.date || (r.date === q.after.date && r.id < q.after.id))) return false;
   }
   if (q?.range) {
     const val = (rec as Record<string, unknown>)[q.range.field] as string | undefined;
@@ -62,6 +69,19 @@ export function createMemFarmRepo<T extends { id: string; farmId: string }>(
     async insertMany(recs) {
       for (const r of recs) assertUnique(r);
       for (const r of recs) table.rows.set(r.id, clone(r));
+    },
+    async aggregate(farmId, q, by, sums) {
+      const groups = new Map<string, AggregateRow>();
+      for (const r of table.rows.values()) {
+        if (r.farmId !== farmId || !live(r) || !matches(r, q)) continue;
+        const key = Object.fromEntries(by.map((k) => [k, r[k] ?? null]));
+        const id = JSON.stringify(key);
+        const g = groups.get(id) ?? { key, sums: Object.fromEntries(sums.map((s) => [s, 0])), count: 0 };
+        for (const s of sums) g.sums[s] = (g.sums[s] ?? 0) + (Number(r[s]) || 0);
+        g.count++;
+        groups.set(id, g);
+      }
+      return [...groups.values()];
     },
     async update(farmId, id, patch, o) {
       const cur = table.rows.get(id);

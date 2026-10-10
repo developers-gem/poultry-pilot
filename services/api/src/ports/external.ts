@@ -28,3 +28,10 @@ export interface PasswordHasher {
   hash(password: string): Promise<string>;
   verify(hash: string, password: string): Promise<boolean>;
 }
+
+/** Object storage for uploaded photos. Local disk in development, S3-compatible storage in production. */
+export interface MediaStorage {
+  put(key: string, bytes: Buffer, contentType: string): Promise<void>;
+  get(key: string): Promise<{ bytes: Buffer; contentType: string } | null>;
+  delete(key: string): Promise<void>;
+}

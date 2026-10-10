@@ -31,6 +31,10 @@ import {
   BirdWeightModel,
   FeedConsumptionModel,
   WaterRecordModel,
+  EggRecordModel,
+  EggInventoryModel,
+  HealthRecordModel,
+  MediaAssetModel,
 } from "./models/index.js";
 import { createMongoFarmRepo } from "./farm-repo.js";
 
@@ -248,5 +252,14 @@ export function createMongoRepositories(connection = mongoose.connection): Repos
     birdWeights: createMongoFarmRepo(BirdWeightModel, { softDelete: true, versioned: true }),
     feedConsumption: createMongoFarmRepo(FeedConsumptionModel, { softDelete: true, versioned: true }),
     waterRecords: createMongoFarmRepo(WaterRecordModel, { softDelete: true, versioned: true }),
+    eggRecords: createMongoFarmRepo(EggRecordModel, { softDelete: true, versioned: true }),
+    eggInventory: createMongoFarmRepo(EggInventoryModel, { softDelete: false, versioned: false }),
+    healthRecords: createMongoFarmRepo(HealthRecordModel, { softDelete: true, versioned: true }),
+    mediaAssets: createMongoFarmRepo(MediaAssetModel, { softDelete: true, versioned: true }),
+    // Cross-farm by design: returns only the farmId, which the caller then checks membership for.
+    async locateDailyRecord(id) {
+      const doc = await DailyRecordModel.findOne({ _id: id, deletedAt: null }, { farmId: 1 }).setOptions({ crossFarm: true } as never).lean();
+      return (doc as { farmId?: string } | null)?.farmId ?? null;
+    },
   };
 }

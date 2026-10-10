@@ -3,7 +3,7 @@
 > Generated from the Mongoose schemas in `services/api/src/adapters/mongo/models`. Do not edit by hand:
 > run `pnpm --filter @poultrypilot/api docs:data-dictionary`. A test fails if this file is out of date.
 
-52 collections, 86 secondary indexes (plus the default `_id` index on each). Design rules and relationships: `docs/data-model.md`.
+53 collections, 86 secondary indexes (plus the default `_id` index on each). Design rules and relationships: `docs/data-model.md`.
 
 | Collection | Domain | Ownership | Indexes | Purpose |
 | --- | --- | --- | --- | --- |
@@ -16,7 +16,7 @@
 | [`houses`](#houses) | Production | farm | 1 | A shed, pen or brooder room |
 | [`flocks`](#flocks) | Production | farm | 3 | A group of birds managed together from placement to closure: broiler batch, layer or breeder flock, chick-rearing group, or a custom poultry type |
 | [`flock_events`](#flock_events) | Production | farm, append-only | 1 | The flock ledger: every placement, death, cull, transfer, split, merge, adjustment, sale and weighing |
-| [`daily_records`](#daily_records) | Production | farm | 2 | One record per flock per farm-local day: house conditions and notes |
+| [`daily_records`](#daily_records) | Production | farm | 2 | One record per flock per farm-local day, entered from web or mobile |
 | [`bird_weights`](#bird_weights) | Production | farm | 1 | A weigh session: individual sample weights of one flock on one day, with statistics computed from those weights |
 | [`egg_records`](#egg_records) | Production | farm | 2 | Eggs collected from one flock on one day, by grade |
 | [`egg_inventory`](#egg_inventory) | Production | farm, append-only | 2 | Egg stock ledger |
@@ -59,6 +59,7 @@
 | [`sync_changes`](#sync_changes) | System | farm, append-only | 1 | Outbound change feed for offline clients: every change to a synced record gets the farm's next sequence number |
 | [`idempotency_keys`](#idempotency_keys) | System | system | 1 | Stored responses for Idempotency-Key writes, so a retried request is answered without running twice |
 | [`counters`](#counters) | System | system | 0 | Atomic per-farm sequences (sync change seq, order numbers) |
+| [`media_assets`](#media_assets) | System | farm | 0 | A photo uploaded by a farm member (daily records, health records) |
 
 ## Identity and tenancy
 
@@ -342,7 +343,7 @@ The flock ledger: every placement, death, cull, transfer, split, merge, adjustme
 
 ### daily_records
 
-One record per flock per farm-local day: house conditions and notes. The day's deaths and culls are flock_events linked by dailyRecordId; feed and water are feed_consumption and water_records for the same flock and date.
+One record per flock per farm-local day, entered from web or mobile. Holds conditions, headcount, notes and photo references; its other sections are written to their source collections and linked by dailyRecordId: deaths, culls and average weight (flock_events), feed (feed_consumption), water (water_records), eggs (egg_records), health observations (health_records).
 
 - **Model:** `DailyRecord`
 - **Ownership:** Farm — every query must include farmId
@@ -352,11 +353,27 @@ One record per flock per farm-local day: house conditions and notes. The day's d
 | --- | --- | --- | --- | --- |
 | `flockId` | String | yes |  | `Flock` |
 | `date` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
+| `houseId` | String | yes |  | `House` |
+| `flockType` | String | yes | one of: `broiler`, `layer`, `breeder`, `chick`, `custom` |  |
+| `observedBirdCount` | Number |  | integer |  |
 | `temperatureMinC` | Number |  | min -60; max 70 |  |
 | `temperatureMaxC` | Number |  | min -60; max 70 |  |
 | `humidityPercent` | Number |  | max 100 |  |
 | `lightingHours` | Number |  | max 24 |  |
 | `notes` | String |  | ≤ 2000 chars |  |
+| `photos` | array of objects |  | custom validation |  |
+| `photos[].assetId` | String | yes |  | `MediaAsset` |
+| `photos[].caption` | String |  | ≤ 200 chars |  |
+| `summary` | object |  |  |  |
+| `summary.mortality` | Number |  | default `0`; integer |  |
+| `summary.culls` | Number |  | default `0`; integer |  |
+| `summary.feedKg` | Number |  | default `0` |  |
+| `summary.waterLitres` | Number |  |  |  |
+| `summary.eggsCollected` | Number |  | integer |  |
+| `summary.eggsBroken` | Number |  | integer |  |
+| `summary.averageWeightG` | Number |  | max 50000 |  |
+| `summary.observations` | Number |  | default `0`; integer |  |
+| `summary.photos` | Number |  | default `0`; integer |  |
 
 | Index | Options | Serves |
 | --- | --- | --- |
@@ -409,6 +426,9 @@ Eggs collected from one flock on one day, by grade. Saving it posts a 'collected
 | `byGrade` | map of Mixed |  |  |  |
 | `byGrade.$*` | Number |  |  |  |
 | `broken` | Number |  | default `0`; integer |  |
+| `averageEggWeightG` | Number |  | max 150 |  |
+| `qualityNotes` | String |  | ≤ 500 chars |  |
+| `dailyRecordId` | String |  |  | `DailyRecord` |
 | `notes` | String |  | ≤ 1000 chars |  |
 
 | Index | Options | Serves |
@@ -686,6 +706,7 @@ Vet visits, observations, treatments, lab tests and post-mortems. Records what p
 | `attachments[].name` | String |  | ≤ 200 chars |  |
 | `attachments[].assetUrl` | String | yes | ≤ 1000 chars |  |
 | `followUpDate` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
+| `dailyRecordId` | String |  |  | `DailyRecord` |
 
 | Index | Options | Serves |
 | --- | --- | --- |
@@ -1624,6 +1645,25 @@ Atomic per-farm sequences (sync change seq, order numbers). _id = purpose:farmId
 
 No secondary indexes: read by `_id` only.
 
+### media_assets
+
+A photo uploaded by a farm member (daily records, health records). The bytes live in object storage under storageKey; this document is the farm-scoped index and access check.
+
+- **Model:** `MediaAsset`
+- **Ownership:** Farm — every query must include farmId
+- **Standard fields:** `_id` (UUIDv7 string), `farmId` (required), `createdBy` (required), `updatedBy`, `createdAt`, `updatedAt` (UTC, required), `version` (optimistic concurrency), `deletedAt`, `deletedBy` (soft delete)
+
+| Field | Type | Required | Constraints | References |
+| --- | --- | --- | --- | --- |
+| `contentType` | String | yes | one of: `image/jpeg`, `image/png`, `image/webp` |  |
+| `sizeBytes` | Number | yes | min 1; max 10000000; integer |  |
+| `sha256` | String | yes | ≤ 64 chars |  |
+| `storageKey` | String | yes | ≤ 300 chars |  |
+
+No secondary indexes: read by `_id` only.
+
+- Read by _id within the farm only; no secondary index. Linked from daily_records.photos[].assetId.
+
 ## Relationship index
 
 Every reference between collections, derived from the schemas.
@@ -1652,9 +1692,12 @@ Every reference between collections, derived from the schemas.
 | `flock_events` | `orderId` | `orders` | many-to-one |
 | `flock_events` | `reversalOf` | `flock_events` | many-to-one |
 | `daily_records` | `flockId` | `flocks` | many-to-one |
+| `daily_records` | `houseId` | `houses` | many-to-one |
+| `daily_records` | `photos[].assetId` | `media_assets` | many-to-one |
 | `bird_weights` | `flockId` | `flocks` | many-to-one |
 | `bird_weights` | `scaleEquipmentId` | `equipment` | many-to-one |
 | `egg_records` | `flockId` | `flocks` | many-to-one |
+| `egg_records` | `dailyRecordId` | `daily_records` | many-to-one |
 | `egg_inventory` | `flockId` | `flocks` | many-to-one |
 | `egg_inventory` | `reversalOf` | `egg_inventory` | many-to-one |
 | `egg_inventory` | `sourceId` | EggRecord \| Order | many-to-one (Polymorphic by sourceType) |
@@ -1679,6 +1722,7 @@ Every reference between collections, derived from the schemas.
 | `health_records` | `vetUserId` | `users` | many-to-one |
 | `health_records` | `treatment.medicineId` | `medicines` | many-to-one |
 | `health_records` | `expenseId` | `expenses` | many-to-one |
+| `health_records` | `dailyRecordId` | `daily_records` | many-to-one |
 | `vaccinations` | `flockId` | `flocks` | many-to-one |
 | `vaccinations` | `medicineId` | `medicines` | many-to-one |
 | `vaccinations` | `administeredBy` | `users` | many-to-one |

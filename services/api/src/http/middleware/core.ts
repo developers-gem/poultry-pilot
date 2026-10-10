@@ -63,6 +63,26 @@ export function requireFarm(farms: Pick<FarmService, "resolveContext">, from: "p
   };
 }
 
+/**
+ * 2b. requireFarmOf — for routes whose URL names a record but not its farm (e.g. /daily-records/:id).
+ * Finds the record's farm, then applies the normal membership check. A missing record and a record on a farm the
+ * caller does not belong to give the same 404, so ids cannot be probed.
+ */
+export function requireFarmOf(locate: (id: string) => Promise<string | null>, farms: Pick<FarmService, "resolveContext">, param: string, label: string): RequestHandler {
+  return async (req, _res, next) => {
+    if (!req.auth) return next(new AppError("INTERNAL", "authenticate must run before requireFarmOf"));
+    const id = req.params[param];
+    const farmId = typeof id === "string" ? await locate(id.toLowerCase()) : null;
+    if (!farmId) return next(notFound(label));
+    try {
+      req.farmCtx = await farms.resolveContext(ctxOf(req), farmId);
+    } catch {
+      return next(notFound(label));
+    }
+    next();
+  };
+}
+
 /** 3a. requireRole — the caller's role on this farm is one of `roles`. Prefer requirePermission for features. */
 export function requireRole(...roles: Role[]): RequestHandler {
   return (req, _res, next) => {

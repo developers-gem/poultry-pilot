@@ -11,7 +11,7 @@ import type {
   UserRecord,
 } from "../../ports/records.js";
 import type { Repositories, Tx, TxRunner } from "../../ports/repositories.js";
-import type { BirdWeightRecord, DailyRecordRecord, FeedConsumptionRecord, FlockEventRecord, FlockRecord, HouseRecord, WaterRecordRecord } from "../../ports/records.js";
+import type { BirdWeightRecord, DailyRecordRecord, EggInventoryRecord, EggRecordRecord, FeedConsumptionRecord, FlockEventRecord, FlockRecord, HealthRecordRecord, HouseRecord, MediaAssetRecord, WaterRecordRecord } from "../../ports/records.js";
 import { createMemFarmRepo } from "./farm-repo.js";
 
 /**
@@ -62,6 +62,10 @@ export interface MemoryStore {
   birdWeights: Table<BirdWeightRecord>;
   feedConsumption: Table<FeedConsumptionRecord>;
   waterRecords: Table<WaterRecordRecord>;
+  eggRecords: Table<EggRecordRecord>;
+  eggInventory: Table<EggInventoryRecord>;
+  healthRecords: Table<HealthRecordRecord>;
+  mediaAssets: Table<MediaAssetRecord>;
 }
 
 export function createMemoryRepositories(): { repos: Repositories; store: MemoryStore } {
@@ -84,6 +88,10 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
     birdWeights: new Table(),
     feedConsumption: new Table(),
     waterRecords: new Table(),
+    eggRecords: new Table(),
+    eggInventory: new Table(),
+    healthRecords: new Table(),
+    mediaAssets: new Table(),
   };
   const transactional = [
     store.users,
@@ -103,6 +111,10 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
     store.birdWeights,
     store.feedConsumption,
     store.waterRecords,
+    store.eggRecords,
+    store.eggInventory,
+    store.healthRecords,
+    store.mediaAssets,
   ] as Table<unknown>[];
 
   let depth = 0;
@@ -321,6 +333,14 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
     birdWeights: createMemFarmRepo(store.birdWeights, { softDelete: true, versioned: true }),
     feedConsumption: createMemFarmRepo(store.feedConsumption, { softDelete: true, versioned: true }),
     waterRecords: createMemFarmRepo(store.waterRecords, { softDelete: true, versioned: true, unique: [["farmId", "flockId", "date"]] }),
+    eggRecords: createMemFarmRepo(store.eggRecords, { softDelete: true, versioned: true, unique: [["farmId", "flockId", "date"]] }),
+    eggInventory: createMemFarmRepo(store.eggInventory, { softDelete: false, versioned: false }),
+    healthRecords: createMemFarmRepo(store.healthRecords, { softDelete: true, versioned: true }),
+    mediaAssets: createMemFarmRepo(store.mediaAssets, { softDelete: true, versioned: true }),
+    async locateDailyRecord(id) {
+      const r = store.dailyRecords.get(id);
+      return r && !r.deletedAt ? r.farmId : null;
+    },
   };
   return { repos, store };
 }

@@ -73,3 +73,16 @@ Each is cheap to change until the phase named.
 | D39 | Concurrency | Every flock command updates the flock document with its expected version, so concurrent commands on one flock cannot both pass the bird check |
 | D40 | Corrections | Reversal events for placement, death, cull, adjustment, sale and weighing; paired and structural events are corrected by the opposite movement; daily-record entries by editing the record |
 | D41 | Sale buyer | `buyerId` omitted until the buyers module can confirm the buyer belongs to the farm (avoids the cross-farm reference gap from the audit) |
+
+## Added with daily farm operations
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| D42 | Daily record shape | A thin header; each section is written to its source collection in one transaction and linked by `dailyRecordId` (no duplicated facts) |
+| D43 | List speed | A derived `summary` on each record, rewritten in the same transaction, so lists read one collection |
+| D44 | Dashboards | Grouped sums run on the database for each source collection; reversals carry the same type and figures as the original and are subtracted |
+| D45 | Farm-less URLs | `/daily-records/:id` locates the record's farm, then applies the normal membership check; non-members get the same 404 as a missing record |
+| D46 | Headcount | `observedBirdCount` is compared with the ledger and shown as a difference; it never changes the ledger (a supervisor posts an adjustment) |
+| D47 | Edits | Each section is diffed and rewritten only if changed, so unchanged re-saves do not add history |
+| D48 | Photos | Raw-body upload, type detected from content (JPEG, PNG, WebP), 5 MB limit, storage behind `MediaStorage` (local disk now, S3-compatible later), `media_assets` index per farm |
+| D49 | Deleting a record | Reverses its ledger and egg-stock entries and soft-deletes its section rows, so the day can be recorded again |

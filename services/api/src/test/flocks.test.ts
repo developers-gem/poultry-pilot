@@ -335,7 +335,9 @@ describe("daily records", () => {
     await s.api("post", `/flocks/${f.id}/mortality`).send({ date: D(-10), count: 1 });
     const list = (await s.api("get", `/flocks/${f.id}/daily-records?from=${D(-3)}&to=${D(-2)}`)).body.items;
     expect(list.map((d: { date: string }) => d.date)).toEqual([D(-2), D(-3)]);
-    expect((await s.api("get", `/flocks/${f.id}/daily-records`)).body.items).toHaveLength(4);
+    // The list holds daily records; a day with only a separate death entry is not a record (its view is per date).
+    expect((await s.api("get", `/flocks/${f.id}/daily-records`)).body.items).toHaveLength(3);
+    expect((await s.api("get", `/flocks/${f.id}/daily-records/${D(-10)}`)).body).toMatchObject({ id: null, mortalityTotal: 1 });
   });
 });
 

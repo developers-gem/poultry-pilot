@@ -16,6 +16,10 @@ import type {
   BirdWeightRecord,
   FeedConsumptionRecord,
   WaterRecordRecord,
+  EggRecordRecord,
+  EggInventoryRecord,
+  HealthRecordRecord,
+  MediaAssetRecord,
 } from "./records.js";
 
 /**
@@ -119,8 +123,18 @@ export interface FarmQuery<T> {
   where?: { [K in keyof T]?: T[K] | T[K][] };
   /** Inclusive range on a string field (farm-local dates). */
   range?: { field: keyof T & string; from?: string; to?: string };
+  /** Field presence: true = the field is set, false = it is absent. */
+  exists?: { [K in keyof T]?: boolean };
   sort?: { field: keyof T & string; dir: 1 | -1 }[];
   limit?: number;
+  /** Keyset pagination: records sorting after this (date desc, id desc) position. */
+  after?: { date: string; id: string };
+}
+
+export interface AggregateRow {
+  key: Record<string, unknown>;
+  sums: Record<string, number>;
+  count: number;
 }
 
 export interface FarmRepo<T extends { id: string; farmId: string }> {
@@ -130,6 +144,8 @@ export interface FarmRepo<T extends { id: string; farmId: string }> {
   insertMany(recs: T[], tx?: Tx): Promise<void>;
   /** Applies the patch; bumps `version` on versioned collections. Returns null if missing, deleted, or the version differs. */
   update(farmId: string, id: string, patch: Partial<T>, opts?: { expectedVersion?: number }, tx?: Tx): Promise<T | null>;
+  /** Group matching live records by `by` fields and sum numeric `sums` fields, on the database server. */
+  aggregate(farmId: string, query: FarmQuery<T>, by: (keyof T & string)[], sums: (keyof T & string)[]): Promise<AggregateRow[]>;
 }
 
 export interface Repositories {
@@ -152,4 +168,14 @@ export interface Repositories {
   birdWeights: FarmRepo<BirdWeightRecord>;
   feedConsumption: FarmRepo<FeedConsumptionRecord>;
   waterRecords: FarmRepo<WaterRecordRecord>;
+  eggRecords: FarmRepo<EggRecordRecord>;
+  /** Append-only. */
+  eggInventory: FarmRepo<EggInventoryRecord>;
+  healthRecords: FarmRepo<HealthRecordRecord>;
+  mediaAssets: FarmRepo<MediaAssetRecord>;
+  /**
+   * The only by-id lookup that does not know the farm: used by /daily-records/:id routes to find which farm a
+   * record belongs to, so the normal membership check can then run. Returns the farmId of a live record or null.
+   */
+  locateDailyRecord(id: string): Promise<string | null>;
 }

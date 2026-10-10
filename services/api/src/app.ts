@@ -11,6 +11,7 @@ import { farmRoutes } from "./http/routes/farm.routes.js";
 import { meRoutes } from "./http/routes/me.routes.js";
 import { flockRoutes } from "./http/routes/flock.routes.js";
 import { houseRoutes } from "./http/routes/house.routes.js";
+import { dailyRecordRoutes, dashboardRoutes, farmDailyRecordRoutes, mediaRoutes } from "./http/routes/daily-record.routes.js";
 import { syncRoutes } from "./http/routes/sync.routes.js";
 import { systemRoutes } from "./http/routes/system.routes.js";
 
@@ -72,7 +73,11 @@ export function createApp(c: Container): Express {
   const secured = [authenticate(c.auth), idempotency(c.repos.idempotency)];
   v1.use("/me", ...secured, meRoutes(c.auth));
   v1.use("/farms/:farmId/houses", ...secured, houseRoutes(c.houses, c.farms));
-  v1.use("/farms/:farmId/flocks", ...secured, flockRoutes(c.flocks, c.farms, c.repos));
+  v1.use("/farms/:farmId/flocks", ...secured, flockRoutes(c.flocks, c.farms, c.repos, c.dailyRecords));
+  v1.use("/farms/:farmId/daily-records", ...secured, farmDailyRecordRoutes(c.dailyRecords, c.farms));
+  v1.use("/farms/:farmId/dashboard", ...secured, dashboardRoutes(c.dailyRecords, c.farms));
+  v1.use("/farms/:farmId/media", ...secured, mediaRoutes(c.media, c.farms));
+  v1.use("/daily-records", ...secured, dailyRecordRoutes(c.dailyRecords, c.farms, c.repos));
   v1.use("/farms", ...secured, farmRoutes(c.farms, c.audit));
   v1.use("/sync", ...secured, syncRoutes(c.sync, c.farms));
 

@@ -26,3 +26,4 @@ apps/mobile/android/local.properties
 apps/mobile/ios/Flutter/Generated.xcconfig
 apps/mobile/ios/Pods/
 state.json
+services/api/data/

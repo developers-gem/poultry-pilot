@@ -2,7 +2,7 @@
 
 How the MongoDB collections fit together and the rules every collection follows. The field-by-field reference is the generated [data dictionary](data-dictionary.md); schemas live in `services/api/src/adapters/mongo/models/`.
 
-52 collections: the 46 the product needs, plus 6 for authentication and infrastructure (`sessions`, `refresh_tokens`, `one_time_tokens`, `sync_changes`, `idempotency_keys`, `counters`). 85 secondary indexes, each tied to a named query.
+53 collections: the 46 the product needs, plus 7 for authentication and infrastructure (`sessions`, `refresh_tokens`, `one_time_tokens`, `sync_changes`, `idempotency_keys`, `counters`, `media_assets`). 86 secondary indexes, each tied to a named query.
 
 ## Conventions
 
@@ -21,7 +21,7 @@ How the MongoDB collections fit together and the rules every collection follows.
 
 | Ownership | Collections | Standard fields | Access rule |
 | --- | --- | --- | --- |
-| Farm | 37 collections, e.g. flocks, daily_records, orders, sync_operations | `farmId`, `createdBy` (required), `updatedBy`, `version`, soft delete unless append-only | Every query includes `farmId`; the `requireFarmScope` plugin throws if it is missing. Indexes start with `farmId` |
+| Farm | 38 collections, e.g. flocks, daily_records, orders, sync_operations, media_assets | `farmId`, `createdBy` (required), `updatedBy`, `version`, soft delete unless append-only | Every query includes `farmId`; the `requireFarmScope` plugin throws if it is missing. Indexes start with `farmId` |
 | Tenant | farms | `createdBy`, `version`, soft delete | Read by `_id` after a membership check |
 | User | users, sessions, refresh/one-time tokens, notifications, training_progress | per collection | Queried by `userId` of the signed-in person |
 | Global | training_courses, articles, glossary_terms, market_prices, weather_cache | `createdBy`/`updatedBy` optional (staff or import job) | Readable by any signed-in user; written by staff tools or jobs |
@@ -48,6 +48,8 @@ Each fact has one home. Some values are also kept as **derived snapshots** for f
 | --- | --- | --- |
 | `flocks.population` (placed, transferred in, mortality, culled, sold, moved out, adjustments, alive) | FlockService | `flock_events` (the flock ledger) |
 | `bird_weights.stats` | the document itself on save (domain `weighSessionStats`) | `bird_weights.weightsG` |
+| `daily_records.summary` | DailyRecordService | the record's linked rows in `flock_events`, `feed_consumption`, `water_records`, `egg_records`, `health_records` |
+| `daily_records.houseId`, `flockType` | DailyRecordService on creation | the flock on that day (type is immutable) |
 | `feed_items.stock` (kg, value) | FeedService | `feed_purchases` − `feed_consumption`, moving average |
 | `feed_consumption.cost` | FeedService at issue time | moving-average cost at that point in the ledger |
 | `inventory_items.stock` | InventoryService | `inventory_transactions` |
@@ -66,7 +68,9 @@ When a record changes, the service writes these in **one transaction** (MongoDB 
 | Action | Writes |
 | --- | --- |
 | Place chicks in a flock | `flock_events` (placement) → `flocks.population`; draws down `chicks.remaining` if from a lot; `expenses` for bought chicks (with the money module) |
-| Save a daily record | `daily_records` + `flock_events` (mortality, cull; reversals of the record's previous ones) + `feed_consumption` + `water_records` → `flocks.population` |
+| Save a daily record | `daily_records` (with derived `summary`) + `flock_events` (mortality, cull, weighing; reversals of the record's previous ones) + `feed_consumption` + `water_records` + `egg_records` + `egg_inventory` + `health_records` (observations) → `flocks.population`; only sections that changed are rewritten. See [daily-operations.md](daily-operations.md) |
+| Delete a daily record | reversals in `flock_events` and `egg_inventory`; soft delete of the record's feed, water, egg and observation records and of the record |
+| Upload a photo | object storage + `media_assets` |
 | Transfer, split or merge birds | paired `flock_events` on both flocks (with cost and weight) → both snapshots; a split creates the new `flocks` document; a merge closes the source |
 | Sell birds, adjust, weigh, close | `flock_events` → `flocks.population` (`bird_weights` for individual weights) |
 | Save an egg record | `egg_records` + `egg_inventory` (collected, and broken as a negative movement); editing it reverses and re-posts by `sourceId` |
@@ -244,4 +248,4 @@ Used by the data import (roadmap Phase 8).
   - computed fields and validators behave as described
 - `data-dictionary.test.ts` fails if the dictionary is out of date.
 - `repositories.contract.test.ts` runs the repository contract against a live server.
-- All 85 indexes were created against FerretDB, which speaks the MongoDB protocol, except 18 that use features FerretDB lacks: TTL, partial, 2dsphere and text indexes. CI creates them on MongoDB 7.
+- All indexes were created against FerretDB, which speaks the MongoDB protocol, except 18 that use features FerretDB lacks: TTL, partial, 2dsphere and text indexes. CI creates them on MongoDB 7.

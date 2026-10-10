@@ -54,7 +54,15 @@ const S = {
   DailyRecordView: registry.register("DailyRecordView", V.DailyRecordView),
   CreateFlockRequest: registry.register("CreateFlockRequest", V.CreateFlockRequest),
   ReplaceFlockRequest: registry.register("ReplaceFlockRequest", V.ReplaceFlockRequest),
-  DailyRecordRequest: registry.register("DailyRecordRequest", V.DailyRecordRequest),
+  UpsertDailyRecordRequest: registry.register("UpsertDailyRecordRequest", V.UpsertDailyRecordRequest),
+  CreateDailyRecordRequest: registry.register("CreateDailyRecordRequest", V.CreateDailyRecordRequest),
+  UpdateDailyRecordRequest: registry.register("UpdateDailyRecordRequest", V.UpdateDailyRecordRequest),
+  DailyRecordListItem: registry.register("DailyRecordListItem", V.DailyRecordListItem),
+  DailyRecordMinimal: registry.register("DailyRecordMinimal", V.DailyRecordMinimal),
+  DailyEntrySheet: registry.register("DailyEntrySheet", V.DailyEntrySheet),
+  DashboardDayView: registry.register("DashboardDayView", V.DashboardDayView),
+  TrendsView: registry.register("TrendsView", V.TrendsView),
+  MediaAssetView: registry.register("MediaAssetView", V.MediaAssetView),
   SyncChange: registry.register("SyncChange", V.SyncChange),
 };
 
@@ -183,9 +191,26 @@ post("/farms/invitations/accept", "Accept an emailed farm invitation", bodyOf(S.
   }
   route("post", "/flocks/{flockId}/close", "Flocks", "Close a flock once every bird is accounted for", flockParams, bodyOf(V.CloseFlockRequest), { 200: json(S.FlockView, "Closed") });
   route("post", "/flocks/{flockId}/events/{eventId}/reverse", "Flock events", "Reverse a wrong placement, death, cull, adjustment, sale or weighing", z.object({ farmId: V.Id, flockId: V.Id, eventId: V.Id }), bodyOf(V.ReverseEventRequest), { 201: json(S.FlockEventView, "Reversal recorded") });
-  route("get", "/flocks/{flockId}/daily-records", "Daily records", "Days with records, newest first", flockParams, { query: V.DateRangeQuery }, { 200: json(items(S.DailyRecordView), "Days") });
+  route("get", "/flocks/{flockId}/daily-records", "Daily records", "This flock's daily records, newest first (cursor pagination)", flockParams, { query: V.DateRangeQuery }, { 200: json(z.object({ items: z.array(S.DailyRecordListItem), nextCursor: z.string().nullable() }), "Records") });
   route("get", "/flocks/{flockId}/daily-records/{date}", "Daily records", "Everything recorded for one day", z.object({ farmId: V.Id, flockId: V.Id, date: V.LocalDate }), {}, { 200: json(S.DailyRecordView, "Day") });
-  route("put", "/flocks/{flockId}/daily-records/{date}", "Daily records", "Create or replace the day's record (deaths, culls, feed, water, conditions)", z.object({ farmId: V.Id, flockId: V.Id, date: V.LocalDate }), bodyOf(S.DailyRecordRequest), { 200: json(S.DailyRecordView, "Saved"), 409: json(S.ErrorEnvelope, "Changed by someone else") });
+  route("put", "/flocks/{flockId}/daily-records/{date}", "Daily records", "Create or replace the day's record (deaths, culls, feed, water, conditions)", z.object({ farmId: V.Id, flockId: V.Id, date: V.LocalDate }), bodyOf(S.UpsertDailyRecordRequest), { 200: json(S.DailyRecordView, "Saved (or DailyRecordMinimal with Prefer: return=minimal)"), 409: json(S.ErrorEnvelope, "Changed by someone else") });
+
+  // ---- daily operations
+  const prefer = z.object({ prefer: z.string().optional().openapi({ description: "return=minimal → respond with id, version and summary only" }) });
+  route("post", "/daily-records", "Daily records", "Record one flock's day: deaths, culls, feed, water, conditions, eggs, weight, observations, photos", farmParams, { headers: prefer, ...bodyOf(S.CreateDailyRecordRequest) }, { 201: json(S.DailyRecordView, "Created (or DailyRecordMinimal)"), 409: json(S.ErrorEnvelope, "A record already exists for that flock and date (details.existingId)") });
+  route("get", "/daily-records", "Daily records", "Compact list, newest first; filter by date or from/to, house, flock, type", farmParams, { query: V.DailyRecordListQuery }, { 200: json(z.object({ items: z.array(S.DailyRecordListItem), nextCursor: z.string().nullable() }), "Records") });
+  route("get", "/daily-records/sheet", "Daily records", "Entry sheet for a day: active flocks, expected birds, today's and yesterday's records", farmParams, { query: z.object({ date: V.LocalDate.optional() }) }, { 200: json(S.DailyEntrySheet, "Sheet") });
+  route("get", "/dashboard/day", "Dashboard", "One day across the farm, per flock and in total", farmParams, { query: V.DashboardDayQuery }, { 200: json(S.DashboardDayView, "Day") });
+  route("get", "/dashboard/trends", "Dashboard", "Daily totals over a range (max 366 days)", farmParams, { query: V.TrendsQuery }, { 200: json(S.TrendsView, "Series") });
+  route("post", "/media", "Media", "Upload a photo (raw JPEG, PNG or WebP body, max 5 MB)", farmParams, { body: { content: { "image/jpeg": { schema: z.string().openapi({ format: "binary" }) }, "image/png": { schema: z.string().openapi({ format: "binary" }) }, "image/webp": { schema: z.string().openapi({ format: "binary" }) } } } }, { 201: json(S.MediaAssetView, "Stored") });
+  route("get", "/media/{assetId}", "Media", "Download a photo of this farm", z.object({ farmId: V.Id, assetId: V.Id }), {}, { 200: { description: "Image bytes" } });
+}
+{
+  const idParams = z.object({ id: V.Id });
+  const prefer = z.object({ prefer: z.string().optional() });
+  registry.registerPath({ method: "get", path: `${API_PREFIX}/daily-records/{id}`, tags: ["Daily records"], summary: "One daily record with every section", security: secured, request: { params: idParams }, responses: { 200: json(S.DailyRecordView, "Record"), ...errors } });
+  registry.registerPath({ method: "put", path: `${API_PREFIX}/daily-records/{id}`, tags: ["Daily records"], summary: "Replace every section (version required)", security: secured, request: { params: idParams, headers: prefer, ...bodyOf(S.UpdateDailyRecordRequest) }, responses: { 200: json(S.DailyRecordView, "Saved (or DailyRecordMinimal)"), ...errors, 409: json(S.ErrorEnvelope, "Changed by someone else") } });
+  registry.registerPath({ method: "delete", path: `${API_PREFIX}/daily-records/{id}`, tags: ["Daily records"], summary: "Delete a record and undo everything it wrote", security: secured, request: { params: idParams }, responses: { 204: { description: "Deleted" }, ...errors } });
 }
 
 // ---- sync -----------------------------------------------------------------

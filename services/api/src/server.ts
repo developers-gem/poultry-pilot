@@ -1,4 +1,5 @@
 import type { Server } from "node:http";
+import { localDiskMediaStorage } from "./adapters/storage.js";
 import { argon2Hasher, googleVerifier, logEmailSender } from "./adapters/external.js";
 import { createMongoRepositories } from "./adapters/mongo/index.js";
 import { createApp } from "./app.js";
@@ -35,6 +36,7 @@ async function main(): Promise<void> {
     health: { mongodb: mongo.check },
     logger,
     hasher: argon2Hasher,
+    media: localDiskMediaStorage(env.MEDIA_DIR),
     email: logEmailSender(logger),
     ...(env.GOOGLE_CLIENT_IDS.length ? { google: googleVerifier(env.GOOGLE_CLIENT_IDS) } : {}),
     config: {

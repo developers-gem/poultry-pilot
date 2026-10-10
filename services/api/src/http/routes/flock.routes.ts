@@ -3,7 +3,6 @@ import {
   CloseFlockRequest,
   CreateFlockRequest,
   CullRequest,
-  DailyRecordRequest,
   DateRangeQuery,
   FlockListQuery,
   Id,
@@ -17,6 +16,7 @@ import {
   SaleRequest,
   SplitRequest,
   TransferRequest,
+  UpsertDailyRecordRequest,
   WeighingRequest,
 } from "@poultrypilot/validation";
 import type { Action } from "@poultrypilot/constants";
@@ -24,6 +24,7 @@ import { Router, type RequestHandler } from "express";
 import { z } from "zod";
 import type { Repositories } from "../../ports/repositories.js";
 import type { FarmService } from "../../services/farm.service.js";
+import type { DailyRecordService } from "../../services/daily-record.service.js";
 import type { FlockService } from "../../services/flock.service.js";
 import { requireFarm, requireFarmResource, requirePermission, validate } from "../middleware/core.js";
 
@@ -31,7 +32,7 @@ import { requireFarm, requireFarmResource, requirePermission, validate } from ".
  * /api/v1/farms/:farmId/flocks — mounted behind authenticate.
  * Chain per route: validate params → requireFarm → requirePermission → requireFarmResource (flock belongs to farm).
  */
-export function flockRoutes(flocks: FlockService, farms: FarmService, repos: Repositories): Router {
+export function flockRoutes(flocks: FlockService, farms: FarmService, repos: Repositories, daily: DailyRecordService): Router {
   const r = Router({ mergeParams: true });
   const farm = [validate("params", z.object({ farmId: Id })), requireFarm(farms)];
   const flock = (action: Action, extra: z.ZodRawShape = {}): RequestHandler[] => [
@@ -101,14 +102,17 @@ export function flockRoutes(flocks: FlockService, farms: FarmService, repos: Rep
     res.status(201).json(await flocks.reverse(req.farmCtx!, fid(req), req.params["eventId"] as string, req.body.reason));
   });
 
-  r.get("/:flockId/daily-records", ...flock("production.read"), validate("query", DateRangeQuery), async (req, res) => {
-    res.json({ items: await flocks.listDailyRecords(req.farmCtx!, fid(req), q(req)) });
+  // Per-flock shortcuts onto the daily records module (same service, same rules).
+  r.get("/:flockId/daily-records", ...flock("production.read"), validate("query", DateRangeQuery.extend({ cursor: z.string().max(500).optional(), limit: z.coerce.number().int().min(1).max(200).default(50) })), async (req, res) => {
+    const query = q<{ from?: string; to?: string; cursor?: string; limit: number }>(req);
+    res.json(await daily.list(req.farmCtx!, { ...query, flockId: fid(req) }));
   });
   r.get("/:flockId/daily-records/:date", ...flock("production.read", { date: LocalDate }), async (req, res) => {
-    res.json(await flocks.getDailyRecord(req.farmCtx!, fid(req), req.params["date"] as string));
+    res.json(await daily.getByFlockDate(req.farmCtx!, fid(req), req.params["date"] as string));
   });
-  r.put("/:flockId/daily-records/:date", ...flock("production.record", { date: LocalDate }), validate("body", DailyRecordRequest), async (req, res) => {
-    res.json(await flocks.putDailyRecord(req.farmCtx!, fid(req), req.params["date"] as string, req.body));
+  r.put("/:flockId/daily-records/:date", ...flock("production.record", { date: LocalDate }), validate("body", UpsertDailyRecordRequest), async (req, res) => {
+    const minimal = /\breturn=minimal\b/i.test(req.header("prefer") ?? "");
+    res.json(await daily.upsertByFlockDate(req.farmCtx!, fid(req), req.params["date"] as string, req.body, { minimal }));
   });
   return r;
 }

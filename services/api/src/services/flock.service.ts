@@ -1,11 +1,8 @@
-import { can } from "@poultrypilot/constants";
 import type {
   AdjustmentRequest,
   CloseFlockRequest,
   CreateFlockRequest,
   CullRequest,
-  DailyRecordRequest,
-  DailyRecordView,
   FlockEventView,
   FlockMetricsView,
   FlockView,
@@ -21,7 +18,6 @@ import type {
 import {
   DomainError,
   acquisitionCostPerBird,
-  addDays,
   assertCanClose,
   assertEventAllowed,
   assertTransition,
@@ -36,10 +32,10 @@ import {
   weightCurve,
   type LedgerEvent,
 } from "../domain/index.js";
-import { AppError, forbidden, notFound } from "../lib/errors.js";
+import { AppError, notFound } from "../lib/errors.js";
 import { newId, type Clock } from "../lib/util.js";
 import type { Repositories, Tx } from "../ports/repositories.js";
-import type { DailyRecordRecord, FarmRecord, FeedConsumptionRecord, FlockEventRecord, FlockRecord, MoneyValue } from "../ports/records.js";
+import type { FarmRecord, FlockEventRecord, FlockRecord, MoneyValue } from "../ports/records.js";
 import type { AuditService } from "./audit.service.js";
 import { assertCan, type FarmContext } from "./context.js";
 import { duplicate } from "./house.service.js";
@@ -52,7 +48,7 @@ export interface FlockDeps {
   sync: SyncService;
 }
 
-type NewEvent = Omit<FlockEventRecord, "id" | "farmId" | "flockId" | "createdBy" | "createdAt" | "updatedAt">;
+export type NewEvent = Omit<FlockEventRecord, "id" | "farmId" | "flockId" | "createdBy" | "createdAt" | "updatedAt">;
 
 /** Event types that can be undone with POST …/events/:eventId/reverse. Paired and structural events cannot. */
 const REVERSIBLE = new Set(["placement", "mortality", "cull", "adjustment", "sale", "weighing"]);
@@ -657,157 +653,12 @@ export function createFlockService(d: FlockDeps) {
       return events.map((e) => toEventView(e, reversed));
     },
 
-    // ---- daily records -----------------------------------------------------------
-
     /**
-     * Creates or replaces the record for one flock and day. Deaths and culls are posted as events linked to the
-     * record; on update, the record's previous events are reversed and the new ones posted (only if they changed).
-     * People without production.edit_any may only record within the farm's edit window and only edit their own records.
+     * Ledger primitives for other services that write flock events inside their own transaction
+     * (daily records). Same validation, snapshot update and optimistic lock as every flock command.
      */
-    async putDailyRecord(ctx: FarmContext, flockId: string, date: string, body: DailyRecordRequest): Promise<DailyRecordView> {
-      assertCan(ctx, "production.record");
-      return onFlock(ctx, flockId, async ({ farm, flock, events, tx }) => {
-        assertStatus(flock, ["active"], "record a day");
-        assertDate(date, farm, flock);
-        for (const f of body.feed) assertCurrency(f.unitCostPerKg, farm, "unitCostPerKg");
-        const editAny = can(ctx.role, "production.edit_any");
-        if (!editAny && date < addDays(todayOf(farm), -farm.settings.workerEditWindowDays)) {
-          throw forbidden(`You can record or edit days up to ${farm.settings.workerEditWindowDays} day(s) back. Ask a supervisor for older days.`);
-        }
-        const existing = (await repos.dailyRecords.find(ctx.farmId, { where: { flockId, date }, limit: 1 }, tx))[0];
-        if (existing) {
-          if (!editAny && existing.createdBy !== ctx.userId) throw forbidden("You can only edit daily records you created");
-          if (body.version === undefined || body.version !== existing.version) {
-            throw new AppError("VERSION_CONFLICT", "This day's record was changed by someone else. Reload it first.", { serverVersion: existing.version });
-          }
-        }
-        const now = clock.now();
-        const fields = {
-          temperatureMinC: body.temperatureMinC,
-          temperatureMaxC: body.temperatureMaxC,
-          humidityPercent: body.humidityPercent,
-          lightingHours: body.lightingHours,
-          notes: body.notes,
-        };
-        let record: DailyRecordRecord;
-        if (existing) {
-          const next = await repos.dailyRecords.update(ctx.farmId, existing.id, { ...fields, updatedBy: ctx.userId, updatedAt: now }, { expectedVersion: existing.version }, tx);
-          if (!next) throw new AppError("VERSION_CONFLICT", "This day's record was changed by someone else");
-          record = next;
-        } else {
-          record = { id: newId(), farmId: ctx.farmId, flockId, date, ...Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined)), createdBy: ctx.userId, createdAt: now, updatedAt: now, version: 0 };
-          await repos.dailyRecords.insert(record, tx).catch(duplicate(`A record for ${date}`));
-        }
-
-        // Deaths and culls: reverse what this record posted before, post the new figures, if anything changed.
-        const reversed = new Set(events.filter((e) => e.reversalOf).map((e) => e.reversalOf!));
-        const linked = events.filter((e) => e.dailyRecordId === record.id && !e.reversalOf && !reversed.has(e.id) && (e.type === "mortality" || e.type === "cull"));
-        const key = (xs: { type: string; cause?: string; birds?: number }[]) => xs.map((x) => `${x.type}:${x.cause ?? ""}:${x.birds}`).sort().join("|");
-        const wanted: NewEvent[] = [
-          ...body.mortality.map((m) => ({ type: "mortality" as const, date, birds: m.count, cause: m.cause, dailyRecordId: record.id })),
-          ...(body.culls > 0 ? [{ type: "cull" as const, date, birds: body.culls, dailyRecordId: record.id }] : []),
-        ];
-        let allEvents = events;
-        if (key(linked) !== key(wanted)) {
-          const drafts: NewEvent[] = [
-            ...linked.map((e) => ({ type: e.type, date: e.date, birds: e.birds!, reversalOf: e.id, reason: "Daily record edited", dailyRecordId: record.id })),
-            ...wanted,
-          ];
-          const out = await appendEvents(ctx, flock, events, drafts, {}, farm, tx, "flock.daily_record_saved");
-          allEvents = [...events, ...out.events];
-        }
-
-        // Feed: replace this record's feed entries.
-        const oldFeed = await repos.feedConsumption.find(ctx.farmId, { where: { dailyRecordId: record.id } }, tx);
-        for (const f of oldFeed) await repos.feedConsumption.update(ctx.farmId, f.id, { deletedAt: now, deletedBy: ctx.userId, updatedAt: now }, undefined, tx);
-        const feed: FeedConsumptionRecord[] = body.feed.map((f) => ({
-          id: newId(),
-          farmId: ctx.farmId,
-          flockId,
-          date,
-          quantityKg: f.quantityKg,
-          dailyRecordId: record.id,
-          ...(f.feedItemId ? { feedItemId: f.feedItemId } : {}),
-          ...(f.unitCostPerKg ? { cost: money(f.unitCostPerKg.amountMinor * f.quantityKg, farm.settings.currency) } : {}),
-          createdBy: ctx.userId,
-          createdAt: now,
-          updatedAt: now,
-          version: 0,
-        }));
-        await repos.feedConsumption.insertMany(feed, tx);
-
-        // Water: one record per flock and day.
-        const water = (await repos.waterRecords.find(ctx.farmId, { where: { flockId, date }, limit: 1 }, tx))[0];
-        if (body.waterLitres !== undefined) {
-          if (water) await repos.waterRecords.update(ctx.farmId, water.id, { litres: body.waterLitres, dailyRecordId: record.id, updatedBy: ctx.userId, updatedAt: now }, undefined, tx);
-          else await repos.waterRecords.insert({ id: newId(), farmId: ctx.farmId, flockId, date, litres: body.waterLitres, dailyRecordId: record.id, createdBy: ctx.userId, createdAt: now, updatedAt: now, version: 0 }, tx);
-        } else if (water) {
-          await repos.waterRecords.update(ctx.farmId, water.id, { deletedAt: now, deletedBy: ctx.userId, updatedAt: now }, undefined, tx);
-        }
-
-        await d.audit.record(ctx, { action: existing ? "daily_record.updated" : "daily_record.created", entity: "daily_record", entityId: record.id, after: { flockId, date, mortality: body.mortality, culls: body.culls, feedKg: body.feed.reduce((t, f) => t + f.quantityKg, 0) } }, tx);
-        await d.sync.recordChange(ctx.farmId, { entity: "daily_record", entityId: record.id, op: "upsert", version: record.version }, tx);
-        return dayView(ctx, flockId, date, allEvents, tx);
-      });
-    },
-
-    async getDailyRecord(ctx: FarmContext, flockId: string, date: string): Promise<DailyRecordView> {
-      assertCan(ctx, "production.read");
-      await loadFlock(ctx, flockId);
-      return dayView(ctx, flockId, date, await loadEvents(ctx, flockId));
-    },
-
-    async listDailyRecords(ctx: FarmContext, flockId: string, q: { from?: string; to?: string }): Promise<DailyRecordView[]> {
-      assertCan(ctx, "production.read");
-      await loadFlock(ctx, flockId);
-      const events = await loadEvents(ctx, flockId);
-      const range = { ...(q.from ? { from: q.from } : {}), ...(q.to ? { to: q.to } : {}) };
-      const [records, feed, water] = await Promise.all([
-        repos.dailyRecords.find(ctx.farmId, { where: { flockId }, range: { field: "date", ...range } }),
-        repos.feedConsumption.find(ctx.farmId, { where: { flockId }, range: { field: "date", ...range } }),
-        repos.waterRecords.find(ctx.farmId, { where: { flockId }, range: { field: "date", ...range } }),
-      ]);
-      const inRange = (d: string) => (!q.from || d >= q.from) && (!q.to || d <= q.to);
-      const dates = new Set([
-        ...records.map((r) => r.date),
-        ...feed.map((f) => f.date),
-        ...water.map((w) => w.date),
-        ...effectiveEvents(events.map(toLedger)).filter((e) => (e.type === "mortality" || e.type === "cull") && inRange(e.date)).map((e) => e.date),
-      ]);
-      const views: DailyRecordView[] = [];
-      for (const date of [...dates].sort().reverse()) views.push(await dayView(ctx, flockId, date, events));
-      return views;
-    },
+    ledger: { farmOf, todayOf, loadFlock, loadEvents, appendEvents, assertStatus, assertDate, assertCurrency, money },
   };
-
-  /** Everything recorded for one flock and day, from every source. */
-  async function dayView(ctx: FarmContext, flockId: string, date: string, events: FlockEventRecord[], tx?: Tx): Promise<DailyRecordView> {
-    const record = (await repos.dailyRecords.find(ctx.farmId, { where: { flockId, date }, limit: 1 }, tx))[0];
-    const feed = await repos.feedConsumption.find(ctx.farmId, { where: { flockId, date } }, tx);
-    const water = (await repos.waterRecords.find(ctx.farmId, { where: { flockId, date }, limit: 1 }, tx))[0];
-    const live = new Set(effectiveEvents(events.map(toLedger)).map((e) => e.id));
-    const day = events.filter((e) => e.date === date && live.has(e.id));
-    const mortality = day.filter((e) => e.type === "mortality").map((e) => ({ cause: e.cause ?? "unknown", count: e.birds ?? 0, eventId: e.id, fromDailyRecord: !!e.dailyRecordId }));
-    return {
-      id: record?.id ?? null,
-      flockId,
-      date,
-      mortality,
-      mortalityTotal: mortality.reduce((t, m) => t + m.count, 0),
-      culls: day.filter((e) => e.type === "cull").reduce((t, e) => t + (e.birds ?? 0), 0),
-      feed: feed.map((f) => ({ id: f.id, quantityKg: f.quantityKg, ...(f.feedItemId ? { feedItemId: f.feedItemId } : {}), ...(f.cost ? { cost: f.cost } : {}) })),
-      feedKg: feed.reduce((t, f) => t + f.quantityKg, 0),
-      ...(water ? { waterLitres: water.litres } : {}),
-      ...(record?.temperatureMinC !== undefined ? { temperatureMinC: record.temperatureMinC } : {}),
-      ...(record?.temperatureMaxC !== undefined ? { temperatureMaxC: record.temperatureMaxC } : {}),
-      ...(record?.humidityPercent !== undefined ? { humidityPercent: record.humidityPercent } : {}),
-      ...(record?.lightingHours !== undefined ? { lightingHours: record.lightingHours } : {}),
-      ...(record?.notes ? { notes: record.notes } : {}),
-      birdsAliveEndOfDay: population(events.map(toLedger), date).alive,
-      version: record?.version ?? null,
-      ...(record ? { createdBy: record.createdBy, updatedAt: record.updatedAt.toISOString() } : {}),
-    };
-  }
 }
 
 export type FlockService = ReturnType<typeof createFlockService>;

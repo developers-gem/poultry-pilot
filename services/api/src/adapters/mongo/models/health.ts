@@ -70,6 +70,7 @@ export const HealthRecordModel = defineCollection({
     expenseId: ref("Expense"),
     attachments: { type: [new Schema({ name: str({ max: 200 }), assetUrl: str({ required: true, max: 1000 }) }, { _id: false })], default: undefined },
     followUpDate: localDate(),
+    dailyRecordId: ref("DailyRecord"),
   },
   indexes: [
     { fields: { farmId: 1, flockId: 1, date: -1 }, why: "Flock health history; active withdrawal check before a sale" },

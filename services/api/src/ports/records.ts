@@ -252,9 +252,26 @@ export interface FlockEventRecord extends FarmOwned {
   note?: string;
 }
 
+export interface DailyRecordSummaryValue {
+  mortality: number;
+  culls: number;
+  feedKg: number;
+  waterLitres?: number;
+  eggsCollected?: number;
+  eggsBroken?: number;
+  averageWeightG?: number;
+  observations: number;
+  photos: number;
+}
+
 export interface DailyRecordRecord extends Editable {
   flockId: string;
   date: string;
+  houseId: string;
+  flockType: import("@poultrypilot/types").FlockType;
+  observedBirdCount?: number;
+  photos: { assetId: string; caption?: string }[];
+  summary?: DailyRecordSummaryValue;
   temperatureMinC?: number;
   temperatureMaxC?: number;
   humidityPercent?: number;
@@ -286,4 +303,47 @@ export interface WaterRecordRecord extends Editable {
   litres: number;
   dailyRecordId?: string;
   notes?: string;
+}
+
+export interface EggRecordRecord extends Editable {
+  flockId: string;
+  date: string;
+  collected: number;
+  broken: number;
+  byGrade?: Partial<Record<import("@poultrypilot/types").EggGrade, number>>;
+  averageEggWeightG?: number;
+  qualityNotes?: string;
+  dailyRecordId?: string;
+  notes?: string;
+}
+
+/** Append-only egg stock ledger entry. quantityDelta > 0 adds stock, < 0 removes it. */
+export interface EggInventoryRecord extends FarmOwned {
+  date: string;
+  type: "collected" | "sold" | "broken" | "used" | "spoiled" | "adjustment" | "reversal";
+  grade?: import("@poultrypilot/types").EggGrade;
+  quantityDelta: number;
+  flockId?: string;
+  sourceType: "egg_record" | "order" | "manual";
+  sourceId?: string;
+  reversalOf?: string;
+  note?: string;
+}
+
+export interface HealthRecordRecord extends Editable {
+  flockId?: string;
+  houseId?: string;
+  type: import("@poultrypilot/types").HealthRecordType;
+  date: string;
+  title: string;
+  observedSigns?: string;
+  affectedBirds?: number;
+  dailyRecordId?: string;
+}
+
+export interface MediaAssetRecord extends Editable {
+  contentType: "image/jpeg" | "image/png" | "image/webp";
+  sizeBytes: number;
+  sha256: string;
+  storageKey: string;
 }
