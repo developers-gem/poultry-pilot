@@ -1,65 +1,120 @@
 # PoultryPilot
 
-Poultry farm management platform: one Node.js API at `/api/v1`, used by a React web app and a Flutter mobile app, backed by MongoDB.
-
-The architecture, audit of the Lovable prototype and the phased migration plan are in the **PoultryPilot — Technical Audit & Migration Plan** document. This repository is separate from the Lovable-synced prototype, which stays untouched as the product reference.
-
-## Status
-
-| Phase | State |
-| --- | --- |
-| 0 · Baseline | Done — contracts, domain calculations, characterization tests of the prototype |
-| 1 · Foundation | In progress — auth, farms, memberships, RBAC, audit, idempotency, sync protocol done; web shell and real-MongoDB CI job outstanding |
-| 2–8 | Not started |
-
-## Layout
+Poultry farm management platform. One REST API (`/api/v1`) and one MongoDB database, shared by a React web app and a Flutter mobile app.
 
 ```
-packages/contracts         Zod schemas and enums shared by API, web and Flutter (source of the OpenAPI document)
-packages/domain            Pure business calculations with unit tests — the only place formulas live
-packages/legacy-reference  Verbatim prototype formulas + characterization tests (never imported by apps)
-apps/api                   Express 5 + Mongoose 8 API
-docs/                      Decisions log
+apps/
+  web/            React + Vite + TypeScript + Tailwind
+  mobile/         Flutter (Android, iOS)
+services/
+  api/            Node.js + Express + TypeScript + Mongoose
+    src/domain/   Business calculations (server-only, unit-tested)
+    test/legacy/  Prototype formulas + characterization tests (development only)
+packages/
+  constants/      Enums, roles, permissions, error codes, API version — no dependencies
+  validation/     Zod schemas for every request and response
+  types/          TypeScript types inferred from the schemas (type-only)
+  contracts/      OpenAPI 3.1 document built from the same schemas
 ```
 
-## Running
+The architecture, the audit of the Lovable prototype and the roadmap are in the **PoultryPilot — Technical Audit & Migration Plan** document. Supabase is not used anywhere.
+
+## Prerequisites
+
+| Tool | Version | Check |
+| --- | --- | --- |
+| Node.js | 22 or newer | `node -v` |
+| pnpm | 9 | `corepack enable && pnpm -v` |
+| Docker | any recent | `docker compose version` |
+| Flutter | 3.24 or newer (mobile only) | `flutter --version` |
+
+## 1. MongoDB
+
+```bash
+docker compose up -d mongo
+docker compose ps            # wait until mongo shows "healthy" (10–20 s on first start)
+```
+
+Runs MongoDB 7 as a single-node replica set (`rs0`) on `localhost:27017`, which the API needs for transactions. Data persists in the `mongo-data` volume. Other commands: `pnpm db:shell` (mongosh), `docker compose down` (stop), `docker compose down -v` (stop and delete data).
+
+Using MongoDB Atlas instead: put the Atlas `mongodb+srv://` URI in `services/api/.env` and skip this step.
+
+## 2. API
 
 ```bash
 pnpm install
-pnpm test            # all tests (domain, characterization, API over HTTP with in-memory repositories)
-pnpm typecheck
-
-docker compose up -d mongo           # local MongoDB replica set
-cp apps/api/.env.example apps/api/.env   # then set JWT_ACCESS_SECRET
-pnpm dev:api                          # http://localhost:4000/api/v1/health
+cp services/api/.env.example services/api/.env
+# Set JWT_ACCESS_SECRET in services/api/.env, e.g. to the output of:
+openssl rand -base64 48
+pnpm dev:api
 ```
 
-## API (Phase 1)
+Check it:
 
-| Method | Path | Notes |
-| --- | --- | --- |
-| GET | `/api/v1/health` | Public |
-| POST | `/auth/register` | Creates user + first farm + owner membership atomically |
-| POST | `/auth/login`, `/auth/google`, `/auth/refresh`, `/auth/logout` | Refresh tokens rotate; reuse revokes the session family |
-| POST | `/auth/password-reset`, `/auth/password-reset/confirm` | Never reveals whether an email exists |
-| GET | `/auth/me` | |
-| GET / POST | `/farms` | My farms with role and permissions / create a farm |
-| GET / PATCH | `/farms/:farmId` | PATCH requires `version` (optimistic concurrency) |
-| GET / POST | `/farms/:farmId/members` | Invite by email with a role |
-| PATCH / DELETE | `/farms/:farmId/members/:membershipId` | A farm always keeps one owner |
-| POST | `/farms/invitations/accept` | Only the invited email can accept |
-| GET | `/farms/:farmId/audit` | Cursor-paginated audit trail |
-| GET | `/sync/pull?farmId&since` | Changes after a per-farm sequence number |
-| POST | `/sync/push` | Offline mutations, processed by the same services as REST, exactly once |
+```bash
+curl -i http://localhost:4000/api/v1/health        # 200 when MongoDB is connected, 503 when not
+curl http://localhost:4000/api/v1/health/live      # process liveness, never checks the database
+curl http://localhost:4000/api/v1/openapi.json     # API contract
+```
 
-All writes accept an `Idempotency-Key` header. Errors always use `{ "error": { "code", "message", "details?", "requestId" } }`.
+Production build: `pnpm --filter @poultrypilot/api build && pnpm --filter @poultrypilot/api start`. Docker image: `docker build -f services/api/Dockerfile -t poultrypilot-api .`, or run API and database together with `docker compose --profile api up -d`.
 
-## Rules that must not be broken
+## 3. Web
 
-1. Formulas live in `packages/domain` with tests. Routes and screens never calculate.
-2. Every farm-owned query takes `farmId`; the Mongoose `requireFarmScope` plugin throws if it is missing.
-3. Services re-check permissions even when middleware already did.
-4. Important changes write an audit event in the same transaction.
-5. Synced entities call `sync.recordChange` in the same transaction.
-6. Business dates are farm-local `YYYY-MM-DD`; money is integer minor units plus currency; weights are stored in grams/kilograms.
-7. Health features record and remind; they never diagnose.
+```bash
+cp apps/web/.env.example apps/web/.env.local
+pnpm dev:web                                       # http://localhost:5173
+```
+
+In development the web app calls `/api` on its own origin and Vite forwards it to `http://localhost:4000`, so no CORS setup is needed. For production, set `VITE_API_BASE_URL` to the API origin and add the web origin to the API's `CORS_ORIGINS`.
+
+## 4. Mobile
+
+```bash
+cd apps/mobile
+flutter create --platforms=android,ios --project-name poultrypilot_mobile --org com.poultrypilot .   # first time only
+cp config/dev.example.json config/dev.json
+flutter pub get
+flutter run --dart-define-from-file=config/dev.json
+```
+
+`config/dev.json` sets `API_BASE_URL`: `http://10.0.2.2:4000` for the Android emulator, `http://localhost:4000` for the iOS simulator, or your computer's LAN IP for a physical phone. See `apps/mobile/README.md`.
+
+## Tests and checks
+
+```bash
+pnpm typecheck
+pnpm test                                          # domain, characterization, API (in-memory) and web tests
+MONGODB_TEST_URI="mongodb://localhost:27017/pp_test?replicaSet=rs0&directConnection=true" pnpm test   # adds real-database checks
+pnpm openapi                                       # writes packages/contracts/openapi.json
+cd apps/mobile && flutter analyze && flutter test
+```
+
+## Environment files
+
+Only `*.example` files are committed. Real values go in:
+
+| File | Used by |
+| --- | --- |
+| `services/api/.env` | API (validated at startup; the process refuses to start and lists every problem) |
+| `apps/web/.env.local` | Web (only `VITE_`-prefixed values reach the browser) |
+| `apps/mobile/config/dev.json` | Mobile (compiled into the app, so never secrets) |
+| `.env` (repository root) | Docker Compose port overrides only |
+
+## API foundation
+
+| Concern | Where |
+| --- | --- |
+| Environment configuration | `services/api/src/config/env.ts` |
+| Structured logging (JSON in production, pretty locally, secrets redacted) | `services/api/src/lib/logger.ts` |
+| Request logging with request IDs | `services/api/src/app.ts` (pino-http) |
+| Security headers, CORS, rate limits, body size limit | `services/api/src/app.ts` |
+| Request validation (Zod) | `services/api/src/http/middleware/core.ts` |
+| Centralized error handling, one error envelope | `services/api/src/http/middleware/core.ts` |
+| API versioning (`/api/v1`) | `packages/constants/src/api.ts` |
+| MongoDB connection, retry, ping | `services/api/src/db/mongo.ts` |
+| Health and OpenAPI endpoints | `services/api/src/http/routes/system.routes.ts` |
+| Graceful shutdown | `services/api/src/server.ts` |
+| OpenAPI contract | `packages/contracts/src/openapi.ts` |
+
+Phase 1 auth, farm membership, RBAC, audit and sync endpoints are also present. Business modules (flocks, production, feed, health, money, market) are not implemented yet.

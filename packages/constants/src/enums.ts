@@ -1,0 +1,93 @@
+/**
+ * Every closed set of values in PoultryPilot, defined once as readonly tuples.
+ * Stored values are lowercase snake_case. Zod schemas (packages/validation), TypeScript types
+ * (packages/types) and the OpenAPI document (packages/contracts) are all derived from these.
+ * Flutter receives them through the generated OpenAPI document — never re-declare them by hand.
+ */
+
+export const SPECIES = ["chicken", "duck", "turkey", "quail", "guinea_fowl"] as const;
+export const FLOCK_PURPOSES = ["broiler", "layer", "breeder", "pullet", "dual_purpose"] as const;
+export const FLOCK_STATUSES = ["planned", "active", "closed", "cancelled"] as const;
+export const HOUSE_TYPES = ["broiler", "layer", "brooder", "breeder", "hatchery", "mixed"] as const;
+export const MORTALITY_CAUSES = [
+  "unknown",
+  "found_dead",
+  "culled",
+  "predator",
+  "heat_stress",
+  "injury",
+  "suspected_disease",
+  "other",
+] as const;
+export const EGG_GRADES = ["large", "medium", "small", "cracked", "dirty", "double_yolk"] as const;
+export const HEALTH_RECORD_TYPES = ["vaccination", "treatment", "vet_visit", "observation", "lab_test"] as const;
+export const REMINDER_STATUSES = ["scheduled", "done", "skipped", "cancelled"] as const;
+export const LEDGER_DIRECTIONS = ["income", "expense"] as const;
+export const LEDGER_CATEGORIES = [
+  "bird_sales",
+  "egg_sales",
+  "chick_sales",
+  "manure_sales",
+  "other_income",
+  "stock_purchase",
+  "feed",
+  "medicine_vaccine",
+  "vet_services",
+  "labour",
+  "electricity",
+  "water",
+  "fuel_transport",
+  "litter_bedding",
+  "rent",
+  "maintenance",
+  "licences_fees",
+  "equipment",
+  "other_expense",
+] as const;
+export const RECURRING_FREQUENCIES = ["daily", "weekly", "monthly", "quarterly", "yearly"] as const;
+export const ORDER_STATUSES = ["pending", "confirmed", "delivered", "closed", "cancelled"] as const;
+export const PAYMENT_METHODS = ["cash", "bank_transfer", "mobile_money", "upi", "card", "cheque", "other"] as const;
+export const LISTING_CATEGORIES = [
+  "live_birds",
+  "dressed_birds",
+  "eggs",
+  "day_old_chicks",
+  "hatching_eggs",
+  "manure",
+  "other",
+] as const;
+export const BIOSECURITY_ENTRY_TYPES = [
+  "cleaning",
+  "disinfection",
+  "visitor",
+  "vehicle",
+  "equipment",
+  "pest_control",
+  "footbath",
+] as const;
+export const ALERT_SEVERITIES = ["info", "warning", "critical"] as const;
+export const CONTENT_KINDS = ["lesson", "article", "glossary_term", "news", "disease_notice"] as const;
+export const ROLES = ["owner", "manager", "worker", "veterinarian", "accountant"] as const;
+export const MEMBERSHIP_STATUSES = ["invited", "active", "revoked"] as const;
+export const UNIT_SYSTEMS = ["metric", "imperial"] as const;
+
+export type Species = (typeof SPECIES)[number];
+export type FlockPurpose = (typeof FLOCK_PURPOSES)[number];
+export type FlockStatus = (typeof FLOCK_STATUSES)[number];
+export type HouseType = (typeof HOUSE_TYPES)[number];
+export type MortalityCause = (typeof MORTALITY_CAUSES)[number];
+export type EggGrade = (typeof EGG_GRADES)[number];
+export type HealthRecordType = (typeof HEALTH_RECORD_TYPES)[number];
+export type ReminderStatus = (typeof REMINDER_STATUSES)[number];
+export type LedgerDirection = (typeof LEDGER_DIRECTIONS)[number];
+export type LedgerCategory = (typeof LEDGER_CATEGORIES)[number];
+export type RecurringFrequency = (typeof RECURRING_FREQUENCIES)[number];
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+export type ListingCategory = (typeof LISTING_CATEGORIES)[number];
+export type BiosecurityEntryType = (typeof BIOSECURITY_ENTRY_TYPES)[number];
+export type AlertSeverity = (typeof ALERT_SEVERITIES)[number];
+export type ContentKind = (typeof CONTENT_KINDS)[number];
+export type Role = (typeof ROLES)[number];
+export type MembershipStatus = (typeof MEMBERSHIP_STATUSES)[number];
+export type UnitSystem = (typeof UNIT_SYSTEMS)[number];

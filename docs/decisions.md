@@ -25,3 +25,13 @@ Each is cheap to change until the phase named.
 - Species at launch → affects production profile seed data (Phase 2).
 - Hosting region (Atlas region / data residency) → blocks staging environment.
 - Marketplace buyer accounts → blocks Phase 5 design.
+
+## Added with the monorepo restructure
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| D14 | Where business calculations live | `services/api/src/domain`, not a shared package, so no client can import business rules |
+| D15 | Readiness vs liveness | `/health` checks MongoDB and returns 503 when it is down; `/health/live` never touches dependencies, so an orchestrator does not restart a healthy process during a database blip |
+| D16 | Startup order | HTTP starts before MongoDB connects, so `/health` can report "degraded" during startup; the process exits if MongoDB never connects within the retry budget |
+| D17 | Shared types for Flutter | Hand-written Dart models for now; generate a Dart client from `packages/contracts/openapi.json` once business endpoints exist |
+| D18 | Local verification without Docker | FerretDB (MongoDB wire protocol) was used in the build environment to exercise connection, ping, failure and recovery; CI runs the same tests against real MongoDB 7 |
