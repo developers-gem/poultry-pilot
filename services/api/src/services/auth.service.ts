@@ -175,6 +175,7 @@ export function createAuthService(d: AuthDeps) {
       role: "owner",
       status: "active",
       joinedAt: now,
+      createdBy: user.id,
       createdAt: now,
       updatedAt: now,
       version: 0,

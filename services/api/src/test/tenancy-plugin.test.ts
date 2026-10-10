@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import { afterAll, describe, expect, it } from "vitest";
-import { MembershipModel, SyncChangeModel } from "../adapters/mongo/models.js";
+import { MembershipModel, SyncChangeModel } from "../adapters/mongo/models/index.js";
 
 /** Runs without a database: the plugin throws in pre-hooks before any command is sent. */
 describe("requireFarmScope mongoose plugin", () => {
@@ -8,7 +8,7 @@ describe("requireFarmScope mongoose plugin", () => {
   mongoose.set("bufferCommands", false);
 
   it("refuses farm-scoped queries without farmId", async () => {
-    await expect(MembershipModel.find({ userId: "u1" }).exec()).rejects.toThrow(/Tenancy violation: find on Membership/);
+    await expect(MembershipModel.find({ userId: "u1" }).exec()).rejects.toThrow(/Tenancy violation: find on FarmMember/);
     await expect(SyncChangeModel.countDocuments({ seq: { $gt: 0 } }).exec()).rejects.toThrow(/Tenancy violation/);
     await expect(MembershipModel.updateMany({ role: "worker" }, { $set: { role: "owner" } }).exec()).rejects.toThrow(/Tenancy violation/);
   });

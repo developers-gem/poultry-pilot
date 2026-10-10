@@ -138,4 +138,11 @@ Only `*.example` files are committed. Real values go in:
 
 Roles: owner, admin, farm_manager, supervisor, worker, accountant, vet. Every farm route checks: signed in → active member of that farm → role permits the action → the record belongs to that farm. Full design, permission table and hierarchy rules: `docs/auth.md`.
 
-Business modules (flocks, production, feed, health, money, market) are not implemented yet.
+## Data model
+
+52 MongoDB collections (Mongoose schemas in `services/api/src/adapters/mongo/models/`), each farm-owned record tenant-scoped by `farmId` with `createdBy`/`updatedBy`, timestamps, versioning and soft delete or append-only corrections.
+
+- `docs/data-model.md` — conventions, ownership, source-of-truth vs derived fields, what each action writes, retention, relationship diagrams, prototype table mapping.
+- `docs/data-dictionary.md` — every field, enum, index (with the query it serves) and reference. Generated: `pnpm --filter @poultrypilot/api docs:data-dictionary`.
+
+The business module services and endpoints (flocks, production, feed, health, money, market) are not implemented yet; their collections are.

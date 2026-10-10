@@ -157,7 +157,7 @@ export function createFarmService(d: FarmDeps) {
         if (existing) {
           m = (await repos.memberships.update(ctx.farmId, existing.id, invite, tx))!;
         } else {
-          m = { id: newId(), farmId: ctx.farmId, email, status: "invited", createdAt: now, version: 0, ...invite };
+          m = { id: newId(), farmId: ctx.farmId, email, status: "invited", createdBy: ctx.userId, createdAt: now, version: 0, ...invite };
           await repos.memberships.create(m, tx);
         }
         await d.audit.record(ctx, { action: "member.invited", entity: "membership", entityId: m.id, after: { email, role } }, tx);
@@ -196,7 +196,7 @@ export function createFarmService(d: FarmDeps) {
         const cur = await findMember(ctx.farmId, target.id);
         if (!cur) throw notFound("Member");
         await guardLastOwner(ctx.farmId, cur, role, tx);
-        const next = await repos.memberships.update(ctx.farmId, cur.id, { role, updatedAt: clock.now() }, tx);
+        const next = await repos.memberships.update(ctx.farmId, cur.id, { role, updatedBy: ctx.userId, updatedAt: clock.now() }, tx);
         await d.audit.record(ctx, { action: "member.role_changed", entity: "membership", entityId: cur.id, before: { role: cur.role }, after: { role } }, tx);
         await memberChanged(ctx, next!, tx);
         return toMembershipView(next!);

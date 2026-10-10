@@ -102,7 +102,21 @@ export function createSyncService(repos: Repositories, clock: Clock) {
         }
         // Conflicts are not stored as processed: the client resolves and resends with a new baseVersion.
         if (result.status !== "conflict") {
-          await repos.sync.saveProcessed({ id: processedId, farmId: ctx.farmId, result, at: clock.now() });
+          const at = clock.now();
+          await repos.sync.saveProcessed({
+            id: processedId,
+            farmId: ctx.farmId,
+            mutationId: m.mutationId,
+            userId: ctx.userId,
+            deviceId: req.deviceId,
+            command: m.command,
+            ...(m.entityId ? { entityId: m.entityId } : {}),
+            ...(m.baseVersion !== undefined ? { baseVersion: m.baseVersion } : {}),
+            status: result.status,
+            result,
+            receivedAt: at,
+            at,
+          });
         }
         results.push(result);
       }

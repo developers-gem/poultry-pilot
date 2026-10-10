@@ -47,3 +47,17 @@ Each is cheap to change until the phase named.
 | D23 | Farm update semantics | `PUT` replaces all editable fields; omitted optional fields are cleared; `version` required |
 | D24 | Non-member responses | 404 everywhere, identical to a missing farm, including for pending invitees and removed members |
 | D25 | Mobile token storage | Refresh token in the platform keystore; web may move to an HttpOnly cookie later without API changes |
+
+## Added with the full data model
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| D26 | Schema declaration | One `defineCollection` helper adds standard fields by ownership; every index must state the query it serves |
+| D27 | Daily data shape | `daily_records` holds mortality, culls and conditions only; eggs, feed and water have their own per-day collections, so each fact has one home |
+| D28 | Stock | Ledger collections are the source of truth; `stock` snapshots on items are derived and written in the same transaction |
+| D29 | Corrections | Editable records are soft-deleted (`deletedAt: null` in every query); ledgers are append-only with `reversalOf` |
+| D30 | Accrual vs cash | `expenses` are bills (may be unpaid); `transactions` are cash movements; profit is computed from `transactions` |
+| D31 | Medicines | `medicines` holds clinical facts (withdrawal days); stock lives in `inventory_items` linked by `medicineId` |
+| D32 | Mortality causes | "culled" removed from causes; culls are a separate count on `daily_records` |
+| D33 | Unknown fields | Schemas use `strict: "throw"` so code that writes an undeclared field fails in tests |
+| D34 | Data dictionary | Generated from the schemas; a test fails when it is stale |

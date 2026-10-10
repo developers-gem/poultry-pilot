@@ -27,7 +27,7 @@ const farm = (): FarmRecord => ({
   createdBy: "u", createdAt: now, updatedAt: now, version: 0,
 });
 const member = (farmId: string, over: Partial<MembershipRecord> = {}): MembershipRecord => ({
-  id: newId(), farmId, userId: newId(), email: `${newId()}@example.com`, role: "worker", status: "active", createdAt: now, updatedAt: now, version: 0, ...over,
+  id: newId(), farmId, userId: newId(), email: `${newId()}@example.com`, role: "worker", status: "active", createdBy: "u-1", createdAt: now, updatedAt: now, version: 0, ...over,
 });
 
 function contract(name: string, setup: () => Promise<{ repos: Repositories; reset: () => Promise<void>; teardown?: () => Promise<void> }>) {
@@ -134,14 +134,14 @@ if (uri) {
   contract("mongodb", async () => {
     const mongo = createMongo({ uri, serverSelectionTimeoutMS: 3000, maxPoolSize: 5, retries: 0, autoIndex: false }, pino({ level: "silent" }));
     await mongo.connect();
-    // Create indexes one by one. FerretDB (used for local checks without Docker) lacks TTL indexes;
+    // Create indexes one by one. FerretDB (used for local checks without Docker) lacks TTL, partial, 2dsphere and text indexes;
     // skip only "not implemented" options so unique indexes are still enforced. Real MongoDB creates all.
     for (const model of Object.values(mongoose.models)) {
       for (const [fields, options] of model.schema.indexes()) {
         try {
           await model.collection.createIndex(fields as Record<string, 1 | -1>, options as Record<string, unknown>);
         } catch (err) {
-          if (!/not implemented/i.test((err as Error).message)) throw err;
+          if (!/not implemented|can.t find index/i.test((err as Error).message)) throw err;
         }
       }
     }

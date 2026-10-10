@@ -9,10 +9,10 @@ export const SPECIES = ["chicken", "duck", "turkey", "quail", "guinea_fowl"] as 
 export const FLOCK_PURPOSES = ["broiler", "layer", "breeder", "pullet", "dual_purpose"] as const;
 export const FLOCK_STATUSES = ["planned", "active", "closed", "cancelled"] as const;
 export const HOUSE_TYPES = ["broiler", "layer", "brooder", "breeder", "hatchery", "mixed"] as const;
+/** Causes of death. Culls are recorded separately (daily_records.culls), so "culled" is not a cause. */
 export const MORTALITY_CAUSES = [
   "unknown",
   "found_dead",
-  "culled",
   "predator",
   "heat_stress",
   "injury",
@@ -20,7 +20,8 @@ export const MORTALITY_CAUSES = [
   "other",
 ] as const;
 export const EGG_GRADES = ["large", "medium", "small", "cracked", "dirty", "double_yolk"] as const;
-export const HEALTH_RECORD_TYPES = ["vaccination", "treatment", "vet_visit", "observation", "lab_test"] as const;
+/** Vaccinations have their own collection (schedule + administration), so they are not a health record type. */
+export const HEALTH_RECORD_TYPES = ["treatment", "vet_visit", "observation", "lab_test", "post_mortem"] as const;
 export const REMINDER_STATUSES = ["scheduled", "done", "skipped", "cancelled"] as const;
 export const LEDGER_DIRECTIONS = ["income", "expense"] as const;
 export const LEDGER_CATEGORIES = [

@@ -97,6 +97,9 @@ export interface MembershipRecord {
   joinedAt?: Date;
   removedAt?: Date;
   removedBy?: string;
+  /** Who created the membership: the inviter, or the user themselves for a farm they created. */
+  createdBy: string;
+  updatedBy?: string;
   createdAt: Date;
   updatedAt: Date;
   version: number;
@@ -136,9 +139,18 @@ export interface SyncChangeRecord {
   at: Date;
 }
 
+/** One pushed offline mutation and its outcome (collection sync_operations). */
 export interface ProcessedMutationRecord {
   id: string; // `${farmId}:${mutationId}`
   farmId: string;
+  mutationId: string;
+  userId: string;
+  deviceId: string;
+  command: string;
+  entityId?: string;
+  baseVersion?: number;
+  status: "accepted" | "rejected" | "conflict";
   result: unknown;
+  receivedAt: Date;
   at: Date;
 }

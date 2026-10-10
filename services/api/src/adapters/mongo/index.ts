@@ -24,7 +24,7 @@ import {
   SessionModel,
   SyncChangeModel,
   UserModel,
-} from "./models.js";
+} from "./models/index.js";
 
 /**
  * MongoDB repositories. Requires a replica set (Atlas, or `mongod --replSet`) for transactions.
@@ -134,9 +134,9 @@ export function createMongoRepositories(connection = mongoose.connection): Repos
       },
     },
     farms: {
-      findById: (id, tx) => findOne<FarmRecord>(FarmModel, { _id: id, deletedAt: { $exists: false } }, tx),
+      findById: (id, tx) => findOne<FarmRecord>(FarmModel, { _id: id, deletedAt: null }, tx),
       async findByIds(ids, tx) {
-        const docs = await FarmModel.find({ _id: { $in: ids }, deletedAt: { $exists: false } }, null, s(tx)).lean();
+        const docs = await FarmModel.find({ _id: { $in: ids }, deletedAt: null }, null, s(tx)).lean();
         return docs.map((d) => fromDoc<FarmRecord>(d));
       },
       async create(rec, tx) {
@@ -178,7 +178,7 @@ export function createMongoRepositories(connection = mongoose.connection): Repos
     },
     audit: {
       async insert(rec, tx) {
-        await AuditModel.create([toDoc(rec)], s(tx));
+        await AuditModel.create([{ ...toDoc(rec), createdAt: rec.at, updatedAt: rec.at }], s(tx));
       },
       async list(farmId, { beforeId, limit }, tx) {
         const filter: Record<string, unknown> = { farmId, ...(beforeId ? { _id: { $lt: beforeId } } : {}) };
@@ -206,19 +206,26 @@ export function createMongoRepositories(connection = mongoose.connection): Repos
     },
     sync: {
       async nextSeq(farmId, tx) {
-        const doc = await CounterModel.findOneAndUpdate({ _id: `sync:${farmId}` }, { $inc: { value: 1 } }, { new: true, upsert: true, ...s(tx) }).lean();
-        return (doc as { value: number }).value;
+        const at = new Date();
+        const doc = await CounterModel.findOneAndUpdate(
+          { _id: `sync:${farmId}` },
+          { $inc: { value: 1 }, $set: { updatedAt: at }, $setOnInsert: { createdAt: at } },
+          { new: true, upsert: true, ...s(tx) },
+        ).lean();
+        return (doc as unknown as { value: number }).value;
       },
       async insertChange(rec, tx) {
-        await SyncChangeModel.create([rec], s(tx));
+        await SyncChangeModel.create([{ _id: `${rec.farmId}:${rec.seq}`, ...rec, createdAt: rec.at, updatedAt: rec.at }], s(tx));
       },
       async listSince(farmId, since, limit, tx) {
-        const docs = await SyncChangeModel.find({ farmId, seq: { $gt: since } }, { _id: 0 }, s(tx)).sort({ seq: 1 }).limit(limit).lean();
+        const docs = await SyncChangeModel.find({ farmId, seq: { $gt: since } }, { _id: 0, createdAt: 0, updatedAt: 0 }, s(tx)).sort({ seq: 1 }).limit(limit).lean();
         return docs as unknown as SyncChangeRecord[];
       },
-      findProcessed: (id, tx) => findOne<ProcessedMutationRecord>(ProcessedMutationModel, { _id: id }, tx),
+      // _id is `${farmId}:${mutationId}`; farmId is repeated in the filter for the tenancy plugin.
+      findProcessed: (id, tx) => findOne<ProcessedMutationRecord>(ProcessedMutationModel, { _id: id, farmId: id.split(":")[0] }, tx),
       async saveProcessed(rec, tx) {
-        await ProcessedMutationModel.create([toDoc(rec)], s(tx));
+        const { at, ...rest } = rec;
+        await ProcessedMutationModel.create([{ ...toDoc(rest as typeof rec), createdAt: at, updatedAt: at }], s(tx));
       },
     },
     ledgerProbe: {
