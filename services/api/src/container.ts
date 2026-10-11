@@ -7,6 +7,10 @@ import type { EmailSender, GoogleTokenVerifier, MediaStorage, PasswordHasher } f
 import { memoryMediaStorage } from "./adapters/storage.js";
 import { createDailyRecordService } from "./services/daily-record.service.js";
 import { createMediaService } from "./services/media.service.js";
+import { createAlertService } from "./services/alert.service.js";
+import { createFeedService } from "./services/feed.service.js";
+import { createInventoryService } from "./services/inventory.service.js";
+import { FeedConsumptionRequest } from "@poultrypilot/validation";
 import type { HealthChecks } from "./ports/health.js";
 import type { Repositories } from "./ports/repositories.js";
 import { createAuditService } from "./services/audit.service.js";
@@ -84,7 +88,10 @@ export function buildContainer(d: ContainerDeps) {
 
   const houses = createHouseService({ repos: d.repos, clock, audit, sync });
   const flocks = createFlockService({ repos: d.repos, clock, audit, sync });
-  const dailyRecords = createDailyRecordService({ repos: d.repos, clock, audit, sync, flocks });
+  const alerts = createAlertService({ repos: d.repos, clock });
+  const inventory = createInventoryService({ repos: d.repos, clock, audit, sync, onStockChanged: (ctx, tx) => alerts.evaluateInventory(ctx, tx) });
+  const feed = createFeedService({ repos: d.repos, clock, audit, sync, inventory, flocks });
+  const dailyRecords = createDailyRecordService({ repos: d.repos, clock, audit, sync, flocks, feed, alerts });
   const media = createMediaService({ repos: d.repos, clock, audit, storage: d.media ?? memoryMediaStorage() });
 
   // Offline field-recording commands (Flutter outbox). Same service methods, same rules, as REST.
@@ -125,7 +132,16 @@ export function buildContainer(d: ContainerDeps) {
     },
   });
 
-  return { ...d, clock, startedAt: clock.now(), accessTokens, audit, sync, auth, farms, houses, flocks, dailyRecords, media };
+  const FeedCommand = FeedConsumptionRequest;
+  sync.register("feed.consume", {
+    action: "inventory.issue",
+    schema: FeedCommand,
+    async run(ctx, raw) {
+      return { entityId: (await feed.consume(ctx, raw as z.output<typeof FeedCommand>)).id };
+    },
+  });
+
+  return { ...d, clock, startedAt: clock.now(), accessTokens, audit, sync, auth, farms, houses, flocks, dailyRecords, media, inventory, feed, alerts };
 }
 
 export type Container = ReturnType<typeof buildContainer>;

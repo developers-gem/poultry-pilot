@@ -153,4 +153,8 @@ Houses and flocks under `/api/v1/farms/:farmId`: flock CRUD, placement, mortalit
 
 `POST/GET /api/v1/farms/:farmId/daily-records`, `GET/PUT/DELETE /api/v1/daily-records/:id`: one record per flock per day covering headcount, mortality, culls, feed, water, temperature, humidity, eggs, broken eggs, egg quality, average weight, health observations, notes and photos. Each section is written to its source collection in one transaction. `GET …/daily-records/sheet` loads a phone's entry screen in one call; `Prefer: return=minimal` keeps responses small; `GET …/dashboard/day` and `…/dashboard/trends` aggregate on the server. Photos: `POST /api/v1/farms/:farmId/media`. Details: `docs/daily-operations.md`.
 
-Feed stock, health, money and market services are not implemented yet; their collections are.
+## FeedWise and inventory
+
+One stock engine for feed, medicine, vaccines, disinfectant, litter, packaging, equipment supplies and other consumables: purchases become lots (supplier, batch, expiry, storage location, unit cost); stock leaves FEFO and is costed at real lot prices; daily-record feed, feed entries and chick-lot placements move stock automatically. Eggs and chicks are in the inventory overview. Water records carry source, pH, dissolved solids, chlorine and treatment, with abnormal-consumption flags. Feed per bird, per kg gain, FCR, feed cost per bird and per egg, and days of feed remaining are calculated on the server. Low-stock, feed-days, expiry and water alerts are raised automatically (also hourly). Details: `docs/feedwise-inventory.md`.
+
+Health, money and market services are not implemented yet; their collections are.

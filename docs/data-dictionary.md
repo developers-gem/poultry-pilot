@@ -3,7 +3,7 @@
 > Generated from the Mongoose schemas in `services/api/src/adapters/mongo/models`. Do not edit by hand:
 > run `pnpm --filter @poultrypilot/api docs:data-dictionary`. A test fails if this file is out of date.
 
-53 collections, 86 secondary indexes (plus the default `_id` index on each). Design rules and relationships: `docs/data-model.md`.
+52 collections, 86 secondary indexes (plus the default `_id` index on each). Design rules and relationships: `docs/data-model.md`.
 
 | Collection | Domain | Ownership | Indexes | Purpose |
 | --- | --- | --- | --- | --- |
@@ -20,12 +20,11 @@
 | [`bird_weights`](#bird_weights) | Production | farm | 1 | A weigh session: individual sample weights of one flock on one day, with statistics computed from those weights |
 | [`egg_records`](#egg_records) | Production | farm | 2 | Eggs collected from one flock on one day, by grade |
 | [`egg_inventory`](#egg_inventory) | Production | farm, append-only | 2 | Egg stock ledger |
-| [`water_records`](#water_records) | Production | farm | 1 | Water drunk by one flock on one day (a leading indicator of illness and heat stress) |
-| [`feed_items`](#feed_items) | Feed | farm | 1 | A feed product the farm buys and issues (e.g |
-| [`feed_purchases`](#feed_purchases) | Feed | farm | 2 | Feed received into stock |
-| [`feed_consumption`](#feed_consumption) | Feed | farm | 2 | Feed issued to a flock on a day, costed at the moving average at the time of issue |
-| [`inventory_items`](#inventory_items) | Inventory | farm | 1 | Non-feed stock: medicines and vaccines (linked to the medicines catalog), disinfectant, litter, egg trays, spare parts |
-| [`inventory_transactions`](#inventory_transactions) | Inventory | farm, append-only | 1 | Stock movements for inventory items |
+| [`water_records`](#water_records) | Production | farm | 1 | Water drunk by one flock on one day, with source, quality (pH, dissolved solids, chlorine), treatment and abnormal-consumption flags |
+| [`feed_consumption`](#feed_consumption) | Feed | farm | 2 | Feed eaten by, or wasted in, a flock's house on a day |
+| [`inventory_items`](#inventory_items) | Inventory | farm | 1 | The stock catalog: feed, medicine, vaccines, disinfectant, litter, packaging, equipment supplies, spare parts and other consumables |
+| [`inventory_lots`](#inventory_lots) | Inventory | farm | 2 | A batch received into stock (a purchase, or a positive stock-count correction): supplier, batch number, expiry, storage location, unit cost and what remains |
+| [`inventory_transactions`](#inventory_transactions) | Inventory | farm, append-only | 2 | The stock ledger: receipts, issues, wastage, stock-count adjustments and reversals, each against one lot |
 | [`medicines`](#medicines) | Health | farm | 1 | Catalog of vaccines and medicines the farm uses, with withdrawal periods |
 | [`health_records`](#health_records) | Health | farm | 2 | Vet visits, observations, treatments, lab tests and post-mortems |
 | [`vaccinations`](#vaccinations) | Health | farm | 2 | A scheduled vaccination for a flock and, once given, its administration details |
@@ -329,6 +328,7 @@ The flock ledger: every placement, death, cull, transfer, split, merge, adjustme
 | `toHouseId` | String |  |  | `House` |
 | `groupId` | String |  |  |  |
 | `dailyRecordId` | String |  |  | `DailyRecord` |
+| `chickLotId` | String |  |  | `ChickLot` |
 | `buyerId` | String |  |  | `Buyer` |
 | `orderId` | String |  |  | `Order` |
 | `fromStatus` | String |  | one of: `planned`, `active`, `closed`, `cancelled` |  |
@@ -466,7 +466,7 @@ Egg stock ledger. Each movement adds (collected, positive adjustment) or removes
 
 ### water_records
 
-Water drunk by one flock on one day (a leading indicator of illness and heat stress).
+Water drunk by one flock on one day, with source, quality (pH, dissolved solids, chlorine), treatment and abnormal-consumption flags. Falling intake is often the first sign of illness or heat stress.
 
 - **Model:** `WaterRecord`
 - **Ownership:** Farm — every query must include farmId
@@ -479,6 +479,15 @@ Water drunk by one flock on one day (a leading indicator of illness and heat str
 | `litres` | Number | yes | max 10000000 |  |
 | `meterReading` | Number |  |  |  |
 | `dailyRecordId` | String |  |  | `DailyRecord` |
+| `source` | String |  | one of: `borehole`, `municipal`, `well`, `rainwater`, `river`, `tanker`, `other` |  |
+| `ph` | Number |  | max 14 |  |
+| `tdsPpm` | Number |  | max 100000 |  |
+| `chlorinePpm` | Number |  | max 100 |  |
+| `qualityRating` | String |  | one of: `good`, `fair`, `poor` |  |
+| `treatment` | String |  | one of: `none`, `chlorination`, `acidification`, `filtration`, `uv`, `medication`, `vitamins`, `other` |  |
+| `treatmentNotes` | String |  | ≤ 300 chars |  |
+| `flags` | array of String |  | one of: `consumption_high`, `consumption_low`, `ph_low`, `ph_high`, `tds_high` |  |
+| `baselineLitres` | Number |  |  |  |
 | `medicated` | Boolean |  | default `false` |  |
 | `healthRecordId` | String |  |  | `HealthRecord` |
 | `notes` | String |  | ≤ 500 chars |  |
@@ -489,66 +498,9 @@ Water drunk by one flock on one day (a leading indicator of illness and heat str
 
 ## Feed
 
-### feed_items
-
-A feed product the farm buys and issues (e.g. broiler starter crumble). Holds a derived stock snapshot in kg.
-
-- **Model:** `FeedItem`
-- **Ownership:** Farm — every query must include farmId
-- **Standard fields:** `_id` (UUIDv7 string), `farmId` (required), `createdBy` (required), `updatedBy`, `createdAt`, `updatedAt` (UTC, required), `version` (optimistic concurrency), `deletedAt`, `deletedBy` (soft delete)
-
-| Field | Type | Required | Constraints | References |
-| --- | --- | --- | --- | --- |
-| `name` | String | yes | ≤ 120 chars |  |
-| `stage` | String | yes | one of: `pre_starter`, `starter`, `grower`, `finisher`, `pre_layer`, `layer`, `breeder`, `other` |  |
-| `form` | String |  | one of: `mash`, `crumble`, `pellet`, `other` |  |
-| `defaultSupplier` | String |  | ≤ 120 chars |  |
-| `bagSizeKg` | Number |  |  |  |
-| `reorderLevelKg` | Number |  |  |  |
-| `active` | Boolean |  | default `true` |  |
-| `stock` | object |  |  |  |
-| `stock.quantity` | Number | yes | min -1000000000 |  |
-| `stock.valueMinor` | Number | yes | min -1000000000000; integer |  |
-| `stock.currency` | String |  | pattern `/^[A-Z]{3}$/` |  |
-| `stock.asOf` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
-
-| Index | Options | Serves |
-| --- | --- | --- |
-| farmId, name | unique, live records only | Feed item list (prefix); names unique within a farm |
-
-### feed_purchases
-
-Feed received into stock. Creates or links an expense for payment tracking.
-
-- **Model:** `FeedPurchase`
-- **Ownership:** Farm — every query must include farmId
-- **Standard fields:** `_id` (UUIDv7 string), `farmId` (required), `createdBy` (required), `updatedBy`, `createdAt`, `updatedAt` (UTC, required), `version` (optimistic concurrency), `deletedAt`, `deletedBy` (soft delete)
-
-| Field | Type | Required | Constraints | References |
-| --- | --- | --- | --- | --- |
-| `feedItemId` | String | yes |  | `FeedItem` |
-| `date` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
-| `supplier` | String |  | ≤ 120 chars |  |
-| `quantityKg` | Number | yes | min 0.001 |  |
-| `bags` | Number |  | integer |  |
-| `unitPricePerKg` | object |  |  |  |
-| `unitPricePerKg.amountMinor` | Number | yes | integer |  |
-| `unitPricePerKg.currency` | String | yes | pattern `/^[A-Z]{3}$/` |  |
-| `total` | object | yes |  |  |
-| `total.amountMinor` | Number | yes | integer |  |
-| `total.currency` | String | yes | pattern `/^[A-Z]{3}$/` |  |
-| `invoiceNumber` | String |  | ≤ 60 chars |  |
-| `expenseId` | String |  |  | `Expense` |
-| `notes` | String |  | ≤ 500 chars |  |
-
-| Index | Options | Serves |
-| --- | --- | --- |
-| farmId, feedItemId, date |  | Ledger replay for moving-average cost and item purchase history |
-| farmId, date ↓ |  | Purchases list and spend by period across all items |
-
 ### feed_consumption
 
-Feed issued to a flock on a day, costed at the moving average at the time of issue. Sum per flock is the FCR numerator.
+Feed eaten by, or wasted in, a flock's house on a day. When it names a feed item, stock is drawn FEFO from that item's lots in the same transaction and the entry is costed at those lots' prices; the sum per flock feeds FCR and feed cost.
 
 - **Model:** `FeedConsumption`
 - **Ownership:** Farm — every query must include farmId
@@ -556,26 +508,32 @@ Feed issued to a flock on a day, costed at the moving average at the time of iss
 
 | Field | Type | Required | Constraints | References |
 | --- | --- | --- | --- | --- |
-| `flockId` | String | yes |  | `Flock` |
-| `feedItemId` | String |  |  | `FeedItem` |
+| `flockId` | String |  |  | `Flock` |
+| `feedItemId` | String |  |  | `InventoryItem` |
+| `kind` | String | yes | one of: `consumption`, `wastage`; default `"consumption"` |  |
 | `date` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
 | `quantityKg` | Number | yes | min 0.001 |  |
 | `dailyRecordId` | String |  |  | `DailyRecord` |
+| `allocations` | array of objects |  |  |  |
+| `allocations[].lotId` | String | yes |  | `InventoryLot` |
+| `allocations[].quantity` | Number | yes |  |  |
+| `allocations[].costMinor` | Number | yes | integer |  |
 | `cost` | object |  |  |  |
 | `cost.amountMinor` | Number | yes | integer |  |
 | `cost.currency` | String | yes | pattern `/^[A-Z]{3}$/` |  |
+| `reason` | String |  | ≤ 300 chars |  |
 | `notes` | String |  | ≤ 500 chars |  |
 
 | Index | Options | Serves |
 | --- | --- | --- |
 | farmId, flockId, date |  | FCR, daily feed per flock, feed-change alerts |
-| farmId, feedItemId, date | partial: {"feedItemId":{"$exists":true}} | Days of cover per item and ledger replay |
+| farmId, feedItemId, date | partial: {"feedItemId":{"$exists":true}} | Average daily use per feed item for days of feed remaining |
 
 ## Inventory
 
 ### inventory_items
 
-Non-feed stock: medicines and vaccines (linked to the medicines catalog), disinfectant, litter, egg trays, spare parts.
+The stock catalog: feed, medicine, vaccines, disinfectant, litter, packaging, equipment supplies, spare parts and other consumables. Feed items carry feed details. Stock is held in lots; the item keeps a derived total.
 
 - **Model:** `InventoryItem`
 - **Ownership:** Farm — every query must include farmId
@@ -584,12 +542,21 @@ Non-feed stock: medicines and vaccines (linked to the medicines catalog), disinf
 | Field | Type | Required | Constraints | References |
 | --- | --- | --- | --- | --- |
 | `name` | String | yes | ≤ 120 chars |  |
-| `category` | String | yes | one of: `medicine`, `vaccine`, `disinfectant`, `litter`, `packaging`, `spare_part`, `cleaning`, `other` |  |
+| `category` | String | yes | one of: `feed`, `medicine`, `vaccine`, `disinfectant`, `litter`, `packaging`, `equipment`, `spare_part`, `cleaning`, `other` |  |
 | `unit` | String | yes | one of: `kg`, `g`, `l`, `ml`, `dose`, `piece`, `tray`, `bag`, `box`, `bottle` |  |
+| `sku` | String |  | ≤ 60 chars |  |
 | `medicineId` | String |  |  | `Medicine` |
+| `feed` | object |  |  |  |
+| `feed.stage` | String | yes | one of: `pre_starter`, `starter`, `grower`, `finisher`, `pre_layer`, `layer`, `breeder`, `other` |  |
+| `feed.form` | String |  | one of: `mash`, `crumble`, `pellet`, `other` |  |
+| `feed.bagSizeKg` | Number |  |  |  |
+| `defaultSupplier` | String |  | ≤ 120 chars |  |
+| `defaultStorageLocation` | String |  | ≤ 120 chars |  |
 | `reorderLevel` | Number |  |  |  |
-| `storageLocation` | String |  | ≤ 120 chars |  |
+| `reorderDays` | Number |  | max 365 |  |
+| `expiryWarningDays` | Number |  | max 365; default `30`; integer |  |
 | `active` | Boolean |  | default `true` |  |
+| `notes` | String |  | ≤ 1000 chars |  |
 | `stock` | object |  |  |  |
 | `stock.quantity` | Number | yes | min -1000000000 |  |
 | `stock.valueMinor` | Number | yes | min -1000000000000; integer |  |
@@ -600,9 +567,38 @@ Non-feed stock: medicines and vaccines (linked to the medicines catalog), disinf
 | --- | --- | --- |
 | farmId, name | unique, live records only | Inventory list (prefix); names unique within a farm |
 
+### inventory_lots
+
+A batch received into stock (a purchase, or a positive stock-count correction): supplier, batch number, expiry, storage location, unit cost and what remains. Stock leaves lots FEFO.
+
+- **Model:** `InventoryLot`
+- **Ownership:** Farm — every query must include farmId
+- **Standard fields:** `_id` (UUIDv7 string), `farmId` (required), `createdBy` (required), `updatedBy`, `createdAt`, `updatedAt` (UTC, required), `version` (optimistic concurrency), `deletedAt`, `deletedBy` (soft delete)
+
+| Field | Type | Required | Constraints | References |
+| --- | --- | --- | --- | --- |
+| `itemId` | String | yes |  | `InventoryItem` |
+| `receivedDate` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
+| `supplier` | String |  | ≤ 120 chars |  |
+| `batchNumber` | String |  | ≤ 60 chars |  |
+| `invoiceNumber` | String |  | ≤ 60 chars |  |
+| `expiryDate` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
+| `storageLocation` | String |  | ≤ 120 chars |  |
+| `quantityReceived` | Number | yes | min 0.001 |  |
+| `quantityRemaining` | Number | yes |  |  |
+| `unitCost` | object | yes |  |  |
+| `unitCost.amountMinor` | Number | yes | integer |  |
+| `unitCost.currency` | String | yes | pattern `/^[A-Z]{3}$/` |  |
+| `expenseId` | String |  |  | `Expense` |
+
+| Index | Options | Serves |
+| --- | --- | --- |
+| farmId, itemId, receivedDate |  | An item's lots for FEFO picking and its stock view |
+| farmId, expiryDate | partial: {"expiryDate":{"$exists":true}} | Expiry alerts: lots expiring soon across the farm |
+
 ### inventory_transactions
 
-Stock movements for inventory items. quantityDelta is signed; lot number and expiry are kept for vaccines and medicines.
+The stock ledger: receipts, issues, wastage, stock-count adjustments and reversals, each against one lot. quantityDelta is signed; valueMinor is the cost moved. Written automatically by purchases, feed use, daily records and manual issues.
 
 - **Model:** `InventoryTransaction`
 - **Ownership:** Farm — every query must include farmId
@@ -612,26 +608,23 @@ Stock movements for inventory items. quantityDelta is signed; lot number and exp
 | Field | Type | Required | Constraints | References |
 | --- | --- | --- | --- | --- |
 | `itemId` | String | yes |  | `InventoryItem` |
-| `type` | String | yes | one of: `receipt`, `issue`, `adjustment`, `disposal`, `reversal` |  |
+| `lotId` | String | yes |  | `InventoryLot` |
+| `type` | String | yes | one of: `receipt`, `issue`, `wastage`, `adjustment`, `reversal` |  |
 | `date` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
 | `quantityDelta` | Number | yes | min -1000000000 |  |
-| `unitCost` | object |  |  |  |
-| `unitCost.amountMinor` | Number | yes | integer |  |
-| `unitCost.currency` | String | yes | pattern `/^[A-Z]{3}$/` |  |
-| `lotNumber` | String |  | ≤ 60 chars |  |
-| `expiryDate` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
+| `valueMinor` | Number | yes | min -1000000000000; integer |  |
+| `currency` | String | yes | pattern `/^[A-Z]{3}$/` |  |
 | `flockId` | String |  |  | `Flock` |
 | `houseId` | String |  |  | `House` |
-| `healthRecordId` | String |  |  | `HealthRecord` |
-| `vaccinationId` | String |  |  | `Vaccination` |
-| `supplier` | String |  | ≤ 120 chars |  |
-| `expenseId` | String |  |  | `Expense` |
+| `sourceType` | String | yes | one of: `purchase`, `feed_consumption`, `manual`, `stock_count`, `vaccination`, `health_record` |  |
+| `sourceId` | String |  |  |  |
+| `reason` | String |  | ≤ 300 chars |  |
 | `reversalOf` | String |  |  | `InventoryTransaction` |
-| `note` | String |  | ≤ 500 chars |  |
 
 | Index | Options | Serves |
 | --- | --- | --- |
-| farmId, itemId, date |  | Stock history and ledger replay per item; lot/expiry lookup |
+| farmId, itemId, date |  | An item's movement history and ledger replay |
+| farmId, sourceId |  | Find the movements of a feed entry or purchase to reverse them |
 
 ## Health
 
@@ -1319,7 +1312,7 @@ A farm's configuration of one alert type: on/off, thresholds, scope and who is n
 
 | Field | Type | Required | Constraints | References |
 | --- | --- | --- | --- | --- |
-| `ruleType` | String | yes | one of: `mortality_spike`, `egg_drop`, `feed_change`, `missing_record`, `heat_stress`, `low_feed_stock`, `low_inventory`, `vaccination_due`, `withdrawal_active` |  |
+| `ruleType` | String | yes | one of: `mortality_spike`, `egg_drop`, `feed_change`, `missing_record`, `heat_stress`, `low_feed_stock`, `low_inventory`, `vaccination_due`, `withdrawal_active`, `expiry_soon`, `expired_stock`, `water_abnormal` |  |
 | `enabled` | Boolean |  | default `true` |  |
 | `parameters` | map of Number |  |  |  |
 | `parameters.$*` | Number |  |  |  |
@@ -1343,7 +1336,7 @@ Something that needs attention, raised by the server-side alert job. States fact
 
 | Field | Type | Required | Constraints | References |
 | --- | --- | --- | --- | --- |
-| `ruleType` | String | yes | one of: `mortality_spike`, `egg_drop`, `feed_change`, `missing_record`, `heat_stress`, `low_feed_stock`, `low_inventory`, `vaccination_due`, `withdrawal_active` |  |
+| `ruleType` | String | yes | one of: `mortality_spike`, `egg_drop`, `feed_change`, `missing_record`, `heat_stress`, `low_feed_stock`, `low_inventory`, `vaccination_due`, `withdrawal_active`, `expiry_soon`, `expired_stock`, `water_abnormal` |  |
 | `severity` | String | yes | one of: `info`, `warning`, `critical` |  |
 | `status` | String | yes | one of: `open`, `acknowledged`, `resolved`; default `"open"` |  |
 | `flockId` | String |  |  | `Flock` |
@@ -1688,6 +1681,7 @@ Every reference between collections, derived from the schemas.
 | `flock_events` | `fromHouseId` | `houses` | many-to-one |
 | `flock_events` | `toHouseId` | `houses` | many-to-one |
 | `flock_events` | `dailyRecordId` | `daily_records` | many-to-one |
+| `flock_events` | `chickLotId` | `chicks` | many-to-one |
 | `flock_events` | `buyerId` | `buyers` | many-to-one |
 | `flock_events` | `orderId` | `orders` | many-to-one |
 | `flock_events` | `reversalOf` | `flock_events` | many-to-one |
@@ -1704,18 +1698,17 @@ Every reference between collections, derived from the schemas.
 | `water_records` | `flockId` | `flocks` | many-to-one |
 | `water_records` | `dailyRecordId` | `daily_records` | many-to-one |
 | `water_records` | `healthRecordId` | `health_records` | many-to-one |
-| `feed_purchases` | `feedItemId` | `feed_items` | many-to-one |
-| `feed_purchases` | `expenseId` | `expenses` | many-to-one |
 | `feed_consumption` | `flockId` | `flocks` | many-to-one |
-| `feed_consumption` | `feedItemId` | `feed_items` | many-to-one |
+| `feed_consumption` | `feedItemId` | `inventory_items` | many-to-one |
 | `feed_consumption` | `dailyRecordId` | `daily_records` | many-to-one |
+| `feed_consumption` | `allocations[].lotId` | `inventory_lots` | many-to-one |
 | `inventory_items` | `medicineId` | `medicines` | many-to-one |
+| `inventory_lots` | `itemId` | `inventory_items` | many-to-one |
+| `inventory_lots` | `expenseId` | `expenses` | many-to-one |
 | `inventory_transactions` | `itemId` | `inventory_items` | many-to-one |
+| `inventory_transactions` | `lotId` | `inventory_lots` | many-to-one |
 | `inventory_transactions` | `flockId` | `flocks` | many-to-one |
 | `inventory_transactions` | `houseId` | `houses` | many-to-one |
-| `inventory_transactions` | `healthRecordId` | `health_records` | many-to-one |
-| `inventory_transactions` | `vaccinationId` | `vaccinations` | many-to-one |
-| `inventory_transactions` | `expenseId` | `expenses` | many-to-one |
 | `inventory_transactions` | `reversalOf` | `inventory_transactions` | many-to-one |
 | `health_records` | `flockId` | `flocks` | many-to-one |
 | `health_records` | `houseId` | `houses` | many-to-one |

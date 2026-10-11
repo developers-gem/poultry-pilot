@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { EggGrade, FlockType, MortalityCause } from "../enums.js";
+import { EggGrade, FeedConsumptionKind, FlockType, MortalityCause, WaterQualityRating, WaterSource, WaterTreatment } from "../enums.js";
 import { Celsius, Count, Cursor, Grams, Id, Kilograms, LocalDate, Money, OptionalText, PositiveCount } from "../primitives.js";
 
 /**
@@ -14,9 +14,26 @@ const MortalityLine = z.object({ cause: MortalityCause, count: PositiveCount }).
 const FeedLine = z
   .object({
     quantityKg: Kilograms.positive(),
+    /** consumption (eaten, counts in FCR) or wastage (spilled or spoiled in the house). */
+    kind: FeedConsumptionKind.default("consumption"),
+    /** A feed item from inventory: stock moves automatically and the feed is costed at its lots' prices. */
     feedItemId: Id.optional(),
-    /** Until the feed stock module costs feed automatically, the price per kg can be given here. */
+    /** For feed not tracked in inventory: the price per kg. Not allowed together with feedItemId. */
     unitCostPerKg: Money.optional(),
+    reason: OptionalText(300),
+  })
+  .strict()
+  .refine((f) => !(f.feedItemId && f.unitCostPerKg), { message: "A feed item is costed from its stock; leave out unitCostPerKg", path: ["unitCostPerKg"] });
+
+const WaterQuality = z
+  .object({
+    source: WaterSource.optional(),
+    ph: z.number().min(0).max(14).optional(),
+    tdsPpm: z.number().nonnegative().max(100_000).optional(),
+    chlorinePpm: z.number().nonnegative().max(100).optional(),
+    qualityRating: WaterQualityRating.optional(),
+    treatment: WaterTreatment.optional(),
+    treatmentNotes: OptionalText(300),
   })
   .strict();
 
@@ -59,6 +76,8 @@ export const DailyRecordFields = z
     culls: Count.default(0),
     feed: z.array(FeedLine).max(10).default([]),
     waterLitres: z.number().nonnegative().max(10_000_000).optional(),
+    /** Source, quality and treatment of the day's water. Needs waterLitres. */
+    waterQuality: WaterQuality.optional(),
     temperatureMinC: Celsius.optional(),
     temperatureMaxC: Celsius.optional(),
     humidityPercent: z.number().min(0).max(100).optional(),
@@ -74,15 +93,17 @@ export const DailyRecordFields = z
 const tempOrder = <T extends { temperatureMinC?: number; temperatureMaxC?: number }>(r: T) =>
   r.temperatureMinC === undefined || r.temperatureMaxC === undefined || r.temperatureMinC <= r.temperatureMaxC;
 const tempMsg = { message: "Minimum temperature is above the maximum", path: ["temperatureMinC"] };
+const waterNeedsLitres = <T extends { waterQuality?: unknown; waterLitres?: number }>(r: T) => !r.waterQuality || r.waterLitres !== undefined;
+const waterMsg = { message: "Give waterLitres with waterQuality", path: ["waterLitres"] };
 
 /** POST /farms/:farmId/daily-records. `id` may be generated on the device (offline). */
-export const CreateDailyRecordRequest = DailyRecordFields.extend({ id: Id.optional(), flockId: Id, date: LocalDate }).strict().refine(tempOrder, tempMsg);
+export const CreateDailyRecordRequest = DailyRecordFields.extend({ id: Id.optional(), flockId: Id, date: LocalDate }).strict().refine(tempOrder, tempMsg).refine(waterNeedsLitres, waterMsg);
 
 /** PUT /daily-records/:id — replaces every section. `version` must match (optimistic concurrency). */
-export const UpdateDailyRecordRequest = DailyRecordFields.extend({ version: z.number().int().nonnegative() }).strict().refine(tempOrder, tempMsg);
+export const UpdateDailyRecordRequest = DailyRecordFields.extend({ version: z.number().int().nonnegative() }).strict().refine(tempOrder, tempMsg).refine(waterNeedsLitres, waterMsg);
 
 /** PUT /farms/:farmId/flocks/:flockId/daily-records/:date — create or replace by flock and date (offline-friendly). */
-export const UpsertDailyRecordRequest = DailyRecordFields.extend({ version: z.number().int().nonnegative().optional() }).strict().refine(tempOrder, tempMsg);
+export const UpsertDailyRecordRequest = DailyRecordFields.extend({ version: z.number().int().nonnegative().optional() }).strict().refine(tempOrder, tempMsg).refine(waterNeedsLitres, waterMsg);
 
 export const DailyRecordListQuery = z.object({
   date: LocalDate.optional(),
@@ -140,9 +161,22 @@ export const DailyRecordView = z.object({
   mortality: z.array(z.object({ cause: MortalityCause, count: z.number(), eventId: z.string(), fromDailyRecord: z.boolean() })),
   mortalityTotal: z.number(),
   culls: z.number(),
-  feed: z.array(z.object({ id: z.string(), quantityKg: z.number(), feedItemId: z.string().optional(), cost: Money.optional() })),
+  feed: z.array(z.object({ id: z.string(), kind: FeedConsumptionKind, quantityKg: z.number(), feedItemId: z.string().optional(), cost: Money.optional() })),
   feedKg: z.number(),
   waterLitres: z.number().optional(),
+  water: z
+    .object({
+      source: WaterSource.optional(),
+      ph: z.number().optional(),
+      tdsPpm: z.number().optional(),
+      chlorinePpm: z.number().optional(),
+      qualityRating: WaterQualityRating.optional(),
+      treatment: WaterTreatment.optional(),
+      treatmentNotes: z.string().optional(),
+      flags: z.array(z.string()),
+      baselineLitres: z.number().nullable(),
+    })
+    .optional(),
   temperatureMinC: z.number().optional(),
   temperatureMaxC: z.number().optional(),
   humidityPercent: z.number().optional(),

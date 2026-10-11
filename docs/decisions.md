@@ -86,3 +86,16 @@ Each is cheap to change until the phase named.
 | D47 | Edits | Each section is diffed and rewritten only if changed, so unchanged re-saves do not add history |
 | D48 | Photos | Raw-body upload, type detected from content (JPEG, PNG, WebP), 5 MB limit, storage behind `MediaStorage` (local disk now, S3-compatible later), `media_assets` index per farm |
 | D49 | Deleting a record | Reverses its ledger and egg-stock entries and soft-deletes its section rows, so the day can be recorded again |
+
+## Added with FeedWise and inventory
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| D50 | One stock engine | Feed, medicine, vaccines and supplies share `inventory_items` → `inventory_lots` → `inventory_transactions`; `feed_items` and `feed_purchases` removed (one catalog, one ledger). Eggs and chicks keep their own ledgers and appear in the overview |
+| D51 | Costing | Lot-based FEFO with each lot's actual unit cost (replaces moving average); positive stock counts valued at current average cost |
+| D52 | Expired stock | Never issued for use; wastage writes expired lots off first |
+| D53 | FCR definition | `fcr` is liveweight FCR (feed ÷ live + sold + moved-out weight); the earlier net-of-arrival figure is `feedPerKgGainKg` |
+| D54 | Feed wastage | Recorded per flock or for the store; counted in feed cost, not in FCR |
+| D55 | Alerts | Keyed per item, lot or flock/day; raised once, reopened, auto-resolved; evaluated in every stock transaction, on demand and hourly |
+| D56 | Water limits | Defaults (±20% vs recent average, pH 6–8, dissolved solids ≤ 1,000 ppm) until per-farm alert rules are built; farms should set them from veterinary or local guidance |
+| D57 | Inventory permissions | `inventory.read` all; `inventory.issue` field and vet roles; `inventory.manage` managers and accountants; `alert.manage` supervisors and above |

@@ -3,6 +3,7 @@ import { localDiskMediaStorage } from "./adapters/storage.js";
 import { argon2Hasher, googleVerifier, logEmailSender } from "./adapters/external.js";
 import { createMongoRepositories } from "./adapters/mongo/index.js";
 import { createApp } from "./app.js";
+import { scheduleAlertJob } from "./jobs/alert-job.js";
 import { loadEnv } from "./config/env.js";
 import { buildContainer } from "./container.js";
 import { createMongo } from "./db/mongo.js";
@@ -66,6 +67,8 @@ async function main(): Promise<void> {
   // Keep-alive sockets must not outlive the shutdown window.
   server.keepAliveTimeout = 5_000;
   server.headersTimeout = 6_000;
+  // Expiry alerts depend on the calendar, so stock alerts are re-checked hourly for every farm.
+  const stopAlertJob = scheduleAlertJob(container, logger);
 
   let shuttingDown = false;
   const shutdown = async (reason: string, code = 0) => {
@@ -77,6 +80,7 @@ async function main(): Promise<void> {
       process.exit(1);
     }, env.SHUTDOWN_TIMEOUT_MS);
     force.unref();
+    stopAlertJob();
     // Stop accepting new connections; idle keep-alive sockets are closed now so close() can finish
     // once in-flight requests complete.
     const closed = new Promise<void>((resolve) => server.close(() => resolve()));

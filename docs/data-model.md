@@ -2,7 +2,7 @@
 
 How the MongoDB collections fit together and the rules every collection follows. The field-by-field reference is the generated [data dictionary](data-dictionary.md); schemas live in `services/api/src/adapters/mongo/models/`.
 
-53 collections: the 46 the product needs, plus 7 for authentication and infrastructure (`sessions`, `refresh_tokens`, `one_time_tokens`, `sync_changes`, `idempotency_keys`, `counters`, `media_assets`). 86 secondary indexes, each tied to a named query.
+52 collections: the 45 product collections, plus 7 for authentication and infrastructure (`sessions`, `refresh_tokens`, `one_time_tokens`, `sync_changes`, `idempotency_keys`, `counters`, `media_assets`). 86 secondary indexes, each tied to a named query.
 
 ## Conventions
 
@@ -21,7 +21,7 @@ How the MongoDB collections fit together and the rules every collection follows.
 
 | Ownership | Collections | Standard fields | Access rule |
 | --- | --- | --- | --- |
-| Farm | 38 collections, e.g. flocks, daily_records, orders, sync_operations, media_assets | `farmId`, `createdBy` (required), `updatedBy`, `version`, soft delete unless append-only | Every query includes `farmId`; the `requireFarmScope` plugin throws if it is missing. Indexes start with `farmId` |
+| Farm | 37 collections, e.g. flocks, daily_records, inventory_lots, orders, sync_operations | `farmId`, `createdBy` (required), `updatedBy`, `version`, soft delete unless append-only | Every query includes `farmId`; the `requireFarmScope` plugin throws if it is missing. Indexes start with `farmId` |
 | Tenant | farms | `createdBy`, `version`, soft delete | Read by `_id` after a membership check |
 | User | users, sessions, refresh/one-time tokens, notifications, training_progress | per collection | Queried by `userId` of the signed-in person |
 | Global | training_courses, articles, glossary_terms, market_prices, weather_cache | `createdBy`/`updatedBy` optional (staff or import job) | Readable by any signed-in user; written by staff tools or jobs |
@@ -50,9 +50,10 @@ Each fact has one home. Some values are also kept as **derived snapshots** for f
 | `bird_weights.stats` | the document itself on save (domain `weighSessionStats`) | `bird_weights.weightsG` |
 | `daily_records.summary` | DailyRecordService | the record's linked rows in `flock_events`, `feed_consumption`, `water_records`, `egg_records`, `health_records` |
 | `daily_records.houseId`, `flockType` | DailyRecordService on creation | the flock on that day (type is immutable) |
-| `feed_items.stock` (kg, value) | FeedService | `feed_purchases` − `feed_consumption`, moving average |
-| `feed_consumption.cost` | FeedService at issue time | moving-average cost at that point in the ledger |
-| `inventory_items.stock` | InventoryService | `inventory_transactions` |
+| `inventory_items.stock` (quantity, value) | InventoryService | `inventory_lots.quantityRemaining × unitCost` |
+| `inventory_lots.quantityRemaining` | InventoryService | `inventory_transactions` for the lot |
+| `feed_consumption.allocations`, `cost` | FeedService at issue time | the FEFO lots used and their unit costs |
+| `water_records.flags`, `baselineLitres` | DailyRecordService on save | the litres, pH and dissolved solids against the farm limits and the previous days |
 | Egg stock per grade | aggregation, no snapshot | sum of `egg_inventory.quantityDelta` |
 | `chicks.remaining` | HatcheryService / FlockService / OrderService | `chicks.quantity` − placements − chick sales |
 | `hatchery_batches.results` | HatcheryService | `hatchery_events.counts` |
@@ -74,11 +75,13 @@ When a record changes, the service writes these in **one transaction** (MongoDB 
 | Transfer, split or merge birds | paired `flock_events` on both flocks (with cost and weight) → both snapshots; a split creates the new `flocks` document; a merge closes the source |
 | Sell birds, adjust, weigh, close | `flock_events` → `flocks.population` (`bird_weights` for individual weights) |
 | Save an egg record | `egg_records` + `egg_inventory` (collected, and broken as a negative movement); editing it reverses and re-posts by `sourceId` |
-| Issue feed | `feed_consumption` (costed) → `feed_items.stock` |
-| Receive feed | `feed_purchases` → `feed_items.stock`; `expenses` (unpaid or paid) |
+| Feed eaten or wasted (daily record or `/feed/consumption`) | `feed_consumption` + `inventory_transactions` (issue or wastage per lot) → `inventory_lots.quantityRemaining`, `inventory_items.stock`; alerts re-evaluated |
+| Purchase (any stock item) | `inventory_lots` + `inventory_transactions` (receipt) → `inventory_items.stock`; alerts re-evaluated; `expenses` when the money module exists |
+| Stock count | `inventory_transactions` (adjustment), and an `inventory_lots` row for a surplus |
+| Place a flock from a chick lot | `chicks.remaining`, `placedFlockIds` + the placement event |
 | Pay an expense | `transactions` (expense) → `expenses.amountPaid/status` |
 | Recurring bill falls due | `expenses` (unique per bill and due date), then `recurring_expenses.nextDueDate` |
-| Give a vaccination | `vaccinations` (done) + `inventory_transactions` (issue) → `inventory_items.stock` |
+| Give a vaccination | `vaccinations` (done) + `inventory_transactions` (issue) → `inventory_items.stock` (with the health module) |
 | Record a treatment | `health_records` (withdrawal dates computed) + `inventory_transactions` + optional `expenses` |
 | Deliver an order | `orders.status/statusHistory` + stock postings: `egg_inventory` (sold), `flock_events` (sale) or `chicks.remaining` |
 | Receive a payment | `order_payments` + `transactions` (income) → `orders.amountPaid/paymentStatus` |
@@ -88,6 +91,8 @@ When a record changes, the service writes these in **one transaction** (MongoDB 
 | Alert job finds a problem | `alerts` (unique dedupKey) + `notifications` per recipient and channel |
 | Offline mutation pushed | `sync_operations` (outcome, exactly once) + whatever the command writes |
 
+> **Change with FeedWise (D50):** feed is an `inventory_items` row of category `feed`; purchases of any item are `inventory_lots`. The separate `feed_items` and `feed_purchases` collections were removed so there is one catalog and one stock ledger. See [feedwise-inventory.md](feedwise-inventory.md).
+>
 > **Change with the flock engine (D35):** deaths and culls are `flock_events`, not fields on `daily_records`. A daily record posts them as events linked by `dailyRecordId`. The flock ledger is therefore the only place a bird-count change is stored. See [flock-engine.md](flock-engine.md).
 
 ## Corrections, deletion and retention
@@ -152,10 +157,11 @@ erDiagram
   flocks ||--o{ egg_records : "one per day"
   egg_records ||--o{ egg_inventory : posts
   flocks ||--o{ water_records : "one per day"
-  feed_items ||--o{ feed_purchases : receives
-  feed_items ||--o{ feed_consumption : issues
+  inventory_items ||--o{ inventory_lots : "received as"
+  inventory_lots ||--o{ inventory_transactions : movements
+  inventory_items ||--o{ feed_consumption : "feed item"
   flocks ||--o{ feed_consumption : eats
-  feed_purchases |o--o| expenses : billed
+  feed_consumption ||--o{ inventory_transactions : "draws stock"
 ```
 
 ### Health, inventory and hatchery
@@ -225,7 +231,7 @@ Used by the data import (roadmap Phase 8).
 | `flocks` | `flocks`, `flock_events` | `chicks_received`/`bird_count` → placement event; sale columns → sale event |
 | `daily_logs` | `daily_records`, `flock_events` (mortality), `egg_records`, `egg_inventory`, `feed_consumption` | Partial rows merged per flock and date; deaths become mortality events; unassigned rows go to review |
 | `bird_weights` | `bird_weights` | Individual weights grouped into sessions by flock and date |
-| `feed_items` | `feed_items`, `feed_purchases` | Each purchase row becomes an item (by name) plus a purchase |
+| `feed_items` | `inventory_items` (category feed), `inventory_lots` | Each purchase row becomes a feed item (by name) plus a lot |
 | `health_records` | `health_records`, `vaccinations` | `record_type = vaccination` rows become vaccinations; `next_due` becomes a scheduled vaccination |
 | `hatchery_batches` | `hatchery_batches`, `hatchery_events`, `chicks` | Results become hatch events; hatched chicks become a lot |
 | `biosecurity_logs` | `biosecurity_logs`, `visitors` | `visitor` rows move to visitors |

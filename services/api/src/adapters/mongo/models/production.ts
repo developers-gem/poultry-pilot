@@ -7,6 +7,9 @@ import {
   HOUSE_TYPES,
   MORTALITY_CAUSES,
   SPECIES,
+  WATER_QUALITY_RATINGS,
+  WATER_SOURCES,
+  WATER_TREATMENTS,
 } from "@poultrypilot/constants";
 import { Schema } from "mongoose";
 import { weighSessionStats } from "../../../domain/index.js";
@@ -126,6 +129,7 @@ export const FlockEventModel = defineCollection({
     /** Links the two halves of a transfer, split or merge. */
     groupId: { type: String },
     dailyRecordId: ref("DailyRecord"),
+    chickLotId: ref("ChickLot"),
     buyerId: ref("Buyer"),
     orderId: ref("Order"),
     fromStatus: enumOf(FLOCK_STATUSES),
@@ -281,13 +285,24 @@ export const WaterRecordModel = defineCollection({
   collection: "water_records",
   domain: D,
   ownership: "farm",
-  description: "Water drunk by one flock on one day (a leading indicator of illness and heat stress).",
+  description:
+    "Water drunk by one flock on one day, with source, quality (pH, dissolved solids, chlorine), treatment and abnormal-consumption flags. Falling intake is often the first sign of illness or heat stress.",
   fields: {
     flockId: ref("Flock", { required: true }),
     date: localDate({ required: true }),
     litres: num({ required: true, max: 10_000_000 }),
     meterReading: num(),
     dailyRecordId: ref("DailyRecord"),
+    source: enumOf(WATER_SOURCES),
+    ph: num({ max: 14 }),
+    tdsPpm: num({ max: 100_000 }),
+    chlorinePpm: num({ max: 100 }),
+    qualityRating: enumOf(WATER_QUALITY_RATINGS),
+    treatment: enumOf(WATER_TREATMENTS),
+    treatmentNotes: str({ max: 300 }),
+    /** Derived on save: consumption against the flock's recent average, pH and dissolved solids against the farm's limits. */
+    flags: { type: [enumOf(["consumption_high", "consumption_low", "ph_low", "ph_high", "tds_high"])], default: undefined },
+    baselineLitres: num(),
     medicated: { type: Boolean, default: false },
     healthRecordId: ref("HealthRecord"),
     notes: text(500),

@@ -12,6 +12,7 @@ import { meRoutes } from "./http/routes/me.routes.js";
 import { flockRoutes } from "./http/routes/flock.routes.js";
 import { houseRoutes } from "./http/routes/house.routes.js";
 import { dailyRecordRoutes, dashboardRoutes, farmDailyRecordRoutes, mediaRoutes } from "./http/routes/daily-record.routes.js";
+import { alertRoutes, feedRoutes, inventoryRoutes, waterRoutes } from "./http/routes/inventory.routes.js";
 import { syncRoutes } from "./http/routes/sync.routes.js";
 import { systemRoutes } from "./http/routes/system.routes.js";
 
@@ -78,6 +79,10 @@ export function createApp(c: Container): Express {
   v1.use("/farms/:farmId/dashboard", ...secured, dashboardRoutes(c.dailyRecords, c.farms));
   v1.use("/farms/:farmId/media", ...secured, mediaRoutes(c.media, c.farms));
   v1.use("/daily-records", ...secured, dailyRecordRoutes(c.dailyRecords, c.farms, c.repos));
+  v1.use("/farms/:farmId/inventory", ...secured, inventoryRoutes(c.inventory, c.farms, c.repos));
+  v1.use("/farms/:farmId/feed", ...secured, feedRoutes(c.feed, c.farms));
+  v1.use("/farms/:farmId/water-records", ...secured, waterRoutes(c.feed, c.farms));
+  v1.use("/farms/:farmId/alerts", ...secured, alertRoutes(c.alerts, c.farms));
   v1.use("/farms", ...secured, farmRoutes(c.farms, c.audit));
   v1.use("/sync", ...secured, syncRoutes(c.sync, c.farms));
 

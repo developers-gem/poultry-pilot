@@ -213,6 +213,40 @@ post("/farms/invitations/accept", "Accept an emailed farm invitation", bodyOf(S.
   registry.registerPath({ method: "delete", path: `${API_PREFIX}/daily-records/{id}`, tags: ["Daily records"], summary: "Delete a record and undo everything it wrote", security: secured, request: { params: idParams }, responses: { 204: { description: "Deleted" }, ...errors } });
 }
 
+// ---- inventory, feed, water, alerts ----------------------------------------
+{
+  const P = `${API_PREFIX}/farms/{farmId}`;
+  const itemParams = z.object({ farmId: V.Id, itemId: V.Id });
+  const any = z.record(z.unknown());
+  const r = (method: "get" | "post" | "put" | "delete", path: string, tag: string, summary: string, params: z.AnyZodObject, request: Record<string, unknown>, ok: Record<string, unknown>) =>
+    registry.registerPath({ method, path: `${P}${path}`, tags: [tag], summary, security: secured, request: { params, ...request }, responses: { ...ok, ...errors } } as never);
+  const items = z.object({ items: z.array(any) });
+  r("get", "/inventory/overview", "Inventory", "All stock: catalog categories, eggs by grade, chick lots", farmParams, {}, { 200: json(any, "Overview") });
+  r("get", "/inventory/items", "Inventory", "Catalog with stock, low-stock and expiry status", farmParams, { query: V.InventoryListQuery }, { 200: json(items, "Items") });
+  r("post", "/inventory/items", "Inventory", "Add an item: feed, medicine, vaccine, disinfectant, litter, packaging, equipment, spare part, cleaning, other", farmParams, bodyOf(V.CreateInventoryItemRequest), { 201: json(any, "Created") });
+  r("get", "/inventory/items/{itemId}", "Inventory", "An item with its open lots", itemParams, {}, { 200: json(any, "Item") });
+  r("put", "/inventory/items/{itemId}", "Inventory", "Replace item details and alert thresholds", itemParams, bodyOf(V.UpdateInventoryItemRequest), { 200: json(any, "Updated") });
+  r("post", "/inventory/items/{itemId}/purchases", "Inventory", "Receive a purchase as a lot (supplier, batch, expiry, location, unit cost)", itemParams, bodyOf(V.PurchaseRequest), { 201: json(any, "Lot") });
+  r("post", "/inventory/items/{itemId}/issues", "Inventory", "Use stock (FEFO; expired stock is never used)", itemParams, bodyOf(V.IssueRequest), { 201: json(any, "Issued"), 422: json(S.ErrorEnvelope, "Not enough in-date stock") });
+  r("post", "/inventory/items/{itemId}/wastage", "Inventory", "Write off lost, spoiled or expired stock (expired first)", itemParams, bodyOf(V.WastageRequest), { 201: json(any, "Recorded") });
+  r("post", "/inventory/items/{itemId}/counts", "Inventory", "Stock count: correct the book quantity", itemParams, bodyOf(V.StockCountRequest), { 201: json(any, "Counted") });
+  r("get", "/inventory/items/{itemId}/transactions", "Inventory", "The item's stock ledger", itemParams, { query: V.TransactionsQuery }, { 200: json(items, "Movements") });
+  r("get", "/inventory/lots", "Inventory", "Lots in stock, optionally only expired or expiring", farmParams, { query: V.LotsQuery }, { 200: json(items, "Lots") });
+  r("get", "/inventory/eggs", "Inventory", "Egg stock by grade", farmParams, {}, { 200: json(any, "Eggs") });
+  r("post", "/inventory/eggs/movements", "Inventory", "Eggs used, spoiled or counted", farmParams, bodyOf(V.EggMovementRequest), { 201: json(any, "Recorded") });
+  r("get", "/inventory/chick-lots", "Inventory", "Chick lots", farmParams, { query: V.ChickLotsQuery }, { 200: json(items, "Lots") });
+  r("post", "/inventory/chick-lots", "Inventory", "Receive day-old chicks", farmParams, bodyOf(V.ReceiveChicksRequest), { 201: json(any, "Lot") });
+  r("post", "/feed/consumption", "Feed", "Feed eaten by a flock, or wasted; moves stock and costs it from lots", farmParams, bodyOf(V.FeedConsumptionRequest), { 201: json(any, "Recorded"), 422: json(S.ErrorEnvelope, "Not enough in-date feed") });
+  r("get", "/feed/consumption", "Feed", "Feed entries", farmParams, { query: V.FeedListQuery }, { 200: json(items, "Entries") });
+  r("delete", "/feed/consumption/{id}", "Feed", "Remove a feed entry and return its stock", z.object({ farmId: V.Id, id: V.Id }), {}, { 204: { description: "Removed" } });
+  r("get", "/feed/stock", "Feed", "Feed stock with average daily use and days of feed remaining", farmParams, {}, { 200: json(any, "Stock") });
+  r("get", "/feed/analytics", "Feed", "Per flock: feed per bird, per kg gain, FCR, wastage, feed cost per bird and per egg", farmParams, { query: V.FeedAnalyticsQuery }, { 200: json(any, "Analytics") });
+  r("get", "/water-records", "Water", "Water records with source, quality, treatment and abnormal flags", farmParams, { query: V.WaterListQuery }, { 200: json(items, "Records") });
+  r("get", "/alerts", "Alerts", "Alerts", farmParams, { query: V.AlertListQuery }, { 200: json(items, "Alerts") });
+  r("post", "/alerts/evaluate", "Alerts", "Re-check stock and expiry alerts now", farmParams, {}, { 200: json(any, "Done") });
+  r("post", "/alerts/{alertId}/acknowledge", "Alerts", "Acknowledge an alert", z.object({ farmId: V.Id, alertId: V.Id }), {}, { 200: json(any, "Acknowledged") });
+}
+
 // ---- sync -----------------------------------------------------------------
 registry.registerPath({
   method: "get",

@@ -37,6 +37,11 @@ export const ACTIONS = [
   "market.read",
   "market.manage",
   "payment.record",
+  // inventory (feed, medicine, supplies)
+  "inventory.read",
+  "inventory.issue", // record use and wastage
+  "inventory.manage", // catalog, purchases, stock counts
+  "alert.manage", // acknowledge alerts, run checks
   // content
   "content.read",
 ] as const;
@@ -48,6 +53,8 @@ const except = (...remove: Action[]) => new Set(ALL.filter((a) => !remove.includ
 
 const WORKER: Action[] = [
   "farm.read",
+  "inventory.read",
+  "inventory.issue",
   "production.read",
   "production.record",
   "production.edit_own_recent",
@@ -90,9 +97,13 @@ export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Action>> = {
     "market.read",
     "market.manage",
     "payment.record",
+    "inventory.read",
+    "inventory.issue",
+    "inventory.manage",
+    "alert.manage",
     "content.read",
   ]),
-  supervisor: new Set<Action>([...WORKER, "member.read", "production.edit_any", "biosecurity.manage"]),
+  supervisor: new Set<Action>([...WORKER, "member.read", "production.edit_any", "biosecurity.manage", "alert.manage"]),
   worker: new Set<Action>(WORKER),
   accountant: new Set<Action>([
     "farm.read",
@@ -102,6 +113,8 @@ export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Action>> = {
     "money.delete",
     "market.read",
     "payment.record",
+    "inventory.read",
+    "inventory.manage",
     "content.read",
   ]),
   vet: new Set<Action>([
@@ -111,6 +124,8 @@ export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Action>> = {
     "health.record_observation",
     "health.manage",
     "biosecurity.read",
+    "inventory.read",
+    "inventory.issue",
     "content.read",
   ]),
 };

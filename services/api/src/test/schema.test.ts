@@ -6,7 +6,7 @@ import { registry, type CollectionMeta } from "../adapters/mongo/models/index.js
 
 const REQUESTED = [
   "users", "farms", "farm_members", "houses", "flocks", "flock_events", "daily_records", "bird_weights", "egg_records", "egg_inventory",
-  "feed_items", "feed_purchases", "feed_consumption", "water_records", "inventory_items", "inventory_transactions", "health_records",
+  "feed_consumption", "inventory_lots", "water_records", "inventory_items", "inventory_transactions", "health_records",
   "vaccinations", "medicines", "hatchery_batches", "hatchery_events", "chicks", "biosecurity_logs", "visitors", "cleaning_tasks",
   "equipment", "equipment_movements", "expenses", "recurring_expenses", "transactions", "buyers", "market_listings", "orders",
   "order_payments", "tasks", "alerts", "alert_rules", "notifications", "weather_cache", "market_prices", "training_courses",

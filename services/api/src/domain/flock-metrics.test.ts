@@ -74,23 +74,42 @@ describe("feed and FCR", () => {
     expect(m.feedPerBirdKg).toBeCloseTo(3.434343, 5);
     expect(m.costsComplete).toBe(false);
   });
-  it("FCR = 3400 / (1120 live + 880 sold − 39.6 placed) = 3400 / 1960.4", () => {
+  it("FCR (liveweight basis) = 3400 / (1120 live + 880 sold) = 1.70; feed per kg gain = 3400 / (2000 − 39.6 placed) = 1.734", () => {
     expect(m.weightInKg).toBeCloseTo(39.6, 6);
     expect(m.weightOutKg).toBe(880);
     expect(m.weightProducedKg).toBeCloseTo(1960.4, 6);
-    expect(m.fcr).toBeCloseTo(1.734340, 5);
+    expect(m.fcr).toBeCloseTo(1.7, 6);
+    expect(m.feedPerKgGainKg).toBeCloseTo(1.734340, 5);
   });
   it("with the mortality-weight setting, dead birds add their estimated weight (2.571 + 8.571 kg)", () => {
     const withDead = computeFlockMetrics({ ...input, includeMortalityWeight: true });
     // 15 birds × 171.43 g on 09-05 (between 40 g and 500 g) + 10 birds × 857.14 g on 09-20 (between 500 g and 1500 g)
     expect(withDead.weightOutKg).toBeCloseTo(880 + 2.571429 + 8.571429, 5);
-    expect(withDead.fcr).toBeCloseTo(3400 / 1971.542857, 6);
+    expect(withDead.fcr).toBeCloseTo(3400 / 2011.142857, 6);
+    expect(withDead.feedPerKgGainKg).toBeCloseTo(3400 / 1971.542857, 6);
   });
   it("selling birds does not make FCR jump (prototype bug B17)", () => {
     const beforeSale = computeFlockMetrics({ ...input, events: events.filter((e) => e.type !== "sale"), asOf: "2026-10-07" });
-    // 960 birds × 2.0 kg − 39.6 = 1880.4 kg produced
-    expect(beforeSale.fcr).toBeCloseTo(3400 / 1880.4, 6);
-    expect(m.fcr! / beforeSale.fcr!).toBeCloseTo(1880.4 / 1960.4, 6);
+    // 960 birds × 2.0 kg = 1920 kg on the farm before the sale; 2000 kg alive + sold after it.
+    expect(beforeSale.fcr).toBeCloseTo(3400 / 1920, 6);
+    expect(m.fcr! / beforeSale.fcr!).toBeCloseTo(1920 / 2000, 6);
+  });
+});
+
+describe("feed cost and wastage", () => {
+  it("feed cost per bird = ₹63,000 / 990 birds; wastage costs money but is not in FCR", () => {
+    expect(m.feedCostMinor).toBe(6_300_000);
+    expect(m.feedCostPerBirdMinor).toBe(6364); // 6,300,000 / 990 = 6363.6 → 6364 paise
+    const wasted = computeFlockMetrics({ ...input, feed: [...feed, { date: "2026-10-06", quantityKg: 50, costMinor: 160_000, kind: "wastage" }] });
+    expect(wasted.feedWastedKg).toBe(50);
+    expect(wasted.feedConsumedKg).toBe(3400);
+    expect(wasted.fcr).toBe(m.fcr);
+    expect(wasted.feedCostMinor).toBe(6_460_000);
+  });
+  it("feed cost per egg = feed cost ÷ eggs collected; null without eggs", () => {
+    expect(m.feedCostPerEggMinor).toBeNull();
+    const layer = computeFlockMetrics({ ...input, eggsCollected: 25_000 });
+    expect(layer.feedCostPerEggMinor).toBeCloseTo(252, 6); // 6,300,000 / 25,000 = 252 paise (₹2.52)
   });
 });
 
@@ -138,7 +157,8 @@ describe("transfers, splits and merges", () => {
     expect(b.cost.totalMinor).toBe(804_000 + 1_350_000);
     // 196 × 1.8 = 352.8 kg live − 100 kg arrived = 252.8 kg produced
     expect(b.weightProducedKg).toBeCloseTo(252.8, 6);
-    expect(b.fcr).toBeCloseTo(450 / 252.8, 6);
+    expect(b.fcr).toBeCloseTo(450 / 352.8, 6);
+    expect(b.feedPerKgGainKg).toBeCloseTo(450 / 252.8, 6);
 
     const flockA: LedgerEvent[] = [...events.slice(0, 3), { id: "out", type: "split_out", date: "2026-09-15", birds: 200, costMinor: 804_000, totalLiveWeightKg: 100 }];
     const a = computeFlockMetrics({ ...input, events: flockA, asOf: "2026-09-16", feed: [] });

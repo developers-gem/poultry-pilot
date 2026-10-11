@@ -46,6 +46,8 @@ export const Placement = z
     /** Total cost of the birds placed. */
     chickCost: Money.optional(),
     ageDaysAtPlacement: z.number().int().min(0).max(2000).default(0),
+    /** Place from a chick lot in inventory: the lot is drawn down, and its unit cost is used if chickCost is not given. */
+    chickLotId: Id.optional(),
   })
   .strict()
   .refine((p) => p.deadOnArrival <= p.count, { message: "Dead on arrival cannot exceed birds placed", path: ["deadOnArrival"] });
@@ -184,11 +186,20 @@ export const FlockMetricsView = z.object({
   dailyWeightGainG: z.number().nullable(),
   recentDailyWeightGainG: z.number().nullable(),
   feedConsumedKg: z.number(),
+  feedWastedKg: z.number(),
   uncostedFeedKg: z.number(),
   feedPerBirdKg: z.number().nullable(),
+  feedCostMinor: z.number(),
+  feedCostPerBirdMinor: z.number().nullable(),
+  /** Minor units per egg; can be fractional (e.g. 252.4 paise). */
+  feedCostPerEggMinor: z.number().nullable(),
+  eggsCollected: z.number(),
   liveWeightKg: z.number().nullable(),
   weightProducedKg: z.number().nullable(),
+  /** Liveweight FCR: feed eaten ÷ (live weight + weight sold or moved out). */
   fcr: z.number().nullable(),
+  /** Feed eaten ÷ weight gained on this farm (excludes the weight birds arrived with). */
+  feedPerKgGainKg: z.number().nullable(),
   currency: z.string(),
   revenueMinor: z.number(),
   cost: z.object({ chickMinor: z.number(), transferredInMinor: z.number(), transferredOutMinor: z.number(), feedMinor: z.number(), otherMinor: z.number(), totalMinor: z.number() }),

@@ -35,6 +35,11 @@ import {
   EggInventoryModel,
   HealthRecordModel,
   MediaAssetModel,
+  InventoryItemModel,
+  InventoryLotModel,
+  InventoryTransactionModel,
+  ChickLotModel,
+  AlertModel,
 } from "./models/index.js";
 import { createMongoFarmRepo } from "./farm-repo.js";
 
@@ -154,6 +159,9 @@ export function createMongoRepositories(connection = mongoose.connection): Repos
       async create(rec, tx) {
         await FarmModel.create([toDoc(rec)], s(tx));
       },
+      async listIds() {
+        return (await FarmModel.find({ deletedAt: null }, { _id: 1 }).lean()).map((d) => String(d._id));
+      },
       async updateVersioned(id, expectedVersion, patch, tx) {
         const doc = await FarmModel.findOneAndUpdate(
           { _id: id, version: expectedVersion },
@@ -256,6 +264,11 @@ export function createMongoRepositories(connection = mongoose.connection): Repos
     eggInventory: createMongoFarmRepo(EggInventoryModel, { softDelete: false, versioned: false }),
     healthRecords: createMongoFarmRepo(HealthRecordModel, { softDelete: true, versioned: true }),
     mediaAssets: createMongoFarmRepo(MediaAssetModel, { softDelete: true, versioned: true }),
+    inventoryItems: createMongoFarmRepo(InventoryItemModel, { softDelete: true, versioned: true }),
+    inventoryLots: createMongoFarmRepo(InventoryLotModel, { softDelete: true, versioned: true }),
+    inventoryTransactions: createMongoFarmRepo(InventoryTransactionModel, { softDelete: false, versioned: false }),
+    chickLots: createMongoFarmRepo(ChickLotModel, { softDelete: true, versioned: true }),
+    alerts: createMongoFarmRepo(AlertModel, { softDelete: false, versioned: true }),
     // Cross-farm by design: returns only the farmId, which the caller then checks membership for.
     async locateDailyRecord(id) {
       const doc = await DailyRecordModel.findOne({ _id: id, deletedAt: null }, { farmId: 1 }).setOptions({ crossFarm: true } as never).lean();

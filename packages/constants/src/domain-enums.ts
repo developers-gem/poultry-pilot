@@ -29,8 +29,14 @@ export const EGG_MOVEMENT_TYPES = ["collected", "sold", "broken", "used", "spoil
 
 // feed & inventory
 export const FEED_STAGES = ["pre_starter", "starter", "grower", "finisher", "pre_layer", "layer", "breeder", "other"] as const;
-export const INVENTORY_CATEGORIES = ["medicine", "vaccine", "disinfectant", "litter", "packaging", "spare_part", "cleaning", "other"] as const;
-export const INVENTORY_TRANSACTION_TYPES = ["receipt", "issue", "adjustment", "disposal", "reversal"] as const;
+/** Stocked item categories. Eggs and chicks have their own ledgers (egg_inventory, chicks) and appear in the inventory overview. */
+export const INVENTORY_CATEGORIES = ["feed", "medicine", "vaccine", "disinfectant", "litter", "packaging", "equipment", "spare_part", "cleaning", "other"] as const;
+/** receipt: into stock (creates a lot) · issue: used · wastage: lost or spoiled · adjustment: stock-count correction · reversal: cancels an entry. */
+export const INVENTORY_TRANSACTION_TYPES = ["receipt", "issue", "wastage", "adjustment", "reversal"] as const;
+export const FEED_CONSUMPTION_KINDS = ["consumption", "wastage"] as const;
+export const WATER_SOURCES = ["borehole", "municipal", "well", "rainwater", "river", "tanker", "other"] as const;
+export const WATER_TREATMENTS = ["none", "chlorination", "acidification", "filtration", "uv", "medication", "vitamins", "other"] as const;
+export const WATER_QUALITY_RATINGS = ["good", "fair", "poor"] as const;
 export const STOCK_UNITS = ["kg", "g", "l", "ml", "dose", "piece", "tray", "bag", "box", "bottle"] as const;
 
 // health
@@ -93,6 +99,9 @@ export const ALERT_RULE_TYPES = [
   "low_inventory",
   "vaccination_due",
   "withdrawal_active",
+  "expiry_soon",
+  "expired_stock",
+  "water_abnormal",
 ] as const;
 export const NOTIFICATION_CHANNELS = ["in_app", "push", "email", "sms", "whatsapp"] as const;
 export const NOTIFICATION_STATUSES = ["queued", "sent", "delivered", "failed", "read"] as const;

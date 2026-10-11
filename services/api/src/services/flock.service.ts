@@ -237,13 +237,15 @@ export function createFlockService(d: FlockDeps) {
   async function metricsFor(ctx: FarmContext, flock: FlockRecord, events: FlockEventRecord[], farm: FarmRecord, asOf?: string, referencePricePerKgMinor?: number): Promise<FlockMetricsView> {
     const feed = await repos.feedConsumption.find(ctx.farmId, { where: { flockId: flock.id } });
     const date = asOf ?? (flock.status === "closed" && flock.closedDate ? flock.closedDate : todayOf(farm));
+    const eggs = await repos.eggRecords.aggregate(ctx.farmId, { where: { flockId: flock.id }, range: { field: "date", to: date } }, ["flockId"], ["collected"]);
     const m = computeFlockMetrics({
       ...(flock.placementDate ? { placementDate: flock.placementDate } : {}),
       ...(flock.hatchDate ? { hatchDate: flock.hatchDate } : {}),
       ...(flock.ageDaysAtPlacement !== undefined ? { ageDaysAtPlacement: flock.ageDaysAtPlacement } : {}),
       ...(flock.startingWeightG !== undefined ? { startingWeightG: flock.startingWeightG } : {}),
       events: events.map(toLedger),
-      feed: feed.map((f) => ({ date: f.date, quantityKg: f.quantityKg, ...(f.cost ? { costMinor: f.cost.amountMinor } : {}) })),
+      feed: feed.map((f) => ({ date: f.date, quantityKg: f.quantityKg, kind: f.kind ?? "consumption", ...(f.cost ? { costMinor: f.cost.amountMinor } : {}) })),
+      eggsCollected: eggs[0]?.sums["collected"] ?? 0,
       asOf: date,
       includeMortalityWeight: farm.settings.fcrIncludesMortalityWeight,
       referencePricePerKgMinor: referencePricePerKgMinor ?? null,
@@ -254,6 +256,27 @@ export function createFlockService(d: FlockDeps) {
 
   // ---- placement -------------------------------------------------------------
 
+  /**
+   * Placing from a chick lot draws the lot down (never below zero) and records the lot on the placement.
+   * The lot's unit cost becomes the chick cost when none is given.
+   */
+  async function drawChickLot(ctx: FarmContext, flock: { id: string; species: FlockRecord["species"] }, p: PlaceFlockRequest, farm: FarmRecord, tx: Tx): Promise<PlaceFlockRequest> {
+    if (!p.chickLotId) return p;
+    const lot = await repos.chickLots.findById(ctx.farmId, p.chickLotId, tx);
+    if (!lot) throw notFound("Chick lot");
+    if (lot.status !== "available") throw new DomainError("INVALID_STATE_TRANSITION", "That chick lot has no chicks left");
+    if (lot.species !== flock.species) throw new AppError("VALIDATION_FAILED", `That lot holds ${lot.species}, not ${flock.species}`);
+    if (p.count > lot.remaining) throw new DomainError("INSUFFICIENT_STOCK", `Only ${lot.remaining} chicks left in that lot`, { available: lot.remaining, requested: p.count });
+    const remaining = lot.remaining - p.count;
+    const next = await repos.chickLots.update(
+      ctx.farmId, lot.id,
+      { remaining, status: remaining === 0 ? "depleted" : "available", placedFlockIds: [...(lot.placedFlockIds ?? []), flock.id], updatedBy: ctx.userId, updatedAt: clock.now() },
+      { expectedVersion: lot.version }, tx,
+    );
+    if (!next) throw new AppError("VERSION_CONFLICT", "That chick lot changed at the same time elsewhere. Try again.");
+    return p.chickCost || !lot.unitCost ? p : { ...p, chickCost: money(lot.unitCost.amountMinor * p.count, farm.settings.currency) };
+  }
+
   function placementDraft(p: PlaceFlockRequest): NewEvent {
     const net = p.count - p.deadOnArrival;
     return {
@@ -263,6 +286,7 @@ export function createFlockService(d: FlockDeps) {
       ...(p.deadOnArrival ? { deadOnArrival: p.deadOnArrival } : {}),
       ...(p.startingWeightG ? { totalLiveWeightKg: Math.round(net * p.startingWeightG) / 1000 } : {}),
       ...(p.chickCost ? { cost: p.chickCost } : {}),
+      ...(p.chickLotId ? { chickLotId: p.chickLotId } : {}),
     };
   }
 
@@ -319,7 +343,8 @@ export function createFlockService(d: FlockDeps) {
           await d.sync.recordChange(ctx.farmId, { entity: "flock", entityId: flock.id, op: "upsert", version: 0, document: toFlockView(flock) }, tx);
           return toFlockView(flock);
         }
-        const out = await appendEvents(ctx, flock, [], [placementDraft(input.placement)], placementFields(input.placement), farm, tx, "flock.placed");
+        const placement = await drawChickLot(ctx, flock, input.placement, farm, tx);
+        const out = await appendEvents(ctx, flock, [], [placementDraft(placement)], placementFields(placement), farm, tx, "flock.placed");
         return toFlockView(out.flock);
       });
     },
@@ -409,7 +434,8 @@ export function createFlockService(d: FlockDeps) {
         assertDate(p.date, farm);
         assertCurrency(p.chickCost, farm, "chickCost");
         await assertCapacity(ctx, flock.houseId, p.count - p.deadOnArrival, flock.id, tx);
-        return toFlockView((await appendEvents(ctx, flock, events, [placementDraft(p)], placementFields(p), farm, tx, "flock.placed")).flock);
+        const placement = await drawChickLot(ctx, flock, p, farm, tx);
+        return toFlockView((await appendEvents(ctx, flock, events, [placementDraft(placement)], placementFields(placement), farm, tx, "flock.placed")).flock);
       });
     },
 

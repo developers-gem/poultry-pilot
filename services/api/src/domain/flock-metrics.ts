@@ -11,6 +11,8 @@ export interface FeedEntry {
   quantityKg: number;
   /** Cost in minor units, or undefined when the feed was not costed. */
   costMinor?: number;
+  /** consumption (default) counts towards FCR; wastage in the flock's house costs money but is not eaten. */
+  kind?: "consumption" | "wastage";
 }
 
 export interface FlockMetricsInput {
@@ -29,6 +31,8 @@ export interface FlockMetricsInput {
   /** Flock-tagged costs and income from the money ledger. */
   otherCostMinor?: number;
   otherIncomeMinor?: number;
+  /** Eggs collected up to asOf (layers and breeders), for feed cost per egg. */
+  eggsCollected?: number;
 }
 
 export interface FlockMetrics extends Population {
@@ -49,18 +53,30 @@ export interface FlockMetrics extends Population {
   dailyWeightGainG: number | null;
   /** Gain between the two most recent weighings. */
   recentDailyWeightGainG: number | null;
+  /** Feed eaten (consumption entries). */
   feedConsumedKg: number;
+  /** Feed wasted in the flock's house (spilled, spoiled): costs money, not counted in FCR. */
+  feedWastedKg: number;
   uncostedFeedKg: number;
+  /** feedConsumed ÷ birds received. */
   feedPerBirdKg: number | null;
+  /** Cost of feed eaten and wasted. */
+  feedCostMinor: number;
+  feedCostPerBirdMinor: number | null;
+  feedCostPerEggMinor: number | null;
+  eggsCollected: number;
   /** Birds alive × latest average weight. */
   liveWeightKg: number | null;
   /** Weight that left the flock: sold, moved out, and (if the farm setting is on) estimated dead weight. */
   weightOutKg: number;
   /** Weight that arrived: placement weight plus weight moved in. */
   weightInKg: number;
-  /** liveWeight + weightOut − weightIn. */
+  /** liveWeight + weightOut − weightIn: the weight the birds gained on this farm. */
   weightProducedKg: number | null;
+  /** Feed conversion ratio on a liveweight basis: feedConsumed ÷ (liveWeight + weightOut). The industry-standard FCR. */
   fcr: number | null;
+  /** feedConsumed ÷ weight gained (weightProduced): excludes the weight birds arrived with. */
+  feedPerKgGainKg: number | null;
   revenueMinor: number;
   cost: {
     chickMinor: number;
@@ -162,10 +178,15 @@ export function computeFlockMetrics(i: FlockMetricsInput): FlockMetrics {
   const weightProducedKg = liveWeightKg === null ? null : liveWeightKg + weightOutKg - weightInKg;
 
   // ---- feed
-  const feedConsumedKg = feed.reduce((t, f) => t + f.quantityKg, 0);
+  const eaten = feed.filter((f) => (f.kind ?? "consumption") === "consumption");
+  const feedConsumedKg = Math.round(eaten.reduce((t, f) => t + f.quantityKg, 0) * 1000) / 1000;
+  const feedWastedKg = Math.round(feed.filter((f) => f.kind === "wastage").reduce((t, f) => t + f.quantityKg, 0) * 1000) / 1000;
   const uncostedFeedKg = feed.filter((f) => f.costMinor === undefined).reduce((t, f) => t + f.quantityKg, 0);
   const feedMinor = feed.reduce((t, f) => t + (f.costMinor ?? 0), 0);
-  const fcr = weightProducedKg !== null && weightProducedKg > 0 && feedConsumedKg > 0 ? feedConsumedKg / weightProducedKg : null;
+  const liveBasisKg = liveWeightKg === null ? null : liveWeightKg + weightOutKg;
+  const fcr = liveBasisKg !== null && liveBasisKg > 0 && feedConsumedKg > 0 ? feedConsumedKg / liveBasisKg : null;
+  const feedPerKgGainKg = weightProducedKg !== null && weightProducedKg > 0 && feedConsumedKg > 0 ? feedConsumedKg / weightProducedKg : null;
+  const eggsCollected = i.eggsCollected ?? 0;
 
   // ---- money
   const sum = (pred: (e: LedgerEvent) => boolean, f: (e: LedgerEvent) => number | undefined) => events.filter(pred).reduce((t, e) => t + (f(e) ?? 0), 0);
@@ -204,13 +225,19 @@ export function computeFlockMetrics(i: FlockMetricsInput): FlockMetrics {
     dailyWeightGainG,
     recentDailyWeightGainG,
     feedConsumedKg,
+    feedWastedKg,
     uncostedFeedKg,
     feedPerBirdKg: pop.birdsIn > 0 ? feedConsumedKg / pop.birdsIn : null,
+    feedCostMinor: feedMinor,
+    feedCostPerBirdMinor: pop.birdsIn > 0 ? Math.round(feedMinor / pop.birdsIn) : null,
+    feedCostPerEggMinor: eggsCollected > 0 ? feedMinor / eggsCollected : null,
+    eggsCollected,
     liveWeightKg,
     weightOutKg,
     weightInKg,
     weightProducedKg,
     fcr,
+    feedPerKgGainKg,
     revenueMinor,
     cost,
     profitMinor,

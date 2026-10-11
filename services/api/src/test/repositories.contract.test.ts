@@ -194,6 +194,25 @@ function contract(name: string, setup: () => Promise<{ repos: Repositories; rese
       expect(await repos.locateDailyRecord(recs[0]!.id)).toBeNull();
     });
 
+    it("inventory, feed, water, chick and alert records round-trip through their schemas", async () => {
+      const farmId = newId();
+      const base = { farmId, createdBy: "u1", createdAt: now, updatedAt: now };
+      const item = { ...base, id: newId(), version: 0, name: "Broiler starter", category: "feed" as const, unit: "kg" as const, feed: { stage: "starter" as const, form: "crumble" as const, bagSizeKg: 50 }, reorderLevel: 200, reorderDays: 5, expiryWarningDays: 30, active: true, stock: { quantity: 0, valueMinor: 0, currency: "INR", asOf: "2026-10-01" } };
+      await repos.inventoryItems.insert(item);
+      const lot = { ...base, id: newId(), version: 0, itemId: item.id, receivedDate: "2026-10-01", supplier: "S", batchNumber: "B1", expiryDate: "2026-12-01", storageLocation: "Store", quantityReceived: 1000, quantityRemaining: 1000, unitCost: { amountMinor: 3000, currency: "INR" } };
+      await repos.inventoryLots.insert(lot);
+      await repos.inventoryTransactions.insert({ ...base, id: newId(), itemId: item.id, lotId: lot.id, type: "receipt", date: "2026-10-01", quantityDelta: 1000, valueMinor: 3_000_000, currency: "INR", sourceType: "purchase", sourceId: lot.id });
+      expect((await repos.inventoryLots.update(farmId, lot.id, { quantityRemaining: 400.5 }, { expectedVersion: 0 }))?.quantityRemaining).toBe(400.5);
+      expect((await repos.inventoryItems.update(farmId, item.id, { stock: { quantity: 400.5, valueMinor: 1_201_500, currency: "INR", asOf: "2026-10-02" } }, { expectedVersion: 0 }))?.stock?.quantity).toBe(400.5);
+      await repos.feedConsumption.insert({ ...base, id: newId(), version: 0, flockId: "f1", feedItemId: item.id, kind: "wastage", date: "2026-10-02", quantityKg: 5, allocations: [{ lotId: lot.id, quantity: 5, costMinor: 15_000 }], cost: { amountMinor: 15_000, currency: "INR" }, reason: "Spill" });
+      await repos.waterRecords.insert({ ...base, id: newId(), version: 0, flockId: "f1", date: "2026-10-02", litres: 300, source: "borehole", ph: 5.4, tdsPpm: 450, chlorinePpm: 3, qualityRating: "fair", treatment: "chlorination", flags: ["consumption_low", "ph_low"], baselineLitres: 400 });
+      await repos.chickLots.insert({ ...base, id: newId(), version: 0, source: "purchased", species: "chicken", hatchDate: "2026-10-01", quantity: 3000, remaining: 3000, status: "available", unitCost: { amountMinor: 3800, currency: "INR" } });
+      await repos.alerts.insert({ farmId, id: newId(), createdBy: "system", createdAt: now, updatedAt: now, version: 0, ruleType: "expiry_soon", severity: "warning", status: "open", date: "2026-10-02", title: "Expiring", message: "m", dedupKey: `expiry_soon:${lot.id}`, values: { quantity: 400.5 } });
+      expect(await repos.waterRecords.find(farmId, { exists: { flags: true } })).toHaveLength(1);
+      expect((await repos.alerts.find(farmId, { where: { dedupKey: `expiry_soon:${lot.id}` } }))[0]?.values).toEqual({ quantity: 400.5 });
+      expect(await repos.farms.listIds()).toEqual(expect.any(Array));
+    });
+
     it("sync: per-farm sequences are independent and changes list in order", async () => {
       const [a, b] = [newId(), newId()];
       expect([await repos.sync.nextSeq(a), await repos.sync.nextSeq(a), await repos.sync.nextSeq(b)]).toEqual([1, 2, 1]);

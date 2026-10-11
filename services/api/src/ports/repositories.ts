@@ -20,6 +20,11 @@ import type {
   EggInventoryRecord,
   HealthRecordRecord,
   MediaAssetRecord,
+  InventoryItemRecord,
+  InventoryLotRecord,
+  InventoryTransactionRecord,
+  ChickLotRecord,
+  AlertRecord,
 } from "./records.js";
 
 /**
@@ -70,6 +75,8 @@ export interface FarmsRepo {
   findById(id: string, tx?: Tx): Promise<FarmRecord | null>;
   findByIds(ids: string[], tx?: Tx): Promise<FarmRecord[]>;
   create(rec: FarmRecord, tx?: Tx): Promise<void>;
+  /** Ids of farms not deleted. Used only by system jobs that run for every farm. */
+  listIds(): Promise<string[]>;
   /** Optimistic update: returns null when the stored version differs from expectedVersion. */
   updateVersioned(id: string, expectedVersion: number, patch: Partial<FarmRecord>, tx?: Tx): Promise<FarmRecord | null>;
 }
@@ -173,6 +180,12 @@ export interface Repositories {
   eggInventory: FarmRepo<EggInventoryRecord>;
   healthRecords: FarmRepo<HealthRecordRecord>;
   mediaAssets: FarmRepo<MediaAssetRecord>;
+  inventoryItems: FarmRepo<InventoryItemRecord>;
+  inventoryLots: FarmRepo<InventoryLotRecord>;
+  /** Append-only. */
+  inventoryTransactions: FarmRepo<InventoryTransactionRecord>;
+  chickLots: FarmRepo<ChickLotRecord>;
+  alerts: FarmRepo<AlertRecord>;
   /**
    * The only by-id lookup that does not know the farm: used by /daily-records/:id routes to find which farm a
    * record belongs to, so the normal membership check can then run. Returns the farmId of a live record or null.

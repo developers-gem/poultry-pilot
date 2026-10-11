@@ -11,7 +11,7 @@ import type {
   UserRecord,
 } from "../../ports/records.js";
 import type { Repositories, Tx, TxRunner } from "../../ports/repositories.js";
-import type { BirdWeightRecord, DailyRecordRecord, EggInventoryRecord, EggRecordRecord, FeedConsumptionRecord, FlockEventRecord, FlockRecord, HealthRecordRecord, HouseRecord, MediaAssetRecord, WaterRecordRecord } from "../../ports/records.js";
+import type { AlertRecord, ChickLotRecord, InventoryItemRecord, InventoryLotRecord, InventoryTransactionRecord, BirdWeightRecord, DailyRecordRecord, EggInventoryRecord, EggRecordRecord, FeedConsumptionRecord, FlockEventRecord, FlockRecord, HealthRecordRecord, HouseRecord, MediaAssetRecord, WaterRecordRecord } from "../../ports/records.js";
 import { createMemFarmRepo } from "./farm-repo.js";
 
 /**
@@ -66,6 +66,11 @@ export interface MemoryStore {
   eggInventory: Table<EggInventoryRecord>;
   healthRecords: Table<HealthRecordRecord>;
   mediaAssets: Table<MediaAssetRecord>;
+  inventoryItems: Table<InventoryItemRecord>;
+  inventoryLots: Table<InventoryLotRecord>;
+  inventoryTransactions: Table<InventoryTransactionRecord>;
+  chickLots: Table<ChickLotRecord>;
+  alerts: Table<AlertRecord>;
 }
 
 export function createMemoryRepositories(): { repos: Repositories; store: MemoryStore } {
@@ -92,6 +97,11 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
     eggInventory: new Table(),
     healthRecords: new Table(),
     mediaAssets: new Table(),
+    inventoryItems: new Table(),
+    inventoryLots: new Table(),
+    inventoryTransactions: new Table(),
+    chickLots: new Table(),
+    alerts: new Table(),
   };
   const transactional = [
     store.users,
@@ -115,6 +125,11 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
     store.eggInventory,
     store.healthRecords,
     store.mediaAssets,
+    store.inventoryItems,
+    store.inventoryLots,
+    store.inventoryTransactions,
+    store.chickLots,
+    store.alerts,
   ] as Table<unknown>[];
 
   let depth = 0;
@@ -222,6 +237,9 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
       },
       async findByIds(ids) {
         return ids.map((id) => store.farms.get(id)).filter((f): f is FarmRecord => !!f && !f.deletedAt);
+      },
+      async listIds() {
+        return store.farms.all().filter((f) => !f.deletedAt).map((f) => f.id);
       },
       async create(rec) {
         store.farms.put(rec.id, rec);
@@ -337,6 +355,11 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
     eggInventory: createMemFarmRepo(store.eggInventory, { softDelete: false, versioned: false }),
     healthRecords: createMemFarmRepo(store.healthRecords, { softDelete: true, versioned: true }),
     mediaAssets: createMemFarmRepo(store.mediaAssets, { softDelete: true, versioned: true }),
+    inventoryItems: createMemFarmRepo(store.inventoryItems, { softDelete: true, versioned: true, unique: [["farmId", "name"]] }),
+    inventoryLots: createMemFarmRepo(store.inventoryLots, { softDelete: true, versioned: true }),
+    inventoryTransactions: createMemFarmRepo(store.inventoryTransactions, { softDelete: false, versioned: false }),
+    chickLots: createMemFarmRepo(store.chickLots, { softDelete: true, versioned: true }),
+    alerts: createMemFarmRepo(store.alerts, { softDelete: false, versioned: true, unique: [["farmId", "dedupKey"]] }),
     async locateDailyRecord(id) {
       const r = store.dailyRecords.get(id);
       return r && !r.deletedAt ? r.farmId : null;

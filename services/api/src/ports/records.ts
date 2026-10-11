@@ -244,6 +244,7 @@ export interface FlockEventRecord extends FarmOwned {
   toHouseId?: string;
   groupId?: string;
   dailyRecordId?: string;
+  chickLotId?: string;
   buyerId?: string;
   fromStatus?: import("@poultrypilot/types").FlockStatus;
   toStatus?: import("@poultrypilot/types").FlockStatus;
@@ -288,12 +289,16 @@ export interface BirdWeightRecord extends Editable {
 }
 
 export interface FeedConsumptionRecord extends Editable {
-  flockId: string;
+  /** Absent for wastage in the store (not in a flock's house). */
+  flockId?: string;
   feedItemId?: string;
+  kind: "consumption" | "wastage";
   date: string;
   quantityKg: number;
   dailyRecordId?: string;
+  allocations?: { lotId: string; quantity: number; costMinor: number }[];
   cost?: MoneyValue;
+  reason?: string;
   notes?: string;
 }
 
@@ -302,6 +307,15 @@ export interface WaterRecordRecord extends Editable {
   date: string;
   litres: number;
   dailyRecordId?: string;
+  source?: "borehole" | "municipal" | "well" | "rainwater" | "river" | "tanker" | "other";
+  ph?: number;
+  tdsPpm?: number;
+  chlorinePpm?: number;
+  qualityRating?: "good" | "fair" | "poor";
+  treatment?: "none" | "chlorination" | "acidification" | "filtration" | "uv" | "medication" | "vitamins" | "other";
+  treatmentNotes?: string;
+  flags?: ("consumption_high" | "consumption_low" | "ph_low" | "ph_high" | "tds_high")[];
+  baselineLitres?: number;
   notes?: string;
 }
 
@@ -346,4 +360,87 @@ export interface MediaAssetRecord extends Editable {
   sizeBytes: number;
   sha256: string;
   storageKey: string;
+}
+
+// ---- inventory ----------------------------------------------------------------
+
+export type InventoryCategory = (typeof import("@poultrypilot/constants").INVENTORY_CATEGORIES)[number];
+export type StockUnit = (typeof import("@poultrypilot/constants").STOCK_UNITS)[number];
+
+export interface InventoryItemRecord extends Editable {
+  name: string;
+  category: InventoryCategory;
+  unit: StockUnit;
+  sku?: string;
+  medicineId?: string;
+  feed?: { stage: (typeof import("@poultrypilot/constants").FEED_STAGES)[number]; form?: "mash" | "crumble" | "pellet" | "other"; bagSizeKg?: number };
+  defaultSupplier?: string;
+  defaultStorageLocation?: string;
+  reorderLevel?: number;
+  reorderDays?: number;
+  expiryWarningDays: number;
+  active: boolean;
+  notes?: string;
+  stock?: { quantity: number; valueMinor: number; currency?: string; asOf: string };
+}
+
+export interface InventoryLotRecord extends Editable {
+  itemId: string;
+  receivedDate: string;
+  supplier?: string;
+  batchNumber?: string;
+  invoiceNumber?: string;
+  expiryDate?: string;
+  storageLocation?: string;
+  quantityReceived: number;
+  quantityRemaining: number;
+  unitCost: MoneyValue;
+}
+
+export interface InventoryTransactionRecord extends FarmOwned {
+  itemId: string;
+  lotId: string;
+  type: "receipt" | "issue" | "wastage" | "adjustment" | "reversal";
+  date: string;
+  quantityDelta: number;
+  valueMinor: number;
+  currency: string;
+  flockId?: string;
+  houseId?: string;
+  sourceType: "purchase" | "feed_consumption" | "manual" | "stock_count" | "vaccination" | "health_record";
+  sourceId?: string;
+  reason?: string;
+  reversalOf?: string;
+}
+
+export interface ChickLotRecord extends Editable {
+  source: "own_hatchery" | "purchased";
+  hatcheryBatchId?: string;
+  supplier?: string;
+  species: import("@poultrypilot/types").Species;
+  breed?: string;
+  hatchDate: string;
+  quantity: number;
+  remaining: number;
+  status: "available" | "depleted" | "closed";
+  placedFlockIds?: string[];
+  unitCost?: MoneyValue;
+  notes?: string;
+}
+
+export interface AlertRecord extends FarmOwned {
+  version: number;
+  ruleType: (typeof import("@poultrypilot/constants").ALERT_RULE_TYPES)[number];
+  severity: "info" | "warning" | "critical";
+  status: "open" | "acknowledged" | "resolved";
+  flockId?: string;
+  houseId?: string;
+  date: string;
+  title: string;
+  message?: string;
+  values?: Record<string, number>;
+  dedupKey: string;
+  acknowledgedBy?: string;
+  acknowledgedAt?: Date;
+  resolvedAt?: Date;
 }

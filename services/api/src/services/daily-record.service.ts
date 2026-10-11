@@ -12,7 +12,7 @@ import type {
   TrendsView,
   UpdateDailyRecordRequest,
 } from "@poultrypilot/types";
-import { addDays, dateRange, effectiveEvents, henDayPercent, population } from "../domain/index.js";
+import { addDays, dateRange, effectiveEvents, evaluateWater, henDayPercent, population } from "../domain/index.js";
 import { AppError, forbidden, notFound } from "../lib/errors.js";
 import { newId, type Clock } from "../lib/util.js";
 import type { AggregateRow, Repositories, Tx } from "../ports/repositories.js";
@@ -22,7 +22,6 @@ import type {
   EggInventoryRecord,
   EggRecordRecord,
   FarmRecord,
-  FeedConsumptionRecord,
   FlockRecord,
   HealthRecordRecord,
 } from "../ports/records.js";
@@ -31,6 +30,8 @@ import { assertCan, type FarmContext } from "./context.js";
 import { toLedger, type FlockService, type NewEvent } from "./flock.service.js";
 import { duplicate } from "./house.service.js";
 import type { SyncService } from "./sync.service.js";
+import type { AlertService } from "./alert.service.js";
+import type { FeedService } from "./feed.service.js";
 
 /** Flock types that lay eggs. Egg entry on a broiler or chick flock is refused. */
 const LAYING = new Set(["layer", "breeder", "custom"]);
@@ -42,6 +43,8 @@ export interface DailyRecordDeps {
   audit: AuditService;
   sync: SyncService;
   flocks: FlockService;
+  feed: FeedService;
+  alerts: AlertService;
 }
 
 type Fields = DailyRecordFields;
@@ -62,7 +65,7 @@ export function summarize(f: Fields): DailyRecordSummaryValue {
   return {
     mortality: f.mortality.reduce((t, m) => t + m.count, 0),
     culls: f.culls,
-    feedKg: Math.round(f.feed.reduce((t, x) => t + x.quantityKg, 0) * 1000) / 1000,
+    feedKg: Math.round(f.feed.filter((x) => (x.kind ?? "consumption") === "consumption").reduce((t, x) => t + x.quantityKg, 0) * 1000) / 1000,
     ...(f.waterLitres !== undefined ? { waterLitres: f.waterLitres } : {}),
     ...(f.eggs ? { eggsCollected: f.eggs.collected, eggsBroken: f.eggs.broken } : {}),
     ...(f.averageWeight ? { averageWeightG: f.averageWeight.averageWeightG } : {}),
@@ -140,6 +143,7 @@ export function createDailyRecordService(d: DailyRecordDeps) {
     L.assertStatus(flock, ["active"], "record a day");
     L.assertDate(date, farm, flock);
     for (const x of f.feed) L.assertCurrency(x.unitCostPerKg, farm, "unitCostPerKg");
+    if (f.waterQuality && f.waterLitres === undefined) throw new AppError("VALIDATION_FAILED", "Give waterLitres with waterQuality");
     if (f.eggs && !LAYING.has(flock.type)) throw new AppError("VALIDATION_FAILED", `${flock.flockCode} is a ${flock.type} flock; eggs are recorded for layer, breeder and custom flocks`);
     await assertPhotos(ctx, f.photos, tx);
     const now = clock.now();
@@ -203,38 +207,64 @@ export function createDailyRecordService(d: DailyRecordDeps) {
       await L.appendEvents(ctx, flock, events, [...reversals, ...wanted], {}, farm, tx, "flock.daily_record_saved");
     }
 
-    // 2. Feed.
+    // 2. Feed: through FeedWise, so a named feed item moves stock and is costed from its lots.
     const oldFeed = await repos.feedConsumption.find(ctx.farmId, { where: { dailyRecordId: record.id } }, tx);
-    const newFeed: FeedConsumptionRecord[] = f.feed.map((x) => ({
-      id: newId(),
-      farmId: ctx.farmId,
-      flockId: flock.id,
-      date,
-      quantityKg: x.quantityKg,
-      dailyRecordId: record.id,
-      ...(x.feedItemId ? { feedItemId: x.feedItemId } : {}),
-      ...(x.unitCostPerKg ? { cost: L.money(x.unitCostPerKg.amountMinor * x.quantityKg, farm.settings.currency) } : {}),
-      createdBy: ctx.userId,
-      createdAt: now,
-      updatedAt: now,
-      version: 0,
-    }));
-    const feedKey = (xs: FeedConsumptionRecord[]) => xs.map((x) => `${x.quantityKg}:${x.feedItemId ?? ""}:${x.cost?.amountMinor ?? ""}`).sort().join("|");
-    if (feedKey(oldFeed) !== feedKey(newFeed)) {
-      for (const x of oldFeed) await repos.feedConsumption.update(ctx.farmId, x.id, { deletedAt: now, deletedBy: ctx.userId, updatedAt: now }, undefined, tx);
-      await repos.feedConsumption.insertMany(newFeed, tx);
+    const lineKey = (x: { kind?: string; quantityKg: number; feedItemId?: string; unitCostMinor?: number; reason?: string }) =>
+      [x.kind ?? "consumption", x.quantityKg, x.feedItemId ?? "", x.feedItemId ? "" : x.unitCostMinor ?? "", x.reason ?? ""].join(":");
+    const oldKey = oldFeed.map((x) => lineKey({ ...x, ...(x.cost && !x.feedItemId ? { unitCostMinor: Math.round(x.cost.amountMinor) } : {}) })).sort().join("|");
+    const newKey = f.feed.map((x) => lineKey({ ...x, ...(x.unitCostPerKg ? { unitCostMinor: Math.round(x.unitCostPerKg.amountMinor * x.quantityKg) } : {}) })).sort().join("|");
+    if (oldKey !== newKey) {
+      for (const x of oldFeed) await d.feed.removeFeed(ctx, farm, x, tx);
+      for (const x of f.feed) await d.feed.recordFeed(ctx, farm, flock, date, x, tx, { dailyRecordId: record.id });
     }
 
-    // 3. Water: one record per flock and day.
+    // 3. Water: one record per flock and day, with quality and abnormal-consumption flags.
     const water = (await repos.waterRecords.find(ctx.farmId, { where: { flockId: flock.id, date }, limit: 1 }, tx))[0];
+    const waterKey = `water:${flock.id}:${date}`;
     if (f.waterLitres !== undefined) {
+      const previous = await repos.waterRecords.find(ctx.farmId, { where: { flockId: flock.id }, range: { field: "date", from: addDays(date, -7), to: addDays(date, -1) } }, tx);
+      const q = f.waterQuality ?? {};
+      const check = evaluateWater({ litres: f.waterLitres, previousDays: previous.map((w) => w.litres), ...(q.ph !== undefined ? { ph: q.ph } : {}), ...(q.tdsPpm !== undefined ? { tdsPpm: q.tdsPpm } : {}) });
+      const fields = {
+        litres: f.waterLitres,
+        dailyRecordId: record.id,
+        source: q.source,
+        ph: q.ph,
+        tdsPpm: q.tdsPpm,
+        chlorinePpm: q.chlorinePpm,
+        qualityRating: q.qualityRating,
+        treatment: q.treatment,
+        treatmentNotes: q.treatmentNotes,
+        flags: check.flags.length ? check.flags : undefined,
+        baselineLitres: check.baselineLitres === null ? undefined : Math.round(check.baselineLitres * 10) / 10,
+      };
       if (!water) {
-        await repos.waterRecords.insert({ id: newId(), farmId: ctx.farmId, flockId: flock.id, date, litres: f.waterLitres, dailyRecordId: record.id, createdBy: ctx.userId, createdAt: now, updatedAt: now, version: 0 }, tx);
-      } else if (water.litres !== f.waterLitres || water.dailyRecordId !== record.id) {
-        await repos.waterRecords.update(ctx.farmId, water.id, { litres: f.waterLitres, dailyRecordId: record.id, updatedBy: ctx.userId, updatedAt: now }, undefined, tx);
+        await repos.waterRecords.insert({ id: newId(), farmId: ctx.farmId, flockId: flock.id, date, ...(Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined)) as typeof fields), createdBy: ctx.userId, createdAt: now, updatedAt: now, version: 0 }, tx);
+      } else {
+        await repos.waterRecords.update(ctx.farmId, water.id, { ...fields, updatedBy: ctx.userId, updatedAt: now }, undefined, tx);
       }
+      if (check.flags.length) {
+        const words: Record<string, string> = {
+          consumption_high: `water intake ${Math.round(check.deviationPercent ?? 0)}% above the recent average of ${Math.round(check.baselineLitres ?? 0)} L`,
+          consumption_low: `water intake ${Math.round(-(check.deviationPercent ?? 0))}% below the recent average of ${Math.round(check.baselineLitres ?? 0)} L`,
+          ph_low: `pH ${q.ph} is below the limit`,
+          ph_high: `pH ${q.ph} is above the limit`,
+          tds_high: `dissolved solids ${q.tdsPpm} ppm are above the limit`,
+        };
+        await d.alerts.raise(ctx, {
+          ruleType: "water_abnormal",
+          severity: check.flags.includes("consumption_low") ? "critical" : "warning",
+          title: `Water: ${flock.flockCode} on ${date}`,
+          message: `${flock.flockCode}: ${check.flags.map((x) => words[x]).join("; ")}. Check drinkers, water lines and the birds; contact your veterinarian if it continues.`,
+          dedupKey: waterKey,
+          date,
+          flockId: flock.id,
+          values: { litres: f.waterLitres, ...(check.baselineLitres !== null ? { baselineLitres: check.baselineLitres } : {}) },
+        }, tx);
+      } else await d.alerts.resolve(ctx, waterKey, tx);
     } else if (water) {
       await repos.waterRecords.update(ctx.farmId, water.id, { deletedAt: now, deletedBy: ctx.userId, updatedAt: now }, undefined, tx);
+      await d.alerts.resolve(ctx, waterKey, tx);
     }
 
     // 4. Eggs and their stock postings.
@@ -365,9 +395,24 @@ export function createDailyRecordService(d: DailyRecordDeps) {
       mortality,
       mortalityTotal: mortality.reduce((t, m) => t + m.count, 0),
       culls: day.filter((e) => e.type === "cull").reduce((t, e) => t + (e.birds ?? 0), 0),
-      feed: feed.map((x) => ({ id: x.id, quantityKg: x.quantityKg, ...(x.feedItemId ? { feedItemId: x.feedItemId } : {}), ...(x.cost ? { cost: x.cost } : {}) })),
-      feedKg: Math.round(feed.reduce((t, x) => t + x.quantityKg, 0) * 1000) / 1000,
+      feed: feed.map((x) => ({ id: x.id, kind: x.kind ?? "consumption", quantityKg: x.quantityKg, ...(x.feedItemId ? { feedItemId: x.feedItemId } : {}), ...(x.cost ? { cost: x.cost } : {}) })),
+      feedKg: Math.round(feed.filter((x) => (x.kind ?? "consumption") === "consumption").reduce((t, x) => t + x.quantityKg, 0) * 1000) / 1000,
       ...(water ? { waterLitres: water.litres } : {}),
+      ...(water
+        ? {
+            water: {
+              ...(water.source ? { source: water.source } : {}),
+              ...(water.ph !== undefined ? { ph: water.ph } : {}),
+              ...(water.tdsPpm !== undefined ? { tdsPpm: water.tdsPpm } : {}),
+              ...(water.chlorinePpm !== undefined ? { chlorinePpm: water.chlorinePpm } : {}),
+              ...(water.qualityRating ? { qualityRating: water.qualityRating } : {}),
+              ...(water.treatment ? { treatment: water.treatment } : {}),
+              ...(water.treatmentNotes ? { treatmentNotes: water.treatmentNotes } : {}),
+              flags: water.flags ?? [],
+              baselineLitres: water.baselineLitres ?? null,
+            },
+          }
+        : {}),
       ...(record?.temperatureMinC !== undefined ? { temperatureMinC: record.temperatureMinC } : {}),
       ...(record?.temperatureMaxC !== undefined ? { temperatureMaxC: record.temperatureMaxC } : {}),
       ...(record?.humidityPercent !== undefined ? { humidityPercent: record.humidityPercent } : {}),

@@ -85,6 +85,10 @@ The table is generated from `packages/constants/src/permissions.ts`; the API enf
 | `market.read` | ✓ | ✓ | ✓ |  |  | ✓ |  |
 | `market.manage` | ✓ | ✓ | ✓ |  |  |  |  |
 | `payment.record` | ✓ | ✓ | ✓ |  |  | ✓ |  |
+| `inventory.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `inventory.issue` | ✓ | ✓ | ✓ | ✓ | ✓ |  | ✓ |
+| `inventory.manage` | ✓ | ✓ | ✓ |  |  | ✓ |  |
+| `alert.manage` | ✓ | ✓ | ✓ | ✓ |  |  |  |
 | `content.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 ### Hierarchy rules for members
