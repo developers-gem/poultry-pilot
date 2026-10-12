@@ -168,3 +168,7 @@ Hatchery batches from egg source and selection through setting, candling, transf
 ## Finance and PoultryMarket
 
 Bills and purchases (payables), incomes and sales (receivables), payments, refunds, transfers between cash, bank and mobile money accounts, recurring expenses, suppliers and customers, with tax, attachments and flock or house allocation. Purchases, vet fees, bird sales and orders post automatically. Reports: P&L, cash flow, expense and revenue breakdowns, aged receivables and payables, flock profitability with cost per bird, kg and egg, and house costing. PoultryMarket: seller listings, browsing without seller contact, orders priced from the listing, a strict order state machine (pending → accepted → preparing → dispatched → delivered → completed, or cancelled), reservations, payments and delivery that moves stock. Details: `docs/finance-market.md`.
+
+## Intelligence layer
+
+Fourteen configurable alert rules (mortality, egg production, feed, water, weight, FCR, stock, expiry, vaccination, vet appointment, hatch, delivery, overdue payment, weather), judged against each farm's own history rather than universal thresholds; absolute limits apply only when a farm sets them. Weather through the backend with a cache and stored history. In-app, push and email notifications through replaceable providers, with preferences, cooldown and retries. `GET /farms/:farmId/dashboard`, `/analytics` and `/alerts`. Details: `docs/intelligence.md`.

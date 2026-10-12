@@ -3,7 +3,7 @@
 > Generated from the Mongoose schemas in `services/api/src/adapters/mongo/models`. Do not edit by hand:
 > run `pnpm --filter @poultrypilot/api docs:data-dictionary`. A test fails if this file is out of date.
 
-60 collections, 98 secondary indexes (plus the default `_id` index on each). Design rules and relationships: `docs/data-model.md`.
+63 collections, 103 secondary indexes (plus the default `_id` index on each). Design rules and relationships: `docs/data-model.md`.
 
 | Collection | Domain | Ownership | Indexes | Purpose |
 | --- | --- | --- | --- | --- |
@@ -53,9 +53,12 @@
 | [`order_payments`](#order_payments) | Market | farm, append-only | 1 | Money received against an order (or refunded) |
 | [`market_prices`](#market_prices) | Market | global | 1 | Reference prices by region, product and date from a named source (fetched behind the API) |
 | [`tasks`](#tasks) | Operations | farm | 2 | A piece of work assigned to someone on the farm, optionally linked to a flock, house or other record |
-| [`alert_rules`](#alert_rules) | Operations | farm | 1 | A farm's configuration of one alert type: on/off, thresholds, scope and who is notified |
+| [`alert_rules`](#alert_rules) | Operations | farm | 1 | A farm's settings for one rule from the catalog (mortality, egg production, feed, water, weight, FCR, stock, expiry, vaccination, vet appointment, hatch, delivery, payment, weather): on or off, parameters, scope, severity, who is told and how |
 | [`alerts`](#alerts) | Operations | farm | 2 | Something that needs attention, raised by the server-side alert job |
-| [`notifications`](#notifications) | Operations | user | 2 | A message to one person (in-app, push, email, SMS, WhatsApp) with delivery state |
+| [`notifications`](#notifications) | Operations | user | 3 | A message to one person on one channel (in-app, push, email) with delivery state |
+| [`push_devices`](#push_devices) | Operations | user | 2 | A phone or browser registered for push notifications |
+| [`notification_preferences`](#notification_preferences) | Operations | user | 1 | How a person wants to be told: push and email on or off, the lowest severity for each, and rules they have muted |
+| [`weather_observations`](#weather_observations) | Operations | global | 1 | Observed daily weather for a location (temperature, humidity, rain, wind), kept as history |
 | [`weather_cache`](#weather_cache) | Operations | global | 2 | Provider responses cached per rounded location (about 1 km) and kind, shared by every farm near that point |
 | [`training_courses`](#training_courses) | Content | global | 2 | A course and its lessons (embedded: always read together, a few lessons each) |
 | [`training_progress`](#training_progress) | Content | user | 1 | A lesson a person has completed |
@@ -1714,7 +1717,7 @@ A piece of work assigned to someone on the farm, optionally linked to a flock, h
 
 | Field | Type | Required | Constraints | References |
 | --- | --- | --- | --- | --- |
-| `kind` | String | yes | one of: `general`, `corrective_action`, `follow_up`; default `"general"` |  |
+| `kind` | String | yes | one of: `general`, `corrective_action`, `follow_up`, `vet_appointment`; default `"general"` |  |
 | `title` | String | yes | ≤ 200 chars |  |
 | `description` | String |  | ≤ 2000 chars |  |
 | `assigneeUserId` | String |  |  | `User` |
@@ -1741,7 +1744,7 @@ A piece of work assigned to someone on the farm, optionally linked to a flock, h
 
 ### alert_rules
 
-A farm's configuration of one alert type: on/off, thresholds, scope and who is notified. Defaults apply when absent.
+A farm's settings for one rule from the catalog (mortality, egg production, feed, water, weight, FCR, stock, expiry, vaccination, vet appointment, hatch, delivery, payment, weather): on or off, parameters, scope, severity, who is told and how. Absent = catalog defaults, which compare with the farm's own history.
 
 - **Model:** `AlertRule`
 - **Ownership:** Farm — every query must include farmId
@@ -1749,19 +1752,20 @@ A farm's configuration of one alert type: on/off, thresholds, scope and who is n
 
 | Field | Type | Required | Constraints | References |
 | --- | --- | --- | --- | --- |
-| `ruleType` | String | yes | one of: `mortality_spike`, `egg_drop`, `feed_change`, `missing_record`, `heat_stress`, `low_feed_stock`, `low_inventory`, `vaccination_due`, `withdrawal_active`, `expiry_soon`, `expired_stock`, `water_abnormal`, `health_follow_up`, `biosecurity_breach`, `wild_bird_contact`, `checklist_failed`, `brooding_conditions`, `hatch_due` |  |
+| `ruleKey` | String | yes | one of: `mortality`, `egg_production`, `feed_consumption`, `water_consumption`, `weight_variance`, `fcr_variance`, `inventory`, `medicine_expiry`, `vaccination_due`, `vet_appointment`, `hatch_date`, `order_delivery`, `payment_overdue`, `weather_risk` |  |
 | `enabled` | Boolean |  | default `true` |  |
 | `parameters` | map of Number |  |  |  |
 | `parameters.$*` | Number |  |  |  |
 | `flockIds` | array of String |  |  | `Flock` |
 | `houseIds` | array of String |  |  | `House` |
+| `severity` | String |  | one of: `info`, `warning`, `critical` |  |
 | `notifyRoles` | array of String |  | one of: `owner`, `admin`, `farm_manager`, `supervisor`, `worker`, `accountant`, `vet` |  |
 | `channels` | array of String |  | one of: `in_app`, `push`, `email`, `sms`, `whatsapp` |  |
 | `cooldownHours` | Number |  | max 720; default `24`; integer |  |
 
 | Index | Options | Serves |
 | --- | --- | --- |
-| farmId, ruleType | unique | Load a farm's rules for the alert job; one rule per type per farm |
+| farmId, ruleKey | unique | Load a farm's rule settings; one per rule per farm |
 
 ### alerts
 
@@ -1773,7 +1777,7 @@ Something that needs attention, raised by the server-side alert job. States fact
 
 | Field | Type | Required | Constraints | References |
 | --- | --- | --- | --- | --- |
-| `ruleType` | String | yes | one of: `mortality_spike`, `egg_drop`, `feed_change`, `missing_record`, `heat_stress`, `low_feed_stock`, `low_inventory`, `vaccination_due`, `withdrawal_active`, `expiry_soon`, `expired_stock`, `water_abnormal`, `health_follow_up`, `biosecurity_breach`, `wild_bird_contact`, `checklist_failed`, `brooding_conditions`, `hatch_due` |  |
+| `ruleType` | String | yes | one of: `mortality_spike`, `egg_drop`, `feed_change`, `missing_record`, `heat_stress`, `low_feed_stock`, `low_inventory`, `vaccination_due`, `withdrawal_active`, `expiry_soon`, `expired_stock`, `water_abnormal`, `health_follow_up`, `biosecurity_breach`, `wild_bird_contact`, `checklist_failed`, `brooding_conditions`, `hatch_due`, `weight_variance`, `fcr_variance`, `vet_appointment`, `order_delivery`, `payment_overdue`, `weather_risk` |  |
 | `severity` | String | yes | one of: `info`, `warning`, `critical` |  |
 | `status` | String | yes | one of: `open`, `acknowledged`, `resolved`; default `"open"` |  |
 | `flockId` | String |  |  | `Flock` |
@@ -1795,7 +1799,7 @@ Something that needs attention, raised by the server-side alert job. States fact
 
 ### notifications
 
-A message to one person (in-app, push, email, SMS, WhatsApp) with delivery state. Kept 180 days.
+A message to one person on one channel (in-app, push, email) with delivery state. Push and email are queued and sent by the delivery worker through replaceable providers, with retries. Kept 180 days.
 
 - **Model:** `Notification`
 - **Ownership:** User — belongs to one person
@@ -1813,15 +1817,88 @@ A message to one person (in-app, push, email, SMS, WhatsApp) with delivery state
 | `link.id` | String |  |  |  |
 | `link.path` | String |  | ≤ 300 chars |  |
 | `alertId` | String |  |  | `Alert` |
+| `ruleKey` | String |  | one of: `mortality`, `egg_production`, `feed_consumption`, `water_consumption`, `weight_variance`, `fcr_variance`, `inventory`, `medicine_expiry`, `vaccination_due`, `vet_appointment`, `hatch_date`, `order_delivery`, `payment_overdue`, `weather_risk` |  |
+| `severity` | String |  | one of: `info`, `warning`, `critical` |  |
 | `sentAt` | Date |  |  |  |
 | `deliveredAt` | Date |  |  |  |
 | `readAt` | Date |  |  |  |
+| `attempts` | Number |  | max 20; default `0`; integer |  |
+| `nextAttemptAt` | Date |  |  |  |
+| `providerMessageId` | String |  | ≤ 200 chars |  |
 | `error` | String |  | ≤ 500 chars |  |
 
 | Index | Options | Serves |
 | --- | --- | --- |
 | userId, createdAt ↓ |  | A person's notification inbox, newest first; unread count |
+| status, nextAttemptAt | partial: {"status":"queued"} | Delivery queue: queued push and email notifications due for an attempt |
 | createdAt | TTL 180 d | TTL: delete notifications after 180 days |
+
+### push_devices
+
+A phone or browser registered for push notifications. Tokens the provider reports as invalid are disabled.
+
+- **Model:** `PushDevice`
+- **Ownership:** User — belongs to one person
+- **Standard fields:** `_id` (UUIDv7 string), `createdBy`, `updatedBy` (when a person made the change), `createdAt`, `updatedAt` (UTC, required)
+
+| Field | Type | Required | Constraints | References |
+| --- | --- | --- | --- | --- |
+| `userId` | String | yes |  | `User` |
+| `platform` | String | yes | one of: `ios`, `android`, `web` |  |
+| `token` | String | yes | ≤ 4096 chars |  |
+| `deviceName` | String |  | ≤ 100 chars |  |
+| `lastSeenAt` | Date | yes |  |  |
+| `disabledAt` | Date |  |  |  |
+
+| Index | Options | Serves |
+| --- | --- | --- |
+| token | unique | One registration per token (re-registering moves it to the signed-in user) |
+| userId |  | A person's devices when sending a push |
+
+### notification_preferences
+
+How a person wants to be told: push and email on or off, the lowest severity for each, and rules they have muted. In-app notifications are always kept.
+
+- **Model:** `NotificationPreference`
+- **Ownership:** User — belongs to one person
+- **Standard fields:** `_id` (UUIDv7 string), `createdBy`, `updatedBy` (when a person made the change), `createdAt`, `updatedAt` (UTC, required)
+
+| Field | Type | Required | Constraints | References |
+| --- | --- | --- | --- | --- |
+| `userId` | String | yes |  | `User` |
+| `pushEnabled` | Boolean |  | default `true` |  |
+| `emailEnabled` | Boolean |  | default `true` |  |
+| `pushMinSeverity` | String | yes | one of: `info`, `warning`, `critical`; default `"warning"` |  |
+| `emailMinSeverity` | String | yes | one of: `info`, `warning`, `critical`; default `"warning"` |  |
+| `mutedRuleKeys` | array of String |  | one of: `mortality`, `egg_production`, `feed_consumption`, `water_consumption`, `weight_variance`, `fcr_variance`, `inventory`, `medicine_expiry`, `vaccination_due`, `vet_appointment`, `hatch_date`, `order_delivery`, `payment_overdue`, `weather_risk` |  |
+
+| Index | Options | Serves |
+| --- | --- | --- |
+| userId | unique | One preference document per person |
+
+### weather_observations
+
+Observed daily weather for a location (temperature, humidity, rain, wind), kept as history. Shared by every farm near that point; weather rules use it as the farm's own baseline.
+
+- **Model:** `WeatherObservation`
+- **Ownership:** Global — shared reference data
+- **Standard fields:** `_id` (UUIDv7 string), `createdAt`, `updatedAt` (UTC, required)
+
+| Field | Type | Required | Constraints | References |
+| --- | --- | --- | --- | --- |
+| `provider` | String | yes | ≤ 40 chars |  |
+| `locationKey` | String | yes | ≤ 40 chars |  |
+| `date` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
+| `tempMaxC` | Number |  | min -90; max 70 |  |
+| `tempMinC` | Number |  | min -90; max 70 |  |
+| `humidityMaxPercent` | Number |  | max 100 |  |
+| `humidityMinPercent` | Number |  | max 100 |  |
+| `rainMm` | Number |  | max 2000 |  |
+| `windMaxKph` | Number |  | max 500 |  |
+
+| Index | Options | Serves |
+| --- | --- | --- |
+| locationKey, date | unique | History for a location over a date range; one row per day |
 
 ### weather_cache
 
@@ -2252,6 +2329,8 @@ Every reference between collections, derived from the schemas.
 | `alerts` | `acknowledgedBy` | `users` | many-to-one |
 | `notifications` | `userId` | `users` | many-to-one |
 | `notifications` | `alertId` | `alerts` | many-to-one |
+| `push_devices` | `userId` | `users` | many-to-one |
+| `notification_preferences` | `userId` | `users` | many-to-one |
 | `training_progress` | `userId` | `users` | many-to-one |
 | `training_progress` | `courseId` | `training_courses` | many-to-one |
 | `training_progress` | `lessonId` | `TrainingCourse.lessons.lessonId` | many-to-one (Embedded lesson id) |

@@ -65,7 +65,7 @@ export const WITHDRAWAL_SOURCES = ["medicine_label", "veterinarian", "other"] as
 export const CHECKLIST_KINDS = ["visitor_declaration", "ppe", "footbath", "cleaning", "disinfection", "vehicle", "pest_control", "audit", "general", "arrival_preparation", "brooder_check"] as const;
 export const CHECKLIST_RESPONSE_TYPES = ["yes_no", "text", "number", "choice"] as const;
 export const PEST_TYPES = ["rodents", "insects", "wild_birds", "other"] as const;
-export const TASK_KINDS = ["general", "corrective_action", "follow_up"] as const;
+export const TASK_KINDS = ["general", "corrective_action", "follow_up", "vet_appointment"] as const;
 export const VISITOR_TYPES = ["vet", "supplier", "buyer", "worker", "government", "contractor", "other"] as const;
 export const CLEANING_SCHEDULES = ["daily", "weekly", "monthly", "between_flocks", "one_off"] as const;
 export const EQUIPMENT_TYPES = ["incubator", "hatcher", "feeder", "drinker", "heater", "fan", "generator", "scale", "vehicle", "sprayer", "other"] as const;
@@ -129,9 +129,21 @@ export const ALERT_RULE_TYPES = [
   "checklist_failed",
   "brooding_conditions",
   "hatch_due",
+  "weight_variance",
+  "fcr_variance",
+  "vet_appointment",
+  "order_delivery",
+  "payment_overdue",
+  "weather_risk",
 ] as const;
 export const NOTIFICATION_CHANNELS = ["in_app", "push", "email", "sms", "whatsapp"] as const;
 export const NOTIFICATION_STATUSES = ["queued", "sent", "delivered", "failed", "read"] as const;
+export const PUSH_PLATFORMS = ["ios", "android", "web"] as const;
+/** The configurable alert rules a farm sees (each maps to one or more alert types). */
+export const RULE_KEYS = [
+  "mortality", "egg_production", "feed_consumption", "water_consumption", "weight_variance", "fcr_variance", "inventory",
+  "medicine_expiry", "vaccination_due", "vet_appointment", "hatch_date", "order_delivery", "payment_overdue", "weather_risk",
+] as const;
 export const WEATHER_KINDS = ["current", "hourly", "daily"] as const;
 
 // content & system

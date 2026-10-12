@@ -16,3 +16,4 @@ export * from "./health.js";
 export * from "./hatchery.js";
 export * from "./orders.js";
 export * from "./finance.js";
+export * from "./intelligence.js";

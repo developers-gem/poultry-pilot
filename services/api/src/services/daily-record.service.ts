@@ -45,6 +45,8 @@ export interface DailyRecordDeps {
   flocks: FlockService;
   feed: FeedService;
   alerts: AlertService;
+  /** The farm's water rule (deviation, baseline days and any quality limits it set). */
+  waterRules?: (ctx: FarmContext, tx: Tx) => Promise<import("../domain/index.js").WaterRules>;
   /** Marks eggs laid during an egg withdrawal period as withheld (FlockHealth). */
   afterEggsWritten?: (ctx: FarmContext, flockId: string, tx: Tx) => Promise<void>;
 }
@@ -224,9 +226,11 @@ export function createDailyRecordService(d: DailyRecordDeps) {
     const water = (await repos.waterRecords.find(ctx.farmId, { where: { flockId: flock.id, date }, limit: 1 }, tx))[0];
     const waterKey = `water:${flock.id}:${date}`;
     if (f.waterLitres !== undefined) {
-      const previous = await repos.waterRecords.find(ctx.farmId, { where: { flockId: flock.id }, range: { field: "date", from: addDays(date, -7), to: addDays(date, -1) } }, tx);
+      const rules = (await d.waterRules?.(ctx, tx)) ?? undefined;
+      const window = (rules as { windowDays?: number } | undefined)?.windowDays ?? 7;
+      const previous = await repos.waterRecords.find(ctx.farmId, { where: { flockId: flock.id }, range: { field: "date", from: addDays(date, -window), to: addDays(date, -1) } }, tx);
       const q = f.waterQuality ?? {};
-      const check = evaluateWater({ litres: f.waterLitres, previousDays: previous.map((w) => w.litres), ...(q.ph !== undefined ? { ph: q.ph } : {}), ...(q.tdsPpm !== undefined ? { tdsPpm: q.tdsPpm } : {}) });
+      const check = evaluateWater({ litres: f.waterLitres, previousDays: previous.map((w) => w.litres), ...(q.ph !== undefined ? { ph: q.ph } : {}), ...(q.tdsPpm !== undefined ? { tdsPpm: q.tdsPpm } : {}), ...(rules ? { rules } : {}) });
       const fields = {
         litres: f.waterLitres,
         dailyRecordId: record.id,

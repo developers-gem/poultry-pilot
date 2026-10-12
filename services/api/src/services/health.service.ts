@@ -376,6 +376,35 @@ export function createHealthService(d: HealthDeps) {
       };
     },
 
+    // ---- vet appointments (tasks of kind vet_appointment; reminded by the vet appointment rule)
+
+    async bookAppointment(ctx: FarmContext, r: { date: string; title: string; vetName?: string; flockId?: string; houseId?: string; notes?: string }) {
+      assertCan(ctx, "health.manage");
+      if (r.flockId) await L.loadFlock(ctx, r.flockId);
+      if (r.houseId && !(await repos.houses.findById(ctx.farmId, r.houseId))) throw notFound("House");
+      const farm = await E.farmOf(ctx);
+      if (r.date < E.todayOf(farm)) throw new AppError("VALIDATION_FAILED", "An appointment cannot be booked in the past");
+      const now = clock.now();
+      const rec = { id: newId(), farmId: ctx.farmId, kind: "vet_appointment" as const, title: r.vetName ? `${r.title} (${r.vetName})` : r.title, dueDate: r.date, status: "open" as const, priority: "normal" as const, ...defined({ description: r.notes, flockId: r.flockId, houseId: r.houseId }), createdBy: ctx.userId, createdAt: now, updatedAt: now, version: 0 };
+      await repos.tasks.insert(rec);
+      return strip(rec);
+    },
+
+    async listAppointments(ctx: FarmContext, q: { includeDone?: boolean }) {
+      assertCan(ctx, "health.read");
+      return (await repos.tasks.find(ctx.farmId, { where: { kind: "vet_appointment", ...(q.includeDone ? {} : { status: ["open", "in_progress"] }) } as never, sort: [{ field: "dueDate", dir: 1 }] })).map(strip);
+    },
+
+    async completeAppointment(ctx: FarmContext, id: string, notes?: string) {
+      assertCan(ctx, "health.manage");
+      const t = await repos.tasks.findById(ctx.farmId, id);
+      if (!t || t.kind !== "vet_appointment") throw notFound("Appointment");
+      if (t.status === "done" || t.status === "cancelled") throw new AppError("INVALID_STATE_TRANSITION", `This appointment is ${t.status}`);
+      const next = await repos.tasks.update(ctx.farmId, id, { status: "done", completedAt: clock.now(), completedBy: ctx.userId, ...(notes ? { resolutionNotes: notes } : {}), updatedAt: clock.now() }, { expectedVersion: t.version });
+      await repos.tx.run((tx) => d.alerts.resolve(ctx, `vet_appointment:${id}`, tx));
+      return strip(next!);
+    },
+
     // ---- programmes and vaccinations
 
     async createProgramme(ctx: FarmContext, input: z.output<typeof CreateProgrammeRequest>) {

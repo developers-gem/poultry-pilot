@@ -302,6 +302,45 @@ function contract(name: string, setup: () => Promise<{ repos: Repositories; rese
       expect((await repos.market.ordersForBuyer("buyer-1")).map((o) => o.id)).toContain(order.id);
     });
 
+    it("intelligence, notification and weather records round-trip", async () => {
+      const farmId = newId();
+      const user = newId();
+      await repos.alertRules.insert({ id: newId(), farmId, ruleKey: "mortality", enabled: true, parameters: { deviationPercent: 80, dailyRatePercentMax: 0.3 }, severity: "critical", channels: ["in_app", "push"], notifyRoles: ["owner"], cooldownHours: 12, createdBy: "u1", createdAt: now, updatedAt: now, version: 0 });
+      expect((await repos.alertRules.find(farmId, { where: { ruleKey: "mortality" } }))[0]?.parameters).toEqual({ deviationPercent: 80, dailyRatePercentMax: 0.3 });
+      const base = { userId: user, farmId, title: "T", attempts: 0, createdAt: now, updatedAt: now };
+      const inApp = { ...base, id: newId(), channel: "in_app" as const, status: "delivered" as const, alertId: "a1", ruleKey: "mortality" as const, severity: "warning" as const, link: { entity: "alert", id: "a1" } };
+      const queued = { ...base, id: newId(), channel: "push" as const, status: "queued" as const, alertId: "a1", nextAttemptAt: new Date(now.getTime() - 1000) };
+      await repos.notifications.insertMany([inApp, queued]);
+      expect(await repos.notifications.unreadCount(user)).toBe(1);
+      expect((await repos.notifications.forUser(user, { limit: 10 })).map((n) => n.id)).toEqual([inApp.id]);
+      expect((await repos.notifications.due(now, 10)).map((n) => n.id)).toContain(queued.id);
+      await repos.notifications.update(queued.id, { status: "sent", sentAt: now, attempts: 1, providerMessageId: "p1" });
+      expect((await repos.notifications.due(now, 10)).map((n) => n.id)).not.toContain(queued.id);
+      expect((await repos.notifications.lastForAlert("a1", user, "push"))?.providerMessageId).toBe("p1");
+      expect(await repos.notifications.markRead(user, "all", now)).toBe(1);
+      expect(await repos.notifications.unreadCount(user)).toBe(0);
+      const token = `tok-${newId()}`;
+      await repos.pushDevices.upsertByToken({ id: newId(), userId: user, platform: "android", token, lastSeenAt: now, createdAt: now, updatedAt: now });
+      const other = newId();
+      const moved = await repos.pushDevices.upsertByToken({ id: newId(), userId: other, platform: "android", token, lastSeenAt: now, createdAt: now, updatedAt: now });
+      expect(moved.userId).toBe(other);
+      expect(await repos.pushDevices.activeForUser(user)).toHaveLength(0);
+      await repos.pushDevices.disableTokens([token], now);
+      expect(await repos.pushDevices.activeForUser(other)).toHaveLength(0);
+      await repos.notificationPreferences.put({ id: newId(), userId: user, pushEnabled: true, emailEnabled: false, pushMinSeverity: "info", emailMinSeverity: "critical", mutedRuleKeys: ["weather_risk"], createdAt: now, updatedAt: now });
+      await repos.notificationPreferences.put({ id: newId(), userId: user, pushEnabled: false, emailEnabled: false, pushMinSeverity: "info", emailMinSeverity: "critical", createdAt: now, updatedAt: now });
+      expect((await repos.notificationPreferences.get(user))?.pushEnabled).toBe(false);
+      const key = `t-${farmId.slice(-6)}`;
+      await repos.weather.putCache({ id: newId(), provider: "fake", locationKey: key, kind: "daily", data: { today: "2026-10-12", daily: [] }, fetchedAt: now, expiresAt: new Date(now.getTime() + 3600_000), createdAt: now, updatedAt: now });
+      await repos.weather.putCache({ id: newId(), provider: "fake", locationKey: key, kind: "daily", data: { today: "2026-10-13", daily: [] }, fetchedAt: now, expiresAt: new Date(now.getTime() + 3600_000), createdAt: now, updatedAt: now });
+      expect(((await repos.weather.getCache("fake", key, "daily"))?.data as { today: string }).today).toBe("2026-10-13");
+      const obs = (date: string, t: number) => ({ id: newId(), provider: "fake", locationKey: key, date, tempMaxC: t, tempMinC: 20, rainMm: 1.5, windMaxKph: 14, humidityMaxPercent: 80, createdAt: now, updatedAt: now });
+      await repos.weather.upsertObservations([obs("2026-10-10", 31), obs("2026-10-11", 32)]);
+      await repos.weather.upsertObservations([obs("2026-10-11", 33)]);
+      const hist = await repos.weather.observations(key, "2026-10-01", "2026-10-31");
+      expect(hist.map((h) => `${h.date}:${h.tempMaxC}`)).toEqual(["2026-10-10:31", "2026-10-11:33"]);
+    });
+
     it("sync: per-farm sequences are independent and changes list in order", async () => {
       const [a, b] = [newId(), newId()];
       expect([await repos.sync.nextSeq(a), await repos.sync.nextSeq(a), await repos.sync.nextSeq(b)]).toEqual([1, 2, 1]);

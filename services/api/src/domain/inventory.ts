@@ -93,13 +93,14 @@ export interface WaterRules {
   /** Alert when a day's consumption differs from the flock's recent average by more than this. */
   deviationPercent: number;
   minBaselineDays: number;
-  phMin: number;
-  phMax: number;
-  tdsMaxPpm: number;
+  /** Quality limits apply only when the farm sets them (from its veterinarian or local water guidance). */
+  phMin?: number;
+  phMax?: number;
+  tdsMaxPpm?: number;
 }
 
-/** Defaults; farms should set limits from their veterinarian or local water guidance. */
-export const DEFAULT_WATER_RULES: WaterRules = { deviationPercent: 20, minBaselineDays: 3, phMin: 6, phMax: 8, tdsMaxPpm: 1000 };
+/** Relative to the flock's own recent intake; no universal quality limits. Farms set them on the water rule. */
+export const DEFAULT_WATER_RULES: WaterRules = { deviationPercent: 20, minBaselineDays: 3 };
 
 export type WaterFlag = "consumption_high" | "consumption_low" | "ph_low" | "ph_high" | "tds_high";
 
@@ -117,8 +118,8 @@ export function evaluateWater(i: { litres: number; ph?: number; tdsPpm?: number;
       if (deviation < -r.deviationPercent) flags.push("consumption_low");
     }
   }
-  if (i.ph !== undefined && i.ph < r.phMin) flags.push("ph_low");
-  if (i.ph !== undefined && i.ph > r.phMax) flags.push("ph_high");
-  if (i.tdsPpm !== undefined && i.tdsPpm > r.tdsMaxPpm) flags.push("tds_high");
+  if (i.ph !== undefined && r.phMin !== undefined && i.ph < r.phMin) flags.push("ph_low");
+  if (i.ph !== undefined && r.phMax !== undefined && i.ph > r.phMax) flags.push("ph_high");
+  if (i.tdsPpm !== undefined && r.tdsMaxPpm !== undefined && i.tdsPpm > r.tdsMaxPpm) flags.push("tds_high");
   return { flags, baselineLitres: baseline, deviationPercent: deviation };
 }

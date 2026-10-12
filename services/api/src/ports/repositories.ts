@@ -51,6 +51,12 @@ import type {
   TransactionRecord,
   MarketListingRecord,
   OrderPaymentRecord,
+  AlertRuleRecord,
+  NotificationRecord,
+  PushDeviceRecord,
+  NotificationPreferenceRecord,
+  WeatherObservationRecord,
+  WeatherCacheRecord,
 } from "./records.js";
 
 /**
@@ -250,6 +256,35 @@ export interface Repositories {
     listingById(id: string): Promise<MarketListingRecord | null>;
     orderById(id: string): Promise<OrderRecord | null>;
     ordersForBuyer(userId: string): Promise<OrderRecord[]>;
+  };
+  alertRules: FarmRepo<AlertRuleRecord>;
+  /** Per-person notifications (not farm-scoped: a person sees theirs across farms) and the delivery queue. */
+  notifications: {
+    insertMany(recs: NotificationRecord[], tx?: Tx): Promise<void>;
+    forUser(userId: string, q: { unreadOnly?: boolean; limit: number }): Promise<NotificationRecord[]>;
+    unreadCount(userId: string): Promise<number>;
+    markRead(userId: string, ids: string[] | "all", at: Date): Promise<number>;
+    /** Queued push and email notifications whose next attempt is due. */
+    due(now: Date, limit: number): Promise<NotificationRecord[]>;
+    update(id: string, patch: Partial<NotificationRecord>): Promise<void>;
+    lastForAlert(alertId: string, userId: string, channel: string): Promise<NotificationRecord | null>;
+  };
+  pushDevices: {
+    upsertByToken(rec: PushDeviceRecord): Promise<PushDeviceRecord>;
+    activeForUser(userId: string): Promise<PushDeviceRecord[]>;
+    disableTokens(tokens: string[], at: Date): Promise<void>;
+    remove(userId: string, id: string): Promise<boolean>;
+  };
+  notificationPreferences: {
+    get(userId: string): Promise<NotificationPreferenceRecord | null>;
+    put(rec: NotificationPreferenceRecord): Promise<void>;
+  };
+  /** Global, location-keyed weather: the provider cache and the daily history. */
+  weather: {
+    getCache(provider: string, locationKey: string, kind: WeatherCacheRecord["kind"]): Promise<WeatherCacheRecord | null>;
+    putCache(rec: WeatherCacheRecord): Promise<void>;
+    upsertObservations(recs: WeatherObservationRecord[]): Promise<void>;
+    observations(locationKey: string, from: string, to: string): Promise<WeatherObservationRecord[]>;
   };
   /** Atomic per-farm sequences (order numbers). */
   counters: { next(name: string, farmId: string, tx?: Tx): Promise<number> };

@@ -13,6 +13,11 @@ import type {
   ArticleRecord,
   MarketListingRecord,
   OrderRecord,
+  NotificationRecord,
+  PushDeviceRecord,
+  NotificationPreferenceRecord,
+  WeatherCacheRecord,
+  WeatherObservationRecord,
   UserRecord,
 } from "../../ports/records.js";
 import type { Repositories, Tx } from "../../ports/repositories.js";
@@ -70,6 +75,12 @@ import {
   TransactionModel,
   MarketListingModel,
   OrderPaymentModel,
+  AlertRuleModel,
+  NotificationModel,
+  PushDeviceModel,
+  NotificationPreferenceModel,
+  WeatherObservationModel,
+  WeatherCacheModel,
 } from "./models/index.js";
 import { createMongoFarmRepo } from "./farm-repo.js";
 
@@ -331,6 +342,80 @@ export function createMongoRepositories(connection = mongoose.connection): Repos
     transactions: createMongoFarmRepo(TransactionModel, { softDelete: false, versioned: false }),
     listings: createMongoFarmRepo(MarketListingModel, { softDelete: true, versioned: true }),
     orderPayments: createMongoFarmRepo(OrderPaymentModel, { softDelete: false, versioned: false }),
+    alertRules: createMongoFarmRepo(AlertRuleModel, { softDelete: false, versioned: true }),
+    notifications: {
+      async insertMany(recs, tx) {
+        if (recs.length) await NotificationModel.create(recs.map(toDoc), { ...s(tx), ordered: true });
+      },
+      async forUser(userId, q) {
+        const docs = await NotificationModel.find({ userId, channel: "in_app", ...(q.unreadOnly ? { readAt: null } : {}) }).sort({ createdAt: -1 }).limit(q.limit).lean();
+        return docs.map((d) => fromDoc<NotificationRecord>(d));
+      },
+      unreadCount: (userId) => NotificationModel.countDocuments({ userId, channel: "in_app", readAt: null }),
+      async markRead(userId, ids, at) {
+        const r = await NotificationModel.updateMany({ userId, channel: "in_app", readAt: null, ...(ids === "all" ? {} : { _id: { $in: ids } }) }, { $set: { readAt: at, status: "read", updatedAt: at } });
+        return r.modifiedCount;
+      },
+      async due(now, limit) {
+        const docs = await NotificationModel.find({ status: "queued", $or: [{ nextAttemptAt: null }, { nextAttemptAt: { $lte: now } }] }).limit(limit).lean();
+        return docs.map((d) => fromDoc<NotificationRecord>(d));
+      },
+      async update(id, patch) {
+        await NotificationModel.updateOne({ _id: id }, toUpdate(patch as Record<string, unknown>));
+      },
+      async lastForAlert(alertId, userId, channel) {
+        const d = await NotificationModel.findOne({ alertId, userId, channel }).sort({ createdAt: -1 }).lean();
+        return d ? fromDoc<NotificationRecord>(d) : null;
+      },
+    },
+    pushDevices: {
+      async upsertByToken(rec) {
+        const { id, createdAt, ...rest } = rec;
+        const d = await PushDeviceModel.findOneAndUpdate({ token: rec.token }, { $set: rest, $unset: { disabledAt: "" }, $setOnInsert: { _id: id, createdAt } }, { upsert: true, new: true }).lean();
+        return fromDoc<PushDeviceRecord>(d);
+      },
+      async activeForUser(userId) {
+        return (await PushDeviceModel.find({ userId, disabledAt: null }).lean()).map((d) => fromDoc<PushDeviceRecord>(d));
+      },
+      async disableTokens(tokens, at) {
+        if (tokens.length) await PushDeviceModel.updateMany({ token: { $in: tokens } }, { $set: { disabledAt: at, updatedAt: at } });
+      },
+      async remove(userId, id) {
+        return (await PushDeviceModel.deleteOne({ _id: id, userId })).deletedCount === 1;
+      },
+    },
+    notificationPreferences: {
+      get: async (userId) => {
+        const d = await NotificationPreferenceModel.findOne({ userId }).lean();
+        return d ? fromDoc<NotificationPreferenceRecord>(d) : null;
+      },
+      async put(rec) {
+        const { id, createdAt, ...rest } = rec;
+        await NotificationPreferenceModel.updateOne({ userId: rec.userId }, { $set: rest, $setOnInsert: { _id: id, createdAt } }, { upsert: true, runValidators: true });
+      },
+    },
+    weather: {
+      async getCache(provider, locationKey, kind) {
+        const d = await WeatherCacheModel.findOne({ provider, locationKey, kind }).lean();
+        return d ? fromDoc<WeatherCacheRecord>(d) : null;
+      },
+      async putCache(rec) {
+        const { id, createdAt, ...rest } = rec;
+        await WeatherCacheModel.updateOne({ provider: rec.provider, locationKey: rec.locationKey, kind: rec.kind }, { $set: rest, $setOnInsert: { _id: id, createdAt } }, { upsert: true });
+      },
+      async upsertObservations(recs) {
+        if (!recs.length) return;
+        await WeatherObservationModel.bulkWrite(
+          recs.map((r) => {
+            const { id, createdAt, ...rest } = r;
+            return { updateOne: { filter: { locationKey: r.locationKey, date: r.date }, update: { $set: rest, $setOnInsert: { _id: id, createdAt } }, upsert: true } };
+          }),
+        );
+      },
+      async observations(locationKey, from, to) {
+        return (await WeatherObservationModel.find({ locationKey, date: { $gte: from, $lte: to } }).sort({ date: 1 }).lean()).map((d) => fromDoc<WeatherObservationRecord>(d));
+      },
+    },
     // Cross-farm by design (marketplace browse and buyer views); callers check what each user may see.
     market: {
       async activeListings(q) {

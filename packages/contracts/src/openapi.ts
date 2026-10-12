@@ -242,7 +242,7 @@ post("/farms/invitations/accept", "Accept an emailed farm invitation", bodyOf(S.
   r("get", "/feed/stock", "Feed", "Feed stock with average daily use and days of feed remaining", farmParams, {}, { 200: json(any, "Stock") });
   r("get", "/feed/analytics", "Feed", "Per flock: feed per bird, per kg gain, FCR, wastage, feed cost per bird and per egg", farmParams, { query: V.FeedAnalyticsQuery }, { 200: json(any, "Analytics") });
   r("get", "/water-records", "Water", "Water records with source, quality, treatment and abnormal flags", farmParams, { query: V.WaterListQuery }, { 200: json(items, "Records") });
-  r("get", "/alerts", "Alerts", "Alerts", farmParams, { query: V.AlertListQuery }, { 200: json(items, "Alerts") });
+  r("get", "/alerts", "Alerts", "Alerts filtered by status, type, rule, severity or flock, with counts of what is open", farmParams, { query: V.AlertsQuery }, { 200: json(z.object({ items: z.array(z.record(z.unknown())), counts: z.record(z.unknown()) }), "Alerts and counts") });
   r("post", "/alerts/evaluate", "Alerts", "Re-check stock and expiry alerts now", farmParams, {}, { 200: json(any, "Done") });
   r("post", "/alerts/{alertId}/acknowledge", "Alerts", "Acknowledge an alert", z.object({ farmId: V.Id, alertId: V.Id }), {}, { 200: json(any, "Acknowledged") });
 }
@@ -400,6 +400,35 @@ post("/farms/invitations/accept", "Accept an emailed farm invitation", bodyOf(S.
   r("post", "/orders/{id}/cancel", M, "Cancel while pending or accepted", oid, bodyOf(V.ReasonRequest), { 200: json(any, "Cancelled") }, B);
   r("post", "/orders/{id}/received", M, "Confirm a dispatched order arrived", oid, {}, { 200: json(any, "Delivered") }, B);
   r("post", "/orders/{id}/complete", M, "Complete a delivered, paid order", oid, {}, { 200: json(any, "Completed") }, B);
+}
+
+// ---- Intelligence: dashboard, analytics, alert rules, weather, notifications -------
+{
+  const P = `${API_PREFIX}/farms/{farmId}`;
+  const any = z.record(z.unknown());
+  const items = z.object({ items: z.array(any) });
+  const r = (method: "get" | "post" | "put" | "delete", path: string, tag: string, summary: string, params: z.AnyZodObject, request: Record<string, unknown>, ok: Record<string, unknown>, prefix = P) =>
+    registry.registerPath({ method, path: `${prefix}${path}`, tags: [tag], summary, security: secured, request: { params, ...request }, responses: { ...ok, ...errors } } as never);
+  const I = "Intelligence";
+  const ruleParams = z.object({ farmId: V.Id, ruleKey: V.RuleKey });
+  r("get", "/dashboard", I, "Home screen in one call: production today, alerts, weather, the coming week, stock, hatchery, money (sections by permission)", farmParams, {}, { 200: json(any, "Dashboard") });
+  r("get", "/analytics", I, "Daily series with baseline bands and anomalies; flocks against the farm's past flocks; alert counts", farmParams, { query: V.AnalyticsQuery }, { 200: json(any, "Analytics") });
+  r("get", "/alert-rules", I, "All 14 rules with the farm's settings, parameters, ranges and defaults", farmParams, {}, { 200: json(items, "Rules") });
+  r("put", "/alert-rules/{ruleKey}", I, "Set a rule: on/off, parameters, severity, channels, roles, cooldown, scope", ruleParams, bodyOf(V.AlertRuleUpdateRequest), { 200: json(any, "Rule") });
+  r("delete", "/alert-rules/{ruleKey}", I, "Back to catalog defaults", ruleParams, {}, { 200: json(any, "Rule") });
+  r("get", "/weather", I, "Current weather, 7-day forecast, history and risks for the farm (cached; through the backend only)", farmParams, { query: V.WeatherQuery }, { 200: json(any, "Weather"), 503: json(S.ErrorEnvelope, "Weather unavailable and nothing cached") });
+  r("get", "/health/appointments", "FlockHealth", "Vet appointments", farmParams, { query: V.AppointmentListQuery }, { 200: json(items, "Appointments") });
+  r("post", "/health/appointments", "FlockHealth", "Book a vet appointment (reminded by the vet appointment rule)", farmParams, bodyOf(V.AppointmentRequest), { 201: json(any, "Booked") });
+  r("post", "/health/appointments/{id}/complete", "FlockHealth", "Mark an appointment done", z.object({ farmId: V.Id, id: V.Id }), bodyOf(V.CompleteAppointmentRequest), { 200: json(any, "Done") });
+  const M = `${API_PREFIX}/me`;
+  const N = "Notifications";
+  r("get", "/notifications", N, "Your in-app notifications across farms, with the unread count", z.object({}), { query: V.NotificationListQuery }, { 200: json(any, "Inbox") }, M);
+  r("post", "/notifications/read", N, "Mark notifications read", z.object({}), bodyOf(V.MarkReadRequest), { 200: json(any, "Marked") }, M);
+  r("post", "/notifications/read-all", N, "Mark all read", z.object({}), {}, { 200: json(any, "Marked") }, M);
+  r("post", "/push-devices", N, "Register this device for push", z.object({}), bodyOf(V.PushDeviceRequest), { 201: json(any, "Registered") }, M);
+  r("delete", "/push-devices/{id}", N, "Remove a device", z.object({ id: V.Id }), {}, { 204: { description: "Removed" } }, M);
+  r("get", "/notification-preferences", N, "Your push and email preferences", z.object({}), {}, { 200: json(any, "Preferences") }, M);
+  r("put", "/notification-preferences", N, "Set push and email on/off, minimum severity, muted rules", z.object({}), bodyOf(V.NotificationPreferencesRequest), { 200: json(any, "Preferences") }, M);
 }
 
 // ---- sync -----------------------------------------------------------------

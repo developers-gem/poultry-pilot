@@ -213,8 +213,10 @@ describe("alerts", () => {
 });
 
 describe("water", () => {
-  it("records source, quality and treatment; flags abnormal consumption and pH, and alerts", async () => {
+  it("records source, quality and treatment; flags abnormal consumption and pH (against the farm's own limit), and alerts", async () => {
     const s = await setup();
+    // No pH limit is assumed: the farm sets its own on the water rule.
+    await s.call("put", "/alert-rules/water_consumption").send({ enabled: true, parameters: { phMin: 6, phMax: 8 } });
     for (const n of [-4, -3, -2]) await s.call("put", `/flocks/${s.flock.id}/daily-records/${D(n)}`).send({ waterLitres: 400 });
     const day = (
       await s.call("put", `/flocks/${s.flock.id}/daily-records/${D(-1)}`).send({

@@ -114,5 +114,4 @@ export const WaterListQuery = z.object({
   limit: z.coerce.number().int().min(1).max(500).default(100),
 });
 
-export const AlertListQuery = z.object({ status: AlertStatus.optional(), ruleType: AlertRuleType.optional(), limit: z.coerce.number().int().min(1).max(200).default(50) });
 

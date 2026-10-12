@@ -11,3 +11,4 @@ export * from "./schemas/health.js";
 export * from "./schemas/biosecurity.js";
 export * from "./schemas/hatchery.js";
 export * from "./schemas/finance.js";
+export * from "./schemas/intelligence.js";

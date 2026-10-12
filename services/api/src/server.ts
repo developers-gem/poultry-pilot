@@ -3,7 +3,9 @@ import { localDiskMediaStorage } from "./adapters/storage.js";
 import { argon2Hasher, googleVerifier, logEmailSender } from "./adapters/external.js";
 import { createMongoRepositories } from "./adapters/mongo/index.js";
 import { createApp } from "./app.js";
-import { scheduleAlertJob } from "./jobs/alert-job.js";
+import { scheduleAlertJob, scheduleDelivery } from "./jobs/alert-job.js";
+import { openMeteoProvider } from "./adapters/weather.js";
+import { emailNotificationProvider, logPushProvider } from "./adapters/notify.js";
 import { loadEnv } from "./config/env.js";
 import { buildContainer } from "./container.js";
 import { createMongo } from "./db/mongo.js";
@@ -38,6 +40,8 @@ async function main(): Promise<void> {
     logger,
     hasher: argon2Hasher,
     media: localDiskMediaStorage(env.MEDIA_DIR),
+    weatherProvider: openMeteoProvider(),
+    notificationProviders: [emailNotificationProvider(logEmailSender(logger)), logPushProvider(logger)],
     email: logEmailSender(logger),
     ...(env.GOOGLE_CLIENT_IDS.length ? { google: googleVerifier(env.GOOGLE_CLIENT_IDS) } : {}),
     config: {
@@ -69,6 +73,7 @@ async function main(): Promise<void> {
   server.headersTimeout = 6_000;
   // Expiry alerts depend on the calendar, so stock alerts are re-checked hourly for every farm.
   const stopAlertJob = scheduleAlertJob(container, logger);
+  const stopDelivery = scheduleDelivery(container, logger);
   // Educational content ships with the API; loading it is idempotent.
   await container.content.seed().catch((err) => logger.error({ err }, "content seed failed"));
 
@@ -83,6 +88,7 @@ async function main(): Promise<void> {
     }, env.SHUTDOWN_TIMEOUT_MS);
     force.unref();
     stopAlertJob();
+    stopDelivery();
     // Stop accepting new connections; idle keep-alive sockets are closed now so close() can finish
     // once in-flight requests complete.
     const closed = new Promise<void>((resolve) => server.close(() => resolve()));

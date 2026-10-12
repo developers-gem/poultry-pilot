@@ -11,7 +11,7 @@ import type {
   UserRecord,
 } from "../../ports/records.js";
 import type { Repositories, Tx, TxRunner } from "../../ports/repositories.js";
-import type { SupplierRecord, MoneyAccountRecord, ExpenseRecord, IncomeRecord, RecurringExpenseRecord, TransactionRecord, MarketListingRecord, OrderPaymentRecord, HatcheryBatchRecord, HatcheryEventRecord, BuyerRecord, OrderRecord, BroodingProfileRecord, ChickArrivalRecord, BrooderCheckRecord, ArticleRecord, MedicineRecord, VaccinationProgrammeRecord, VaccinationRecord, ChecklistTemplateRecord, VisitorRecord, BiosecurityLogRecord, CleaningTaskRecord, EquipmentRecord, EquipmentMovementRecord, TaskRecord, AlertRecord, ChickLotRecord, InventoryItemRecord, InventoryLotRecord, InventoryTransactionRecord, BirdWeightRecord, DailyRecordRecord, EggInventoryRecord, EggRecordRecord, FeedConsumptionRecord, FlockEventRecord, FlockRecord, HealthRecordRecord, HouseRecord, MediaAssetRecord, WaterRecordRecord } from "../../ports/records.js";
+import type { AlertRuleRecord, NotificationRecord, PushDeviceRecord, NotificationPreferenceRecord, WeatherObservationRecord, WeatherCacheRecord, SupplierRecord, MoneyAccountRecord, ExpenseRecord, IncomeRecord, RecurringExpenseRecord, TransactionRecord, MarketListingRecord, OrderPaymentRecord, HatcheryBatchRecord, HatcheryEventRecord, BuyerRecord, OrderRecord, BroodingProfileRecord, ChickArrivalRecord, BrooderCheckRecord, ArticleRecord, MedicineRecord, VaccinationProgrammeRecord, VaccinationRecord, ChecklistTemplateRecord, VisitorRecord, BiosecurityLogRecord, CleaningTaskRecord, EquipmentRecord, EquipmentMovementRecord, TaskRecord, AlertRecord, ChickLotRecord, InventoryItemRecord, InventoryLotRecord, InventoryTransactionRecord, BirdWeightRecord, DailyRecordRecord, EggInventoryRecord, EggRecordRecord, FeedConsumptionRecord, FlockEventRecord, FlockRecord, HealthRecordRecord, HouseRecord, MediaAssetRecord, WaterRecordRecord } from "../../ports/records.js";
 import { createMemFarmRepo } from "./farm-repo.js";
 
 /**
@@ -97,6 +97,12 @@ export interface MemoryStore {
   transactions: Table<TransactionRecord>;
   listings: Table<MarketListingRecord>;
   orderPayments: Table<OrderPaymentRecord>;
+  alertRules: Table<AlertRuleRecord>;
+  notifications: Table<NotificationRecord>;
+  pushDevices: Table<PushDeviceRecord>;
+  notificationPreferences: Table<NotificationPreferenceRecord>;
+  weatherObservations: Table<WeatherObservationRecord>;
+  weatherCache: Table<WeatherCacheRecord>;
   counters: Map<string, number>;
 }
 
@@ -155,6 +161,12 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
     transactions: new Table(),
     listings: new Table(),
     orderPayments: new Table(),
+    alertRules: new Table(),
+    notifications: new Table(),
+    pushDevices: new Table(),
+    notificationPreferences: new Table(),
+    weatherObservations: new Table(),
+    weatherCache: new Table(),
     counters: new Map(),
   };
   const transactional = [
@@ -210,6 +222,12 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
     store.transactions,
     store.listings,
     store.orderPayments,
+    store.alertRules,
+    store.notifications,
+    store.pushDevices,
+    store.notificationPreferences,
+    store.weatherObservations,
+    store.weatherCache,
   ] as Table<unknown>[];
 
   let depth = 0;
@@ -465,6 +483,87 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
     transactions: createMemFarmRepo(store.transactions, { softDelete: false, versioned: false }),
     listings: createMemFarmRepo(store.listings, { softDelete: true, versioned: true }),
     orderPayments: createMemFarmRepo(store.orderPayments, { softDelete: false, versioned: false }),
+    alertRules: createMemFarmRepo(store.alertRules, { softDelete: false, versioned: true, unique: [["farmId", "ruleKey"]] }),
+    notifications: {
+      async insertMany(recs) {
+        for (const r of recs) store.notifications.put(r.id, structuredClone(r));
+      },
+      async forUser(userId, q) {
+        return store.notifications.all().filter((n) => n.userId === userId && n.channel === "in_app" && (!q.unreadOnly || !n.readAt)).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, q.limit).map((n) => structuredClone(n));
+      },
+      async unreadCount(userId) {
+        return store.notifications.all().filter((n) => n.userId === userId && n.channel === "in_app" && !n.readAt).length;
+      },
+      async markRead(userId, ids, at) {
+        let n = 0;
+        for (const r of store.notifications.all()) {
+          if (r.userId === userId && r.channel === "in_app" && !r.readAt && (ids === "all" || ids.includes(r.id))) {
+            store.notifications.put(r.id, { ...r, readAt: at, status: "read", updatedAt: at });
+            n++;
+          }
+        }
+        return n;
+      },
+      async due(now, limit) {
+        return store.notifications.all().filter((n) => n.status === "queued" && (!n.nextAttemptAt || n.nextAttemptAt <= now)).slice(0, limit).map((n) => structuredClone(n));
+      },
+      async update(id, patch) {
+        const r = store.notifications.get(id);
+        if (r) store.notifications.put(id, { ...r, ...patch });
+      },
+      async lastForAlert(alertId, userId, channel) {
+        return store.notifications.all().filter((n) => n.alertId === alertId && n.userId === userId && n.channel === channel).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null;
+      },
+    },
+    pushDevices: {
+      async upsertByToken(rec) {
+        const existing = store.pushDevices.all().find((d) => d.token === rec.token);
+        const next = existing ? { ...existing, userId: rec.userId, platform: rec.platform, ...(rec.deviceName ? { deviceName: rec.deviceName } : {}), lastSeenAt: rec.lastSeenAt, disabledAt: undefined, updatedAt: rec.updatedAt } : rec;
+        store.pushDevices.put(next.id, structuredClone(next));
+        return structuredClone(next);
+      },
+      async activeForUser(userId) {
+        return store.pushDevices.all().filter((d) => d.userId === userId && !d.disabledAt).map((d) => structuredClone(d));
+      },
+      async disableTokens(tokens, at) {
+        for (const d of store.pushDevices.all()) if (tokens.includes(d.token)) store.pushDevices.put(d.id, { ...d, disabledAt: at, updatedAt: at });
+      },
+      async remove(userId, id) {
+        const d = store.pushDevices.get(id);
+        if (!d || d.userId !== userId) return false;
+        store.pushDevices.rows.delete(id);
+        return true;
+      },
+    },
+    notificationPreferences: {
+      async get(userId) {
+        const r = store.notificationPreferences.all().find((p) => p.userId === userId);
+        return r ? structuredClone(r) : null;
+      },
+      async put(rec) {
+        const existing = store.notificationPreferences.all().find((p) => p.userId === rec.userId);
+        store.notificationPreferences.put(existing?.id ?? rec.id, structuredClone({ ...rec, id: existing?.id ?? rec.id }));
+      },
+    },
+    weather: {
+      async getCache(provider, locationKey, kind) {
+        const r = store.weatherCache.all().find((c) => c.provider === provider && c.locationKey === locationKey && c.kind === kind);
+        return r ? structuredClone(r) : null;
+      },
+      async putCache(rec) {
+        const existing = store.weatherCache.all().find((c) => c.provider === rec.provider && c.locationKey === rec.locationKey && c.kind === rec.kind);
+        store.weatherCache.put(existing?.id ?? rec.id, structuredClone({ ...rec, id: existing?.id ?? rec.id }));
+      },
+      async upsertObservations(recs) {
+        for (const r of recs) {
+          const existing = store.weatherObservations.all().find((o) => o.locationKey === r.locationKey && o.date === r.date);
+          store.weatherObservations.put(existing?.id ?? r.id, structuredClone({ ...r, id: existing?.id ?? r.id, createdAt: existing?.createdAt ?? r.createdAt }));
+        }
+      },
+      async observations(locationKey, from, to) {
+        return store.weatherObservations.all().filter((o) => o.locationKey === locationKey && o.date >= from && o.date <= to).sort((a, b) => (a.date < b.date ? -1 : 1)).map((o) => structuredClone(o));
+      },
+    },
     market: {
       async activeListings(q) {
         const t = q.text?.toLowerCase();

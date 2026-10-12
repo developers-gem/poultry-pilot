@@ -2,7 +2,7 @@
 
 How the MongoDB collections fit together and the rules every collection follows. The field-by-field reference is the generated [data dictionary](data-dictionary.md); schemas live in `services/api/src/adapters/mongo/models/`.
 
-60 collections: the 53 product collections, plus 7 for authentication and infrastructure (`sessions`, `refresh_tokens`, `one_time_tokens`, `sync_changes`, `idempotency_keys`, `counters`, `media_assets`). 98 secondary indexes, each tied to a named query.
+63 collections: the 56 product collections, plus 7 for authentication and infrastructure (`sessions`, `refresh_tokens`, `one_time_tokens`, `sync_changes`, `idempotency_keys`, `counters`, `media_assets`). 103 secondary indexes, each tied to a named query.
 
 ## Conventions
 
@@ -23,8 +23,8 @@ How the MongoDB collections fit together and the rules every collection follows.
 | --- | --- | --- | --- |
 | Farm | 45 collections, e.g. flocks, daily_records, inventory_lots, hatchery_batches, incomes, money_accounts, sync_operations | `farmId`, `createdBy` (required), `updatedBy`, `version`, soft delete unless append-only | Every query includes `farmId`; the `requireFarmScope` plugin throws if it is missing. Indexes start with `farmId` |
 | Tenant | farms | `createdBy`, `version`, soft delete | Read by `_id` after a membership check |
-| User | users, sessions, refresh/one-time tokens, notifications, training_progress | per collection | Queried by `userId` of the signed-in person |
-| Global | training_courses, articles, glossary_terms, market_prices, weather_cache | `createdBy`/`updatedBy` optional (staff or import job) | Readable by any signed-in user; written by staff tools or jobs |
+| User | users, sessions, refresh/one-time tokens, notifications, push_devices, notification_preferences, training_progress | per collection | Queried by `userId` of the signed-in person |
+| Global | training_courses, articles, glossary_terms, market_prices, weather_cache, weather_observations (location-keyed) | `createdBy`/`updatedBy` optional (staff or import job) | Readable by any signed-in user; written by staff tools or jobs |
 | System | audit_logs, idempotency_keys, counters | none (actor is a domain field, e.g. `actorUserId`) | Written by the API only |
 
 `createdBy` is required on every farm record people create. It is absent only where no person writes the record (sessions, tokens, sync, audit, cache, notifications) — listed and enforced in `schema.test.ts`.
@@ -94,6 +94,9 @@ When a record changes, the service writes these in **one transaction** (MongoDB 
 | Biosecurity log | `biosecurity_logs` + `inventory_transactions` for products + `tasks` / alerts for problems found |
 | Complete a cleaning schedule | `biosecurity_logs` + `cleaning_tasks.lastDoneDate/nextDueDate` |
 | Move equipment | `equipment_movements` + `equipment.houseId`; corrective action if not disinfected |
+| Any alert raised (any module) | checked against `alert_rules` (on/off, scope, severity) → `alerts` → `notifications` (in-app delivered; push and email queued) |
+| Delivery worker | `notifications.status/attempts/nextAttemptAt`; invalid `push_devices` disabled |
+| Weather fetched | `weather_cache` (1 hour) + `weather_observations` (past days upserted) |
 | Accept an order | `orders.status` + `market_listings.quantityAvailable` (reserved) + `incomes` receivable |
 | Deliver an order | `orders.status/delivery` + stock: `egg_inventory` (sold), `flock_events` (sale with orderId) or `chicks.remaining` |
 | Cancel an order | `orders.status` + reservation returned + receivable cancelled (refused while payments stand) |

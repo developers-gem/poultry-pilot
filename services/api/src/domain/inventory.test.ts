@@ -70,8 +70,10 @@ describe("water evaluation", () => {
   it("needs a baseline before judging consumption", () => {
     expect(evaluateWater({ litres: 10, previousDays: [200, 200] })).toMatchObject({ flags: [], baselineLitres: null });
   });
-  it("flags pH and dissolved solids outside the limits", () => {
-    expect(evaluateWater({ litres: 200, ph: 5.5, previousDays: [] }).flags).toEqual(["ph_low"]);
-    expect(evaluateWater({ litres: 200, ph: 8.4, tdsPpm: 1500, previousDays: [] }).flags).toEqual(["ph_high", "tds_high"]);
+  it("flags pH and dissolved solids only against limits the farm set; none are assumed", () => {
+    expect(evaluateWater({ litres: 200, ph: 5.5, tdsPpm: 5000, previousDays: [] }).flags).toEqual([]);
+    const rules = { deviationPercent: 20, minBaselineDays: 3, phMin: 6, phMax: 8, tdsMaxPpm: 1000 };
+    expect(evaluateWater({ litres: 200, ph: 5.5, previousDays: [], rules }).flags).toEqual(["ph_low"]);
+    expect(evaluateWater({ litres: 200, ph: 8.4, tdsPpm: 1500, previousDays: [], rules }).flags).toEqual(["ph_high", "tds_high"]);
   });
 });

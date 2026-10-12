@@ -20,7 +20,7 @@ export const fakeHasher: PasswordHasher = {
 
 export const upHealth: HealthChecks = { mongodb: async () => ({ status: "up", latencyMs: 1 }) };
 
-export function makeApp(opts: { hasher?: PasswordHasher; rateLimit?: number; globalRateLimit?: number; health?: HealthChecks; bodyLimit?: string; google?: GoogleTokenVerifier; maxFailedLogins?: number } = {}) {
+export function makeApp(opts: { hasher?: PasswordHasher; rateLimit?: number; globalRateLimit?: number; health?: HealthChecks; bodyLimit?: string; google?: GoogleTokenVerifier; maxFailedLogins?: number; weatherProvider?: import("../ports/external.js").WeatherProvider; notificationProviders?: import("../ports/external.js").NotificationProvider[] } = {}) {
   const { repos, store } = createMemoryRepositories();
   const email = memoryEmailSender();
   const container = buildContainer({
@@ -30,6 +30,8 @@ export function makeApp(opts: { hasher?: PasswordHasher; rateLimit?: number; glo
     hasher: opts.hasher ?? fakeHasher,
     email,
     ...(opts.google ? { google: opts.google } : {}),
+    ...(opts.weatherProvider ? { weatherProvider: opts.weatherProvider } : {}),
+    ...(opts.notificationProviders ? { notificationProviders: opts.notificationProviders } : {}),
     config: {
       version: "0.1.0-test",
       environment: "test",

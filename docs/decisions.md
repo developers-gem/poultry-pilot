@@ -142,3 +142,16 @@ Each is cheap to change until the phase named.
 | D83 | Listing reservation | Quantity reserved on acceptance (refused beyond what is left), returned on cancellation |
 | D84 | Marketplace privacy and pricing | Listings never carry seller contact; buyers see it after acceptance; prices come only from the listing (fixes B8) |
 | D85 | Delivery moves stock | Eggs, chick lots, or a flock sale through the flock engine (withdrawal periods apply; the order carries the income) |
+
+## Added with the intelligence layer
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| D86 | Thresholds | No universal poultry thresholds: production rules compare a flock with its own recent days or the farm's own past flocks; absolute limits, targets and weather limits have no default and apply only when the farm sets them |
+| D87 | Water quality defaults | FeedWise's fixed pH (6–8) and TDS (1000 ppm) defaults removed; set on the water rule |
+| D88 | One gate for all alerts | Every alert, from any module, passes its governing rule (on/off, scope, severity) and then the notifier |
+| D89 | Alert lifecycles | Production alerts are per day and stay until handled; condition and schedule alerts (FCR, vaccination, appointment, hatch, delivery, payment, weather) resolve themselves when the condition clears |
+| D90 | Overdue payments | Only documents with a due date someone set can be overdue; others are aged in reports, not alerted |
+| D91 | Weather | Backend-only behind a provider port (Open-Meteo by default); cached 1 hour per ~5 km location; daily observations kept as history and used as the farm's weather baseline; stale cache served when the provider fails |
+| D92 | Notifications | Providers per channel behind a port; in-app always stored; push and email queued with retries and backoff; recipients by rule roles and money permission; personal preferences and mutes; cooldown except on escalation |
+| D93 | Dashboard | One call, sections by permission, each section isolated so a failure (e.g. weather) never breaks the rest |

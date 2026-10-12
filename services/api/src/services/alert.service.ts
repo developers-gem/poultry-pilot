@@ -1,9 +1,10 @@
-import { addDays, averageDailyUseKg, daysOfCover, expiryStatus, isExpired, lastNDates, localDateOf, q3 } from "../domain/index.js";
+import { RULE_DEFINITIONS, addDays, averageDailyUseKg, daysOfCover, expiryStatus, isExpired, lastNDates, localDateOf, q3 } from "../domain/index.js";
 import { AppError, notFound } from "../lib/errors.js";
 import { newId, type Clock } from "../lib/util.js";
 import type { Repositories, Tx } from "../ports/repositories.js";
 import type { AlertRecord } from "../ports/records.js";
 import { assertCan, type FarmContext } from "./context.js";
+import type { EffectiveRule } from "./rules.service.js";
 
 export interface RaiseInput {
   ruleType: AlertRecord["ruleType"];
@@ -29,21 +30,45 @@ const alertView = ({ farmId: _f, updatedBy: _u, ...a }: AlertRecord) => ({
  * Alerts are keyed by dedupKey: raising the same condition again does nothing while it is open, reopens it if it
  * had been resolved, and resolve() closes it when the condition clears (e.g. after restocking).
  */
+/** Wired in the container: the farm's rule settings, and the notifier for new, reopened or escalated alerts. */
+export interface AlertHooks {
+  ruleFor?: (ctx: FarmContext, alertType: AlertRecord["ruleType"], tx?: Tx) => Promise<EffectiveRule | undefined>;
+  onRaised?: (ctx: FarmContext, alert: AlertRecord, rule: EffectiveRule | undefined, reason: "new" | "reopened" | "escalated", tx?: Tx) => Promise<void>;
+}
+
+const SEVERITY_RANK = { info: 0, warning: 1, critical: 2 } as const;
+
 export function createAlertService(d: { repos: Repositories; clock: Clock }) {
   const { repos, clock } = d;
+  const hooks: AlertHooks = {};
 
+  /**
+   * Every alert in PoultryPilot comes through here, so the farm's rule settings always apply: a rule switched off
+   * raises nothing (and resolves what it had raised), severity and scope follow the farm, and new, reopened or
+   * escalated alerts are handed to the notifier.
+   */
   async function raise(ctx: FarmContext, a: RaiseInput, tx?: Tx) {
+    const rule = await hooks.ruleFor?.(ctx, a.ruleType, tx);
+    if (rule && !rule.enabled) return resolve(ctx, a.dedupKey, tx);
+    if (rule?.flockIds && a.flockId && !rule.flockIds.includes(a.flockId)) return;
+    if (rule?.houseIds && a.houseId && !rule.houseIds.includes(a.houseId)) return;
+    const severity = rule?.severity ?? a.severity;
+    const input = { ...a, severity };
     const existing = (await repos.alerts.find(ctx.farmId, { where: { dedupKey: a.dedupKey }, limit: 1 }, tx))[0];
     const now = clock.now();
     if (existing) {
       if (existing.status === "resolved") {
-        await repos.alerts.update(ctx.farmId, existing.id, { status: "open", severity: a.severity, title: a.title, message: a.message, values: a.values, resolvedAt: undefined, acknowledgedAt: undefined, acknowledgedBy: undefined, updatedAt: now }, undefined, tx);
-      } else if (existing.severity !== a.severity || existing.message !== a.message) {
-        await repos.alerts.update(ctx.farmId, existing.id, { severity: a.severity, title: a.title, message: a.message, values: a.values, updatedAt: now }, undefined, tx);
+        const next = await repos.alerts.update(ctx.farmId, existing.id, { status: "open", severity, title: a.title, message: a.message, values: a.values, resolvedAt: undefined, acknowledgedAt: undefined, acknowledgedBy: undefined, updatedAt: now }, undefined, tx);
+        if (next) await hooks.onRaised?.(ctx, next, rule, "reopened", tx);
+      } else if (existing.severity !== severity || existing.message !== a.message) {
+        const next = await repos.alerts.update(ctx.farmId, existing.id, { severity, title: a.title, message: a.message, values: a.values, updatedAt: now }, undefined, tx);
+        if (next && SEVERITY_RANK[severity] > SEVERITY_RANK[existing.severity]) await hooks.onRaised?.(ctx, next, rule, "escalated", tx);
       }
       return;
     }
-    await repos.alerts.insert({ id: newId(), farmId: ctx.farmId, status: "open", createdBy: "system", createdAt: now, updatedAt: now, version: 0, ...a }, tx);
+    const rec: AlertRecord = { id: newId(), farmId: ctx.farmId, status: "open", createdBy: "system", createdAt: now, updatedAt: now, version: 0, ...input };
+    await repos.alerts.insert(rec, tx);
+    await hooks.onRaised?.(ctx, rec, rule, "new", tx);
   }
 
   async function resolve(ctx: FarmContext, dedupKey: string, tx?: Tx) {
@@ -105,16 +130,30 @@ export function createAlertService(d: { repos: Repositories; clock: Clock }) {
   }
 
   return {
+    hooks,
     raise,
     resolve,
     evaluateInventory,
 
-    async list(ctx: FarmContext, q: { status?: AlertRecord["status"]; ruleType?: AlertRecord["ruleType"]; limit: number }) {
+    /** Alerts with filters (status, type, rule, severity, flock) and counts of what is open. */
+    async list(ctx: FarmContext, q: { status?: AlertRecord["status"]; ruleType?: AlertRecord["ruleType"]; ruleKey?: string; severity?: AlertRecord["severity"]; flockId?: string; limit: number }) {
       assertCan(ctx, "farm.read");
       const where: Record<string, unknown> = {};
       if (q.status) where["status"] = q.status;
       if (q.ruleType) where["ruleType"] = q.ruleType;
-      return (await repos.alerts.find(ctx.farmId, { where: where as never, sort: [{ field: "updatedAt", dir: -1 }], limit: q.limit })).map(alertView);
+      else if (q.ruleKey) where["ruleType"] = RULE_DEFINITIONS[q.ruleKey as keyof typeof RULE_DEFINITIONS]?.alertTypes ?? [];
+      if (q.severity) where["severity"] = q.severity;
+      if (q.flockId) where["flockId"] = q.flockId;
+      const items = (await repos.alerts.find(ctx.farmId, { where: where as never, sort: [{ field: "updatedAt", dir: -1 }], limit: q.limit })).map(alertView);
+      const open = await repos.alerts.find(ctx.farmId, { where: { status: ["open", "acknowledged"] } as never });
+      return {
+        items,
+        counts: {
+          open: open.filter((a) => a.status === "open").length,
+          acknowledged: open.filter((a) => a.status === "acknowledged").length,
+          bySeverity: { critical: open.filter((a) => a.severity === "critical").length, warning: open.filter((a) => a.severity === "warning").length, info: open.filter((a) => a.severity === "info").length },
+        },
+      };
     },
 
     async acknowledge(ctx: FarmContext, id: string) {

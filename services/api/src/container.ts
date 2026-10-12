@@ -18,6 +18,12 @@ import { createChickStartService } from "./services/chickstart.service.js";
 import { createCalendarService } from "./services/calendar.service.js";
 import { createFinanceService } from "./services/finance.service.js";
 import { createMarketService } from "./services/market.service.js";
+import { createRulesService } from "./services/rules.service.js";
+import { createNotificationService } from "./services/notification.service.js";
+import { createWeatherService } from "./services/weather.service.js";
+import { createIntelligenceService } from "./services/intelligence.service.js";
+import { createDashboardService } from "./services/dashboard.service.js";
+import type { NotificationProvider, WeatherProvider } from "./ports/external.js";
 import { FeedConsumptionRequest } from "@poultrypilot/validation";
 import type { HealthChecks } from "./ports/health.js";
 import type { Repositories } from "./ports/repositories.js";
@@ -58,6 +64,10 @@ export interface ContainerDeps {
   google?: GoogleTokenVerifier;
   /** Photo storage. Defaults to in-memory (tests); server.ts passes local disk or S3. */
   media?: MediaStorage;
+  /** Weather source (server.ts: Open-Meteo). Without one, weather is unavailable. */
+  weatherProvider?: WeatherProvider;
+  /** Push and email delivery providers (server.ts: email through EmailSender, push through a log provider). */
+  notificationProviders?: NotificationProvider[];
   clock?: Clock;
 }
 
@@ -103,6 +113,17 @@ export function buildContainer(d: ContainerDeps) {
   flocks.hooks.extraCostMinor.push(finance.flockExtraCostMinor);
   flocks.hooks.extraIncomeMinor.push(finance.flockExtraIncomeMinor);
   const alerts = createAlertService({ repos: d.repos, clock });
+  // Every alert follows the farm's rule settings and is fanned out by the notifier.
+  const rules = createRulesService({ repos: d.repos, clock, audit });
+  const notifications = createNotificationService({ repos: d.repos, clock, providers: d.notificationProviders ?? [] });
+  alerts.hooks.ruleFor = rules.forAlertType;
+  alerts.hooks.onRaised = notifications.onAlert;
+  const weather = createWeatherService({
+    repos: d.repos,
+    clock,
+    rules,
+    provider: d.weatherProvider ?? { name: "none", fetch: async () => { throw new Error("no weather provider configured"); } },
+  });
   const inventory = createInventoryService({ repos: d.repos, clock, audit, sync, onStockChanged: (ctx, tx) => alerts.evaluateInventory(ctx, tx) });
   inventory.hooks.afterPurchase.push(finance.onInventoryPurchase);
   const feed = createFeedService({ repos: d.repos, clock, audit, sync, inventory, flocks });
@@ -117,7 +138,12 @@ export function buildContainer(d: ContainerDeps) {
   const chickStart = createChickStartService({ repos: d.repos, clock, audit, flocks, biosecurity, alerts });
   const calendar = createCalendarService({ repos: d.repos, clock });
   const market = createMarketService({ repos: d.repos, clock, audit, sync, finance, flocks, inventory, hatchery });
-  const dailyRecords = createDailyRecordService({ repos: d.repos, clock, audit, sync, flocks, feed, alerts, afterEggsWritten: flockHealth.refreshWithheldEggs });
+  const dailyRecords = createDailyRecordService({ repos: d.repos, clock, audit, sync, flocks, feed, alerts, afterEggsWritten: flockHealth.refreshWithheldEggs,
+    waterRules: async (ctx, tx) => {
+      const r = await rules.config(ctx, "water_consumption", tx);
+      return { deviationPercent: r.params["deviationPercent"] ?? 20, minBaselineDays: r.params["minBaselineDays"] ?? 3, windowDays: r.params["windowDays"] ?? 7, ...(r.params["phMin"] !== undefined ? { phMin: r.params["phMin"] } : {}), ...(r.params["phMax"] !== undefined ? { phMax: r.params["phMax"] } : {}), ...(r.params["tdsMaxPpm"] !== undefined ? { tdsMaxPpm: r.params["tdsMaxPpm"] } : {}) } as never;
+    },
+  });
   const media = createMediaService({ repos: d.repos, clock, audit, storage: d.media ?? memoryMediaStorage() });
 
   // Offline field-recording commands (Flutter outbox). Same service methods, same rules, as REST.
@@ -158,6 +184,9 @@ export function buildContainer(d: ContainerDeps) {
     },
   });
 
+  const intelligence = createIntelligenceService({ repos: d.repos, clock, alerts, rules, flocks, weather });
+  const dashboard = createDashboardService({ repos: d.repos, clock, dailyRecords, weather, calendar, inventory, feed, hatchery, finance, flocks, intelligence, rules });
+
   const FeedCommand = FeedConsumptionRequest;
   sync.register("feed.consume", {
     action: "inventory.issue",
@@ -167,7 +196,7 @@ export function buildContainer(d: ContainerDeps) {
     },
   });
 
-  return { ...d, clock, startedAt: clock.now(), accessTokens, audit, sync, auth, farms, houses, flocks, dailyRecords, media, inventory, feed, alerts, flockHealth, biosecurity, content, hatchery, chickStart, calendar, finance, market };
+  return { ...d, clock, startedAt: clock.now(), accessTokens, audit, sync, auth, farms, houses, flocks, dailyRecords, media, inventory, feed, alerts, flockHealth, biosecurity, content, hatchery, chickStart, calendar, finance, market, rules, notifications, weather, intelligence, dashboard };
 }
 
 export type Container = ReturnType<typeof buildContainer>;

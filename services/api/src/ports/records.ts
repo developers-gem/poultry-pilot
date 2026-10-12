@@ -628,7 +628,7 @@ export interface EquipmentMovementRecord extends FarmOwned {
 }
 
 export interface TaskRecord extends Editable {
-  kind: "general" | "corrective_action" | "follow_up";
+  kind: "general" | "corrective_action" | "follow_up" | "vet_appointment";
   title: string;
   description?: string;
   assigneeUserId?: string;
@@ -945,4 +945,95 @@ export interface OrderPaymentRecord extends FarmOwned {
   transactionId?: string;
   accountId?: string;
   note?: string;
+}
+
+// ---- intelligence, weather, notifications ----------------------------------------------
+
+export type RuleKeyValue = (typeof import("@poultrypilot/constants").RULE_KEYS)[number];
+export type ChannelValue = "in_app" | "push" | "email" | "sms" | "whatsapp";
+
+export interface AlertRuleRecord extends Editable {
+  ruleKey: RuleKeyValue;
+  enabled: boolean;
+  parameters?: Record<string, number>;
+  flockIds?: string[];
+  houseIds?: string[];
+  severity?: "info" | "warning" | "critical";
+  notifyRoles?: import("@poultrypilot/types").Role[];
+  channels?: ChannelValue[];
+  cooldownHours: number;
+}
+
+export interface NotificationRecord {
+  id: string;
+  userId: string;
+  farmId?: string;
+  channel: ChannelValue;
+  status: "queued" | "sent" | "delivered" | "failed" | "read";
+  title: string;
+  body?: string;
+  link?: { entity?: string; id?: string; path?: string };
+  alertId?: string;
+  ruleKey?: RuleKeyValue;
+  severity?: "info" | "warning" | "critical";
+  sentAt?: Date;
+  deliveredAt?: Date;
+  readAt?: Date;
+  attempts: number;
+  nextAttemptAt?: Date;
+  providerMessageId?: string;
+  error?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface PushDeviceRecord {
+  id: string;
+  userId: string;
+  platform: "ios" | "android" | "web";
+  token: string;
+  deviceName?: string;
+  lastSeenAt: Date;
+  disabledAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface NotificationPreferenceRecord {
+  id: string;
+  userId: string;
+  pushEnabled: boolean;
+  emailEnabled: boolean;
+  pushMinSeverity: "info" | "warning" | "critical";
+  emailMinSeverity: "info" | "warning" | "critical";
+  mutedRuleKeys?: RuleKeyValue[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface WeatherObservationRecord {
+  id: string;
+  provider: string;
+  locationKey: string;
+  date: string;
+  tempMaxC?: number;
+  tempMinC?: number;
+  humidityMaxPercent?: number;
+  humidityMinPercent?: number;
+  rainMm?: number;
+  windMaxKph?: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface WeatherCacheRecord {
+  id: string;
+  provider: string;
+  locationKey: string;
+  kind: "current" | "hourly" | "daily";
+  data: unknown;
+  fetchedAt: Date;
+  expiresAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }

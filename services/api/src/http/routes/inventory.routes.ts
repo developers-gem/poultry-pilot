@@ -1,5 +1,5 @@
 import {
-  AlertListQuery,
+  AlertsQuery,
   ChickLotsQuery,
   CreateInventoryItemRequest,
   EggMovementRequest,
@@ -82,11 +82,11 @@ export function waterRoutes(feed: FeedService, farms: FarmService): Router {
 }
 
 /** /api/v1/farms/:farmId/alerts */
-export function alertRoutes(alerts: AlertService, farms: FarmService): Router {
+export function alertRoutes(alerts: AlertService, farms: FarmService, evaluate: (ctx: import("../../services/context.js").FarmContext) => Promise<unknown>): Router {
   const r = Router({ mergeParams: true });
   const farm = [validate("params", z.object({ farmId: Id })), requireFarm(farms)];
-  r.get("/", ...farm, requirePermission("farm.read"), validate("query", AlertListQuery), async (req, res) => res.json({ items: await alerts.list(req.farmCtx!, q(req)) }));
-  r.post("/evaluate", ...farm, requirePermission("alert.manage"), async (req, res) => res.json(await alerts.evaluate(req.farmCtx!)));
+  r.get("/", ...farm, requirePermission("farm.read"), validate("query", AlertsQuery), async (req, res) => res.json(await alerts.list(req.farmCtx!, q(req))));
+  r.post("/evaluate", ...farm, requirePermission("alert.manage"), async (req, res) => res.json({ evaluatedAt: new Date().toISOString(), rules: await evaluate(req.farmCtx!) }));
   r.post("/:alertId/acknowledge", validate("params", z.object({ farmId: Id, alertId: Id })), requireFarm(farms), requirePermission("alert.manage"), async (req, res) => {
     res.json(await alerts.acknowledge(req.farmCtx!, req.params["alertId"] as string));
   });

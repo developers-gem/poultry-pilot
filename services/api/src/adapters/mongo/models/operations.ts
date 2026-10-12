@@ -1,6 +1,8 @@
 import {
   ALERT_RULE_TYPES,
   ALERT_SEVERITIES,
+  PUSH_PLATFORMS,
+  RULE_KEYS,
   ALERT_STATUSES,
   NOTIFICATION_CHANNELS,
   NOTIFICATION_STATUSES,
@@ -11,7 +13,7 @@ import {
   WEATHER_KINDS,
 } from "@poultrypilot/constants";
 import { Schema } from "mongoose";
-import { bool, defineCollection, enumOf, instant, int, localDate, ref, refs, str, text } from "./base.js";
+import { bool, defineCollection, enumOf, instant, int, localDate, num, ref, refs, str, text } from "./base.js";
 
 const D = "Operations";
 
@@ -50,18 +52,20 @@ export const AlertRuleModel = defineCollection({
   collection: "alert_rules",
   domain: D,
   ownership: "farm",
-  description: "A farm's configuration of one alert type: on/off, thresholds, scope and who is notified. Defaults apply when absent.",
+  description:
+    "A farm's settings for one rule from the catalog (mortality, egg production, feed, water, weight, FCR, stock, expiry, vaccination, vet appointment, hatch, delivery, payment, weather): on or off, parameters, scope, severity, who is told and how. Absent = catalog defaults, which compare with the farm's own history.",
   fields: {
-    ruleType: enumOf(ALERT_RULE_TYPES, { required: true }),
+    ruleKey: enumOf(RULE_KEYS, { required: true }),
     enabled: bool(true),
     parameters: { type: Map, of: Number, default: undefined },
     flockIds: refs("Flock"),
     houseIds: refs("House"),
+    severity: enumOf(ALERT_SEVERITIES),
     notifyRoles: { type: [enumOf(ROLES)], default: undefined },
     channels: { type: [enumOf(NOTIFICATION_CHANNELS)], default: undefined },
     cooldownHours: int({ default: 24, max: 720 }),
   },
-  indexes: [{ fields: { farmId: 1, ruleType: 1 }, options: { unique: true }, why: "Load a farm's rules for the alert job; one rule per type per farm" }],
+  indexes: [{ fields: { farmId: 1, ruleKey: 1 }, options: { unique: true }, why: "Load a farm's rule settings; one per rule per farm" }],
 });
 
 export const AlertModel = defineCollection({
@@ -98,7 +102,8 @@ export const NotificationModel = defineCollection({
   domain: D,
   ownership: "user",
   actor: "none",
-  description: "A message to one person (in-app, push, email, SMS, WhatsApp) with delivery state. Kept 180 days.",
+  description:
+    "A message to one person on one channel (in-app, push, email) with delivery state. Push and email are queued and sent by the delivery worker through replaceable providers, with retries. Kept 180 days.",
   fields: {
     userId: ref("User", { required: true }),
     farmId: ref("Farm"),
@@ -108,15 +113,79 @@ export const NotificationModel = defineCollection({
     body: text(2000),
     link: { type: new Schema({ entity: str({ max: 40 }), id: { type: String }, path: str({ max: 300 }) }, { _id: false }) },
     alertId: ref("Alert"),
+    ruleKey: enumOf(RULE_KEYS),
+    severity: enumOf(ALERT_SEVERITIES),
     sentAt: instant(),
     deliveredAt: instant(),
     readAt: instant(),
+    attempts: int({ default: 0, max: 20 }),
+    nextAttemptAt: instant(),
+    providerMessageId: str({ max: 200 }),
     error: str({ max: 500 }),
   },
   indexes: [
     { fields: { userId: 1, createdAt: -1 }, why: "A person's notification inbox, newest first; unread count" },
+    { fields: { status: 1, nextAttemptAt: 1 }, options: { partialFilterExpression: { status: "queued" } }, why: "Delivery queue: queued push and email notifications due for an attempt" },
     { fields: { createdAt: 1 }, options: { expireAfterSeconds: 180 * 86_400 }, why: "TTL: delete notifications after 180 days" },
   ],
+});
+
+export const PushDeviceModel = defineCollection({
+  model: "PushDevice",
+  collection: "push_devices",
+  domain: D,
+  ownership: "user",
+  description: "A phone or browser registered for push notifications. Tokens the provider reports as invalid are disabled.",
+  fields: {
+    userId: ref("User", { required: true }),
+    platform: enumOf(PUSH_PLATFORMS, { required: true }),
+    token: str({ required: true, max: 4096, trim: false }),
+    deviceName: str({ max: 100 }),
+    lastSeenAt: instant({ required: true }),
+    disabledAt: instant(),
+  },
+  indexes: [
+    { fields: { token: 1 }, options: { unique: true }, why: "One registration per token (re-registering moves it to the signed-in user)" },
+    { fields: { userId: 1 }, why: "A person's devices when sending a push" },
+  ],
+});
+
+export const NotificationPreferenceModel = defineCollection({
+  model: "NotificationPreference",
+  collection: "notification_preferences",
+  domain: D,
+  ownership: "user",
+  description: "How a person wants to be told: push and email on or off, the lowest severity for each, and rules they have muted. In-app notifications are always kept.",
+  fields: {
+    userId: ref("User", { required: true }),
+    pushEnabled: bool(true),
+    emailEnabled: bool(true),
+    pushMinSeverity: enumOf(ALERT_SEVERITIES, { required: true, default: "warning" }),
+    emailMinSeverity: enumOf(ALERT_SEVERITIES, { required: true, default: "warning" }),
+    mutedRuleKeys: { type: [enumOf(RULE_KEYS)], default: undefined },
+  },
+  indexes: [{ fields: { userId: 1 }, options: { unique: true }, why: "One preference document per person" }],
+});
+
+export const WeatherObservationModel = defineCollection({
+  model: "WeatherObservation",
+  collection: "weather_observations",
+  domain: D,
+  ownership: "global",
+  actor: "none",
+  description: "Observed daily weather for a location (temperature, humidity, rain, wind), kept as history. Shared by every farm near that point; weather rules use it as the farm's own baseline.",
+  fields: {
+    provider: str({ required: true, max: 40 }),
+    locationKey: str({ required: true, max: 40 }),
+    date: localDate({ required: true }),
+    tempMaxC: num({ min: -90, max: 70 }),
+    tempMinC: num({ min: -90, max: 70 }),
+    humidityMaxPercent: num({ max: 100 }),
+    humidityMinPercent: num({ max: 100 }),
+    rainMm: num({ max: 2000 }),
+    windMaxKph: num({ max: 500 }),
+  },
+  indexes: [{ fields: { locationKey: 1, date: 1 }, options: { unique: true }, why: "History for a location over a date range; one row per day" }],
 });
 
 export const WeatherCacheModel = defineCollection({

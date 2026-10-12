@@ -61,7 +61,7 @@ describe("standard fields", () => {
     }
     const withoutActor = registry.filter((c) => c.actor === "none").map((c) => c.collection).sort();
     expect(withoutActor).toEqual(
-      ["audit_logs", "counters", "idempotency_keys", "notifications", "one_time_tokens", "refresh_tokens", "sessions", "sync_changes", "sync_operations", "weather_cache"].sort(),
+      ["audit_logs", "counters", "idempotency_keys", "notifications", "one_time_tokens", "refresh_tokens", "sessions", "sync_changes", "sync_operations", "weather_cache", "weather_observations"].sort(),
     );
   });
 
