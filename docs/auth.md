@@ -76,6 +76,7 @@ The table is generated from `packages/constants/src/permissions.ts`; the API enf
 | `health.read` | ✓ | ✓ | ✓ | ✓ | ✓ |  | ✓ |
 | `health.record_observation` | ✓ | ✓ | ✓ | ✓ | ✓ |  | ✓ |
 | `health.manage` | ✓ | ✓ | ✓ |  |  |  | ✓ |
+| `health.vaccinate` | ✓ | ✓ | ✓ | ✓ |  |  | ✓ |
 | `biosecurity.read` | ✓ | ✓ | ✓ | ✓ | ✓ |  | ✓ |
 | `biosecurity.record` | ✓ | ✓ | ✓ | ✓ | ✓ |  |  |
 | `biosecurity.manage` | ✓ | ✓ | ✓ | ✓ |  |  |  |

@@ -12,3 +12,4 @@ export * from "./ledger.js";
 export * from "./alerts.js";
 export * from "./flock-metrics.js";
 export * from "./inventory.js";
+export * from "./health.js";

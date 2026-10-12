@@ -10,6 +10,8 @@ export const FarmSettings = z.object({
   fcrIncludesMortalityWeight: z.boolean().default(false),
   /** Workers may edit their own production entries for this many farm-local days (0 = today only). */
   workerEditWindowDays: z.number().int().min(0).max(7).default(1),
+  /** The farm's own rule: hours between a visitor's last poultry contact and entry. Omit to not check. */
+  visitorDowntimeHours: z.number().nonnegative().max(10_000).optional(),
 });
 
 export const CreateFarmRequest = z.object({
@@ -37,6 +39,7 @@ export const ReplaceFarmRequest = z
     unitSystem: UnitSystem,
     fcrIncludesMortalityWeight: z.boolean(),
     workerEditWindowDays: z.number().int().min(0).max(7),
+    visitorDowntimeHours: z.number().nonnegative().max(10_000).optional(),
     version: z.number().int().nonnegative(),
   })
   .strict();

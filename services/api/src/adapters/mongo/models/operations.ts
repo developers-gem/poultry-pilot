@@ -5,6 +5,7 @@ import {
   NOTIFICATION_CHANNELS,
   NOTIFICATION_STATUSES,
   ROLES,
+  TASK_KINDS,
   TASK_PRIORITIES,
   TASK_STATUSES,
   WEATHER_KINDS,
@@ -21,6 +22,7 @@ export const TaskModel = defineCollection({
   ownership: "farm",
   description: "A piece of work assigned to someone on the farm, optionally linked to a flock, house or other record.",
   fields: {
+    kind: enumOf(TASK_KINDS, { required: true, default: "general" }),
     title: str({ required: true, max: 200 }),
     description: text(2000),
     assigneeUserId: ref("User"),
@@ -32,6 +34,9 @@ export const TaskModel = defineCollection({
     related: { type: new Schema({ entity: str({ required: true, max: 40 }), id: { type: String, required: true } }, { _id: false }) },
     completedAt: instant(),
     completedBy: ref("User"),
+    resolutionNotes: text(2000),
+    verifiedAt: instant(),
+    verifiedBy: ref("User"),
   },
   indexes: [
     { fields: { farmId: 1, status: 1, dueDate: 1 }, why: "Farm task board by status and due date" },

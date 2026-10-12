@@ -136,6 +136,9 @@ export function validate(part: Part, schema: ZodTypeAny): RequestHandler {
 export function idempotency(repo: IdempotencyRepo): RequestHandler {
   return async (req, res, next) => {
     const key = req.header("idempotency-key");
+    // A request passes this middleware once, even if routers mounted at overlapping prefixes include it twice.
+    if ((req as { idempotencyHandled?: boolean }).idempotencyHandled) return next();
+    (req as { idempotencyHandled?: boolean }).idempotencyHandled = true;
     if (!key || !["POST", "PUT", "PATCH", "DELETE"].includes(req.method) || !req.auth) return next();
     if (!/^[\w-]{8,100}$/.test(key)) return next(new AppError("VALIDATION_FAILED", "Idempotency-Key must be 8–100 letters, digits, - or _"));
     const id = `${req.auth.userId}:${key}`;

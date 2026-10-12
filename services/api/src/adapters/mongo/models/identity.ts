@@ -1,6 +1,6 @@
 import { MEMBERSHIP_STATUSES, ROLES, SESSION_PLATFORMS, UNIT_SYSTEMS, USER_STATUSES } from "@poultrypilot/constants";
 import { Schema } from "mongoose";
-import { GeoPointSchema, bool, defineCollection, enumOf, instant, int, ref, str, text } from "./base.js";
+import { GeoPointSchema, bool, defineCollection, enumOf, instant, int, num, ref, str, text } from "./base.js";
 
 const D = "Identity and tenancy";
 
@@ -122,6 +122,8 @@ export const FarmModel = defineCollection({
           unitSystem: enumOf(UNIT_SYSTEMS, { required: true }),
           fcrIncludesMortalityWeight: bool(false),
           workerEditWindowDays: int({ default: 1, max: 7 }),
+          /** The farm's own rule for hours between a visitor's last poultry contact and entry. None = not checked. */
+          visitorDowntimeHours: num({ max: 10_000 }),
         },
         { _id: false },
       ),

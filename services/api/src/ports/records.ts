@@ -327,6 +327,7 @@ export interface EggRecordRecord extends Editable {
   byGrade?: Partial<Record<import("@poultrypilot/types").EggGrade, number>>;
   averageEggWeightG?: number;
   qualityNotes?: string;
+  withheldUntil?: string;
   dailyRecordId?: string;
   notes?: string;
 }
@@ -344,19 +345,52 @@ export interface EggInventoryRecord extends FarmOwned {
   note?: string;
 }
 
+export interface TreatmentRecord {
+  id: string;
+  medicineId?: string;
+  medicineName: string;
+  inventoryItemId?: string;
+  quantityUsed?: number;
+  dose?: string;
+  route?: (typeof import("@poultrypilot/constants").ADMINISTRATION_ROUTES)[number];
+  frequency?: string;
+  startDate: string;
+  durationDays: number;
+  endDate: string;
+  withdrawalMeatDays?: number;
+  withdrawalEggDays?: number;
+  withdrawalSource?: "medicine_label" | "veterinarian" | "other";
+  withdrawalMeatUntil?: string;
+  withdrawalEggsUntil?: string;
+  prescribedBy?: string;
+  prescriptionReference?: string;
+  stockCostMinor?: number;
+}
+
 export interface HealthRecordRecord extends Editable {
   flockId?: string;
   houseId?: string;
   type: import("@poultrypilot/types").HealthRecordType;
   date: string;
   title: string;
+  symptoms?: string[];
   observedSigns?: string;
   affectedBirds?: number;
+  deadBirds?: number;
+  vetName?: string;
+  vetUserId?: string;
+  assessment?: { text: string; by: string; source: "veterinarian" | "laboratory" | "farm_staff" };
+  lab?: { name?: string; reference?: string; result?: string };
+  treatments?: TreatmentRecord[];
+  cost?: MoneyValue;
+  followUpDate?: string;
+  followUpDone?: boolean;
+  attachments?: { assetId: string; name?: string }[];
   dailyRecordId?: string;
 }
 
 export interface MediaAssetRecord extends Editable {
-  contentType: "image/jpeg" | "image/png" | "image/webp";
+  contentType: "image/jpeg" | "image/png" | "image/webp" | "application/pdf";
   sizeBytes: number;
   sha256: string;
   storageKey: string;
@@ -443,4 +477,188 @@ export interface AlertRecord extends FarmOwned {
   acknowledgedBy?: string;
   acknowledgedAt?: Date;
   resolvedAt?: Date;
+}
+
+// ---- health -------------------------------------------------------------------
+
+export interface MedicineRecord extends Editable {
+  name: string;
+  type: (typeof import("@poultrypilot/constants").MEDICINE_TYPES)[number];
+  activeIngredient?: string;
+  manufacturer?: string;
+  defaultRoute?: TreatmentRecord["route"];
+  doseUnit?: StockUnit;
+  withdrawalMeatDays?: number;
+  withdrawalEggDays?: number;
+  withdrawalSource?: TreatmentRecord["withdrawalSource"];
+  prescriptionRequired?: boolean;
+  label?: { name: string; url?: string };
+  notes?: string;
+}
+
+export interface VaccinationProgrammeRecord extends Editable {
+  name: string;
+  flockTypes?: import("@poultrypilot/types").FlockType[];
+  items: { dayOfAge: number; vaccineName: string; medicineId?: string; targetDisease?: string; route?: TreatmentRecord["route"]; notes?: string }[];
+  source?: string;
+  active: boolean;
+}
+
+export interface VaccinationRecord extends Editable {
+  flockId: string;
+  programmeId?: string;
+  dayOfAge?: number;
+  medicineId?: string;
+  vaccineName: string;
+  targetDisease?: string;
+  status: "scheduled" | "done" | "skipped" | "cancelled";
+  dueDate: string;
+  administeredDate?: string;
+  administeredBy?: string;
+  route?: TreatmentRecord["route"];
+  birdsVaccinated?: number;
+  inventoryItemId?: string;
+  dosesUsed?: number;
+  batches?: { lotId?: string; batchNumber?: string; expiryDate?: string; doses?: number }[];
+  stockCostMinor?: number;
+  skipReason?: string;
+  notes?: string;
+}
+
+// ---- biosecurity ----------------------------------------------------------------
+
+export interface ChecklistItemRecord {
+  id: string;
+  text: string;
+  required: boolean;
+  responseType: "yes_no" | "text" | "number" | "choice";
+  choices?: string[];
+  failIf?: string;
+  createActionOnFail: boolean;
+}
+
+export interface ChecklistTemplateRecord extends Editable {
+  name: string;
+  kind: (typeof import("@poultrypilot/constants").CHECKLIST_KINDS)[number];
+  items: ChecklistItemRecord[];
+  active: boolean;
+  source?: string;
+}
+
+export interface ChecklistResult {
+  templateId: string;
+  templateVersion: number;
+  answers: { itemId: string; text: string; answer: string | number | boolean; passed: boolean }[];
+  failedCount: number;
+}
+
+export interface VisitorRecord extends Editable {
+  name: string;
+  company?: string;
+  type: (typeof import("@poultrypilot/constants").VISITOR_TYPES)[number];
+  phone?: string;
+  purpose?: string;
+  vehicleRegistration?: string;
+  housesVisited?: string[];
+  previousPoultryContact?: { hadContact: boolean; lastContactAt?: Date; description?: string };
+  downtimeHours?: number;
+  requiredDowntimeHours?: number;
+  declaration?: { declaredName: string; declaredAt: Date; signatureAssetId?: string; checklist?: ChecklistResult };
+  ppeUsed?: string[];
+  footbathUsed: boolean;
+  disinfected: boolean;
+  flags?: ("downtime_short" | "declaration_failed")[];
+  checkInAt: Date;
+  checkOutAt?: Date;
+  hostUserId?: string;
+  notes?: string;
+}
+
+export interface BiosecurityLogRecord extends Editable {
+  type: import("@poultrypilot/types").BiosecurityEntryType;
+  date: string;
+  houseId?: string;
+  cleaningTaskId?: string;
+  performedBy?: string;
+  product?: { inventoryItemId?: string; name?: string; quantityUsed?: number; concentration?: string; stockCostMinor?: number };
+  footbath?: { action: "changed" | "checked" | "topped_up"; disinfectant?: string; concentration?: string };
+  vehicle?: { registration: string; driver?: string; company?: string; purpose?: string; disinfected: boolean; entryAt?: Date; exitAt?: Date; lastPoultryContactAt?: Date };
+  pest?: { pestType: "rodents" | "insects" | "wild_birds" | "other"; method?: string; stationsChecked?: number; activityFound: boolean };
+  wildBird?: { description: string; count?: number; location?: string; contactWithPoultry: boolean; contactWithFeedOrWater: boolean; deadWildBirdsFound?: number };
+  checklist?: ChecklistResult;
+  attachments?: { assetId: string; name?: string }[];
+  details?: string;
+}
+
+export interface CleaningTaskRecord extends Editable {
+  title: string;
+  activity: "cleaning" | "disinfection";
+  schedule: (typeof import("@poultrypilot/constants").CLEANING_SCHEDULES)[number];
+  houseIds?: string[];
+  checklistTemplateId?: string;
+  assigneeUserId?: string;
+  nextDueDate?: string;
+  lastDoneDate?: string;
+  active: boolean;
+  notes?: string;
+}
+
+export interface EquipmentRecord extends Editable {
+  name: string;
+  type: (typeof import("@poultrypilot/constants").EQUIPMENT_TYPES)[number];
+  serialNumber?: string;
+  houseId?: string;
+  status: "in_service" | "maintenance" | "retired";
+  nextMaintenanceDate?: string;
+  notes?: string;
+}
+
+export interface EquipmentMovementRecord extends FarmOwned {
+  equipmentId: string;
+  date: string;
+  fromHouseId?: string;
+  toHouseId?: string;
+  offFarmDestination?: string;
+  disinfected: boolean;
+  movedBy?: string;
+  note?: string;
+}
+
+export interface TaskRecord extends Editable {
+  kind: "general" | "corrective_action" | "follow_up";
+  title: string;
+  description?: string;
+  assigneeUserId?: string;
+  dueDate?: string;
+  status: "open" | "in_progress" | "done" | "cancelled";
+  priority: "low" | "normal" | "high" | "urgent";
+  flockId?: string;
+  houseId?: string;
+  related?: { entity: string; id: string };
+  completedAt?: Date;
+  completedBy?: string;
+  resolutionNotes?: string;
+  verifiedAt?: Date;
+  verifiedBy?: string;
+}
+
+export interface ArticleRecord {
+  id: string;
+  kind: "fact" | "guide" | "news" | "disease_notice";
+  slug: string;
+  locale: string;
+  title: string;
+  summary?: string;
+  body?: string;
+  regionCode: string;
+  tags?: string[];
+  status: "draft" | "in_review" | "published" | "archived";
+  publishedAt?: Date;
+  reviewedBy?: string;
+  reviewedAt?: Date;
+  sources: { name: string; url?: string; retrievedAt?: Date }[];
+  createdBy?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  version: number;
 }

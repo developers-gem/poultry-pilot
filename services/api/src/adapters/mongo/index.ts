@@ -9,6 +9,7 @@ import type {
   RefreshTokenRecord,
   SessionRecord,
   SyncChangeRecord,
+  ArticleRecord,
   UserRecord,
 } from "../../ports/records.js";
 import type { Repositories, Tx } from "../../ports/repositories.js";
@@ -40,6 +41,17 @@ import {
   InventoryTransactionModel,
   ChickLotModel,
   AlertModel,
+  MedicineModel,
+  VaccinationProgrammeModel,
+  VaccinationModel,
+  ChecklistTemplateModel,
+  VisitorModel,
+  BiosecurityLogModel,
+  CleaningTaskModel,
+  EquipmentModel,
+  EquipmentMovementModel,
+  TaskModel,
+  ArticleModel,
 } from "./models/index.js";
 import { createMongoFarmRepo } from "./farm-repo.js";
 
@@ -269,6 +281,29 @@ export function createMongoRepositories(connection = mongoose.connection): Repos
     inventoryTransactions: createMongoFarmRepo(InventoryTransactionModel, { softDelete: false, versioned: false }),
     chickLots: createMongoFarmRepo(ChickLotModel, { softDelete: true, versioned: true }),
     alerts: createMongoFarmRepo(AlertModel, { softDelete: false, versioned: true }),
+    medicines: createMongoFarmRepo(MedicineModel, { softDelete: true, versioned: true }),
+    vaccinationProgrammes: createMongoFarmRepo(VaccinationProgrammeModel, { softDelete: true, versioned: true }),
+    vaccinations: createMongoFarmRepo(VaccinationModel, { softDelete: true, versioned: true }),
+    checklistTemplates: createMongoFarmRepo(ChecklistTemplateModel, { softDelete: true, versioned: true }),
+    visitors: createMongoFarmRepo(VisitorModel, { softDelete: true, versioned: true }),
+    biosecurityLogs: createMongoFarmRepo(BiosecurityLogModel, { softDelete: true, versioned: true }),
+    cleaningTasks: createMongoFarmRepo(CleaningTaskModel, { softDelete: true, versioned: true }),
+    equipment: createMongoFarmRepo(EquipmentModel, { softDelete: true, versioned: true }),
+    equipmentMovements: createMongoFarmRepo(EquipmentMovementModel, { softDelete: false, versioned: false }),
+    tasks: createMongoFarmRepo(TaskModel, { softDelete: true, versioned: true }),
+    articles: {
+      async findPublished(q) {
+        const docs = await ArticleModel.find({ status: "published", locale: q.locale, regionCode: { $in: q.regionCodes }, ...(q.kind ? { kind: q.kind } : {}), ...(q.tag ? { tags: q.tag } : {}) }).sort({ publishedAt: -1 }).lean();
+        return docs.map((d) => fromDoc<ArticleRecord>(d));
+      },
+      findBySlug: (slug, locale) => findOne<ArticleRecord>(ArticleModel, { slug, locale }),
+      async upsert(rec) {
+        // updateOne skips document validation, so the publishing rules are checked here as well.
+        await new ArticleModel({ ...rec, _id: rec.id, id: undefined }).validate();
+        const { id, ...rest } = rec;
+        await ArticleModel.updateOne({ slug: rec.slug, locale: rec.locale }, { $set: rest, $setOnInsert: { _id: id } }, { upsert: true, runValidators: true });
+      },
+    },
     // Cross-farm by design: returns only the farmId, which the caller then checks membership for.
     async locateDailyRecord(id) {
       const doc = await DailyRecordModel.findOne({ _id: id, deletedAt: null }, { farmId: 1 }).setOptions({ crossFarm: true } as never).lean();

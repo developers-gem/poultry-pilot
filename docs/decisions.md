@@ -99,3 +99,17 @@ Each is cheap to change until the phase named.
 | D55 | Alerts | Keyed per item, lot or flock/day; raised once, reopened, auto-resolved; evaluated in every stock transaction, on demand and hourly |
 | D56 | Water limits | Defaults (±20% vs recent average, pH 6–8, dissolved solids ≤ 1,000 ppm) until per-farm alert rules are built; farms should set them from veterinary or local guidance |
 | D57 | Inventory permissions | `inventory.read` all; `inventory.issue` field and vet roles; `inventory.manage` managers and accountants; `alert.manage` supervisors and above |
+
+## Added with FlockHealth and BioSecure Farm
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| D58 | Diagnosis | Never generated. `assessment` stores text attributed to a named veterinarian, laboratory or staff member |
+| D59 | Country rules | None built in: withdrawal periods from label or vet (per medicine, overridable per treatment, with source); vaccination programmes, visitor downtime and checklists are farm-defined; legal duties are referred to "local requirements" |
+| D60 | Withdrawal enforcement | Meat withdrawal blocks sales and moves into other flocks through its last day; eggs laid during egg withdrawal are flagged `withheldUntil` (sales check with the market module) |
+| D61 | No invented defaults | A medicine with no recorded withdrawal period produces no withdrawal; the app does not guess |
+| D62 | Checklists | Farm-owned, versioned templates with per-item failure answers; failures create corrective actions and an alert; generic starter templates offered, never imposed |
+| D63 | Corrective actions | Stored as `tasks` of kind `corrective_action`; completed by staff, verified by someone else (supervisor and above) |
+| D64 | Health costs | Vet fees and medicine/vaccine stock used flow into flock cost through a flock-engine hook |
+| D65 | Educational content | Published health and biosecurity articles must cite sources (model, repository and loader); seed articles need veterinary review and link checks before launch |
+| D66 | Route namespaces | Every module owns a unique prefix (`/health`, `/biosecurity`, …); the idempotency middleware also runs once per request |

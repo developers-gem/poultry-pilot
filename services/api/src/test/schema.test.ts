@@ -185,6 +185,13 @@ describe("document validation", () => {
     await expect(ok.validate()).resolves.toBeUndefined();
   });
 
+  it("refuses to publish a health or biosecurity article without sources", async () => {
+    const a = new M.ArticleModel({ _id: "a-3", kind: "guide", slug: "g", locale: "en", title: "T", tags: ["biosecurity"], status: "published", publishedAt: new Date() });
+    await expect(a.validate()).rejects.toThrow(/health and biosecurity articles need at least one source/);
+    a.set("status", "draft");
+    await expect(a.validate()).resolves.toBeUndefined();
+  });
+
   it("enforces the role enum on farm members", () => {
     const err = new M.MembershipModel({ ...base, email: "a@b.co", role: "manager", status: "active" }).validateSync();
     expect(err?.errors["role"]).toBeDefined();

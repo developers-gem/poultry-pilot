@@ -113,6 +113,7 @@ export function createFarmService(d: FarmDeps) {
             unitSystem: input.unitSystem,
             fcrIncludesMortalityWeight: input.fcrIncludesMortalityWeight,
             workerEditWindowDays: input.workerEditWindowDays,
+            ...(input.visitorDowntimeHours !== undefined ? { visitorDowntimeHours: input.visitorDowntimeHours } : {}),
           },
           updatedAt: clock.now(),
         };

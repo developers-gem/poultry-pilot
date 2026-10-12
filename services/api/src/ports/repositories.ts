@@ -25,6 +25,17 @@ import type {
   InventoryTransactionRecord,
   ChickLotRecord,
   AlertRecord,
+  MedicineRecord,
+  VaccinationProgrammeRecord,
+  VaccinationRecord,
+  ChecklistTemplateRecord,
+  VisitorRecord,
+  BiosecurityLogRecord,
+  CleaningTaskRecord,
+  EquipmentRecord,
+  EquipmentMovementRecord,
+  TaskRecord,
+  ArticleRecord,
 } from "./records.js";
 
 /**
@@ -186,6 +197,23 @@ export interface Repositories {
   inventoryTransactions: FarmRepo<InventoryTransactionRecord>;
   chickLots: FarmRepo<ChickLotRecord>;
   alerts: FarmRepo<AlertRecord>;
+  medicines: FarmRepo<MedicineRecord>;
+  vaccinationProgrammes: FarmRepo<VaccinationProgrammeRecord>;
+  vaccinations: FarmRepo<VaccinationRecord>;
+  checklistTemplates: FarmRepo<ChecklistTemplateRecord>;
+  visitors: FarmRepo<VisitorRecord>;
+  biosecurityLogs: FarmRepo<BiosecurityLogRecord>;
+  cleaningTasks: FarmRepo<CleaningTaskRecord>;
+  equipment: FarmRepo<EquipmentRecord>;
+  /** Append-only. */
+  equipmentMovements: FarmRepo<EquipmentMovementRecord>;
+  tasks: FarmRepo<TaskRecord>;
+  /** Global educational content (not farm-owned). */
+  articles: {
+    findPublished(q: { kind?: ArticleRecord["kind"]; tag?: string; regionCodes: string[]; locale: string }): Promise<ArticleRecord[]>;
+    findBySlug(slug: string, locale: string): Promise<ArticleRecord | null>;
+    upsert(rec: ArticleRecord): Promise<void>;
+  };
   /**
    * The only by-id lookup that does not know the farm: used by /daily-records/:id routes to find which farm a
    * record belongs to, so the normal membership check can then run. Returns the farmId of a live record or null.

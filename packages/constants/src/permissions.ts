@@ -25,7 +25,8 @@ export const ACTIONS = [
   // health
   "health.read",
   "health.record_observation",
-  "health.manage", // vaccinations, treatments, reminders
+  "health.manage", // vet visits, treatments, medicines, programmes
+  "health.vaccinate", // record vaccinations given
   // biosecurity
   "biosecurity.read",
   "biosecurity.record",
@@ -89,6 +90,7 @@ export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Action>> = {
     "health.read",
     "health.record_observation",
     "health.manage",
+    "health.vaccinate",
     "biosecurity.read",
     "biosecurity.record",
     "biosecurity.manage",
@@ -103,7 +105,7 @@ export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Action>> = {
     "alert.manage",
     "content.read",
   ]),
-  supervisor: new Set<Action>([...WORKER, "member.read", "production.edit_any", "biosecurity.manage", "alert.manage"]),
+  supervisor: new Set<Action>([...WORKER, "member.read", "production.edit_any", "biosecurity.manage", "alert.manage", "health.vaccinate"]),
   worker: new Set<Action>(WORKER),
   accountant: new Set<Action>([
     "farm.read",
@@ -123,6 +125,7 @@ export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Action>> = {
     "health.read",
     "health.record_observation",
     "health.manage",
+    "health.vaccinate",
     "biosecurity.read",
     "inventory.read",
     "inventory.issue",

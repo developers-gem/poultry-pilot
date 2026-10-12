@@ -69,6 +69,8 @@ async function main(): Promise<void> {
   server.headersTimeout = 6_000;
   // Expiry alerts depend on the calendar, so stock alerts are re-checked hourly for every farm.
   const stopAlertJob = scheduleAlertJob(container, logger);
+  // Educational content ships with the API; loading it is idempotent.
+  await container.content.seed().catch((err) => logger.error({ err }, "content seed failed"));
 
   let shuttingDown = false;
   const shutdown = async (reason: string, code = 0) => {

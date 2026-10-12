@@ -10,6 +10,9 @@ import { createMediaService } from "./services/media.service.js";
 import { createAlertService } from "./services/alert.service.js";
 import { createFeedService } from "./services/feed.service.js";
 import { createInventoryService } from "./services/inventory.service.js";
+import { createHealthService } from "./services/health.service.js";
+import { createBiosecurityService } from "./services/biosecurity.service.js";
+import { createContentService } from "./services/content.service.js";
 import { FeedConsumptionRequest } from "@poultrypilot/validation";
 import type { HealthChecks } from "./ports/health.js";
 import type { Repositories } from "./ports/repositories.js";
@@ -91,7 +94,13 @@ export function buildContainer(d: ContainerDeps) {
   const alerts = createAlertService({ repos: d.repos, clock });
   const inventory = createInventoryService({ repos: d.repos, clock, audit, sync, onStockChanged: (ctx, tx) => alerts.evaluateInventory(ctx, tx) });
   const feed = createFeedService({ repos: d.repos, clock, audit, sync, inventory, flocks });
-  const dailyRecords = createDailyRecordService({ repos: d.repos, clock, audit, sync, flocks, feed, alerts });
+  const flockHealth = createHealthService({ repos: d.repos, clock, audit, sync, flocks, inventory, alerts });
+  // FlockHealth plugs into the flock engine: no sale or move during a meat withdrawal; health costs in flock profit.
+  flocks.hooks.beforeBirdsLeave.push(flockHealth.assertBirdsMayLeave);
+  flocks.hooks.extraCostMinor.push(flockHealth.flockHealthCostMinor);
+  const biosecurity = createBiosecurityService({ repos: d.repos, clock, audit, sync, inventory, alerts });
+  const content = createContentService({ repos: d.repos, clock });
+  const dailyRecords = createDailyRecordService({ repos: d.repos, clock, audit, sync, flocks, feed, alerts, afterEggsWritten: flockHealth.refreshWithheldEggs });
   const media = createMediaService({ repos: d.repos, clock, audit, storage: d.media ?? memoryMediaStorage() });
 
   // Offline field-recording commands (Flutter outbox). Same service methods, same rules, as REST.
@@ -141,7 +150,7 @@ export function buildContainer(d: ContainerDeps) {
     },
   });
 
-  return { ...d, clock, startedAt: clock.now(), accessTokens, audit, sync, auth, farms, houses, flocks, dailyRecords, media, inventory, feed, alerts };
+  return { ...d, clock, startedAt: clock.now(), accessTokens, audit, sync, auth, farms, houses, flocks, dailyRecords, media, inventory, feed, alerts, flockHealth, biosecurity, content };
 }
 
 export type Container = ReturnType<typeof buildContainer>;

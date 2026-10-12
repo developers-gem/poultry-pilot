@@ -2,7 +2,7 @@
 
 How the MongoDB collections fit together and the rules every collection follows. The field-by-field reference is the generated [data dictionary](data-dictionary.md); schemas live in `services/api/src/adapters/mongo/models/`.
 
-52 collections: the 45 product collections, plus 7 for authentication and infrastructure (`sessions`, `refresh_tokens`, `one_time_tokens`, `sync_changes`, `idempotency_keys`, `counters`, `media_assets`). 86 secondary indexes, each tied to a named query.
+54 collections: the 47 product collections, plus 7 for authentication and infrastructure (`sessions`, `refresh_tokens`, `one_time_tokens`, `sync_changes`, `idempotency_keys`, `counters`, `media_assets`). 89 secondary indexes, each tied to a named query.
 
 ## Conventions
 
@@ -21,7 +21,7 @@ How the MongoDB collections fit together and the rules every collection follows.
 
 | Ownership | Collections | Standard fields | Access rule |
 | --- | --- | --- | --- |
-| Farm | 37 collections, e.g. flocks, daily_records, inventory_lots, orders, sync_operations | `farmId`, `createdBy` (required), `updatedBy`, `version`, soft delete unless append-only | Every query includes `farmId`; the `requireFarmScope` plugin throws if it is missing. Indexes start with `farmId` |
+| Farm | 39 collections, e.g. flocks, daily_records, inventory_lots, checklist_templates, sync_operations | `farmId`, `createdBy` (required), `updatedBy`, `version`, soft delete unless append-only | Every query includes `farmId`; the `requireFarmScope` plugin throws if it is missing. Indexes start with `farmId` |
 | Tenant | farms | `createdBy`, `version`, soft delete | Read by `_id` after a membership check |
 | User | users, sessions, refresh/one-time tokens, notifications, training_progress | per collection | Queried by `userId` of the signed-in person |
 | Global | training_courses, articles, glossary_terms, market_prices, weather_cache | `createdBy`/`updatedBy` optional (staff or import job) | Readable by any signed-in user; written by staff tools or jobs |
@@ -57,7 +57,9 @@ Each fact has one home. Some values are also kept as **derived snapshots** for f
 | Egg stock per grade | aggregation, no snapshot | sum of `egg_inventory.quantityDelta` |
 | `chicks.remaining` | HatcheryService / FlockService / OrderService | `chicks.quantity` − placements − chick sales |
 | `hatchery_batches.results` | HatcheryService | `hatchery_events.counts` |
-| `health_records.treatment.withdrawal*Until` | HealthService on save | `treatment.endDate` + `medicines.withdrawal*Days` |
+| `health_records.treatments[].endDate`, `withdrawal*Until` | HealthService on save | start + duration; end + withdrawal days (treatment override, else the medicine's catalog entry; none if neither) |
+| `egg_records.withheldUntil` | HealthService when treatments or eggs change | egg withdrawal windows of the flock's treatments |
+| `visitors.downtimeHours`, `flags` | BiosecurityService at check-in | last poultry contact vs check-in, the farm's `visitorDowntimeHours`, declaration checklist |
 | `expenses.amountPaid`, `expenses.status` | LedgerService | `transactions` with `sourceId` = expense |
 | `orders.amountPaid`, `orders.paymentStatus` | OrderService | `order_payments` |
 | Vaccination "overdue" | never stored | `status = scheduled` and `dueDate` < farm-local today |
@@ -81,13 +83,15 @@ When a record changes, the service writes these in **one transaction** (MongoDB 
 | Place a flock from a chick lot | `chicks.remaining`, `placedFlockIds` + the placement event |
 | Pay an expense | `transactions` (expense) → `expenses.amountPaid/status` |
 | Recurring bill falls due | `expenses` (unique per bill and due date), then `recurring_expenses.nextDueDate` |
-| Give a vaccination | `vaccinations` (done) + `inventory_transactions` (issue) → `inventory_items.stock` (with the health module) |
-| Record a treatment | `health_records` (withdrawal dates computed) + `inventory_transactions` + optional `expenses` |
+| Give a vaccination | `vaccinations` (done, batches and expiry from lots) + `inventory_transactions` (issue) → `inventory_items.stock`; alert resolved |
+| Record a treatment | `health_records` (treatments with withdrawal dates) + `inventory_transactions` (issue) + `egg_records.withheldUntil`; `withdrawal_active` alert |
+| Check a visitor in | `visitors` + `tasks` (corrective actions for failed declaration items) + alerts (downtime, failed checklist) |
+| Biosecurity log | `biosecurity_logs` + `inventory_transactions` for products + `tasks` / alerts for problems found |
+| Complete a cleaning schedule | `biosecurity_logs` + `cleaning_tasks.lastDoneDate/nextDueDate` |
+| Move equipment | `equipment_movements` + `equipment.houseId`; corrective action if not disinfected |
 | Deliver an order | `orders.status/statusHistory` + stock postings: `egg_inventory` (sold), `flock_events` (sale) or `chicks.remaining` |
 | Receive a payment | `order_payments` + `transactions` (income) → `orders.amountPaid/paymentStatus` |
 | Hatch results | `hatchery_events` → `hatchery_batches.results/status`; creates a `chicks` lot |
-| Complete a cleaning task | `biosecurity_logs` (with cleaningTaskId) → `cleaning_tasks.lastDoneDate/nextDueDate` |
-| Move equipment | `equipment_movements` → `equipment.houseId` |
 | Alert job finds a problem | `alerts` (unique dedupKey) + `notifications` per recipient and channel |
 | Offline mutation pushed | `sync_operations` (outcome, exactly once) + whatever the command writes |
 
@@ -171,6 +175,7 @@ erDiagram
   medicines ||--o{ inventory_items : "stocked as"
   inventory_items ||--o{ inventory_transactions : movements
   medicines ||--o{ vaccinations : vaccine
+  vaccination_programmes ||--o{ vaccinations : schedules
   flocks ||--o{ vaccinations : programme
   flocks ||--o{ health_records : history
   medicines ||--o{ health_records : "treatment uses"
@@ -185,11 +190,16 @@ erDiagram
 
 ```mermaid
 erDiagram
+  checklist_templates ||--o{ biosecurity_logs : "answered in"
+  checklist_templates ||--o{ visitors : "declaration"
+  checklist_templates ||--o{ cleaning_tasks : "used by"
   cleaning_tasks ||--o{ biosecurity_logs : "completed as"
   houses ||--o{ biosecurity_logs : "done in"
   houses }o--o{ visitors : "visited"
   houses ||--o{ equipment : "located in"
   equipment ||--o{ equipment_movements : moves
+  biosecurity_logs ||--o{ tasks : "corrective actions"
+  visitors ||--o{ tasks : "corrective actions"
 ```
 
 ### Money and market

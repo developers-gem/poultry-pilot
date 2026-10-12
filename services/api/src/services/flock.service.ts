@@ -74,8 +74,22 @@ export function toLedger(e: FlockEventRecord): LedgerEvent {
   };
 }
 
+/**
+ * Extension points for modules built after the flock engine (wired in the container):
+ * - beforeBirdsLeave: e.g. FlockHealth refuses a sale or move during a meat withdrawal period;
+ * - extraCostMinor: e.g. FlockHealth adds vet fees and medicine used to the flock's costs.
+ */
+export interface FlockHooks {
+  beforeBirdsLeave: ((ctx: FarmContext, flock: FlockRecord, date: string, purpose: "sale" | "move", tx: Tx) => Promise<void>)[];
+  extraCostMinor: ((ctx: FarmContext, flockId: string, asOf: string) => Promise<number>)[];
+}
+
 export function createFlockService(d: FlockDeps) {
   const { repos, clock } = d;
+  const hooks: FlockHooks = { beforeBirdsLeave: [], extraCostMinor: [] };
+  const birdsLeave = async (ctx: FarmContext, flock: FlockRecord, date: string, purpose: "sale" | "move", tx: Tx) => {
+    for (const h of hooks.beforeBirdsLeave) await h(ctx, flock, date, purpose, tx);
+  };
 
   // ---- loading & guards ------------------------------------------------------
 
@@ -238,6 +252,8 @@ export function createFlockService(d: FlockDeps) {
     const feed = await repos.feedConsumption.find(ctx.farmId, { where: { flockId: flock.id } });
     const date = asOf ?? (flock.status === "closed" && flock.closedDate ? flock.closedDate : todayOf(farm));
     const eggs = await repos.eggRecords.aggregate(ctx.farmId, { where: { flockId: flock.id }, range: { field: "date", to: date } }, ["flockId"], ["collected"]);
+    let otherCostMinor = 0;
+    for (const h of hooks.extraCostMinor) otherCostMinor += await h(ctx, flock.id, date);
     const m = computeFlockMetrics({
       ...(flock.placementDate ? { placementDate: flock.placementDate } : {}),
       ...(flock.hatchDate ? { hatchDate: flock.hatchDate } : {}),
@@ -246,6 +262,7 @@ export function createFlockService(d: FlockDeps) {
       events: events.map(toLedger),
       feed: feed.map((f) => ({ date: f.date, quantityKg: f.quantityKg, kind: f.kind ?? "consumption", ...(f.cost ? { costMinor: f.cost.amountMinor } : {}) })),
       eggsCollected: eggs[0]?.sums["collected"] ?? 0,
+      otherCostMinor,
       asOf: date,
       includeMortalityWeight: farm.settings.fcrIncludesMortalityWeight,
       referencePricePerKgMinor: referencePricePerKgMinor ?? null,
@@ -475,6 +492,7 @@ export function createFlockService(d: FlockDeps) {
           return { flock: toFlockView(out.flock) };
         }
         if (r.toFlockId === flock.id) throw new AppError("VALIDATION_FAILED", "Cannot transfer birds to the same flock");
+        await birdsLeave(ctx, flock, r.date, "move", tx);
         const dest = await loadFlock(ctx, r.toFlockId, tx);
         assertStatus(dest, ["active"], "receive birds");
         if (dest.species !== flock.species) throw new AppError("VALIDATION_FAILED", `Cannot move ${flock.species} into a ${dest.species} flock`);
@@ -497,6 +515,7 @@ export function createFlockService(d: FlockDeps) {
       return onFlock(ctx, flockId, async ({ farm, flock, events, tx }) => {
         assertStatus(flock, ["active"], "split the flock");
         assertDate(r.date, farm, flock);
+        await birdsLeave(ctx, flock, r.date, "move", tx);
         const ledger = events.map(toLedger);
         const available = birdsAvailable(ledger, r.date);
         if (r.birds > available) throw new DomainError("INSUFFICIENT_BIRDS", `Only ${available} birds can leave ${flock.flockCode} on ${r.date}`, { available, requested: r.birds });
@@ -547,6 +566,7 @@ export function createFlockService(d: FlockDeps) {
       return onFlock(ctx, flockId, async ({ farm, flock, events, tx }) => {
         assertStatus(flock, ["active"], "merge the flock");
         assertDate(r.date, farm, flock);
+        await birdsLeave(ctx, flock, r.date, "move", tx);
         if (r.intoFlockId === flock.id) throw new AppError("VALIDATION_FAILED", "A flock cannot merge into itself");
         const target = await loadFlock(ctx, r.intoFlockId, tx);
         assertStatus(target, ["active"], "receive a merge");
@@ -582,6 +602,7 @@ export function createFlockService(d: FlockDeps) {
       return onFlock(ctx, flockId, async ({ farm, flock, events, tx }) => {
         assertStatus(flock, ["active"], "sell birds");
         assertDate(r.date, farm, flock);
+        await birdsLeave(ctx, flock, r.date, "sale", tx);
         for (const [m, f] of [[r.pricePerKg, "pricePerKg"], [r.pricePerBird, "pricePerBird"], [r.total, "total"]] as const) assertCurrency(m, farm, f);
         const available = birdsAvailable(events.map(toLedger), r.date);
         if (r.birds > available) {
@@ -684,6 +705,7 @@ export function createFlockService(d: FlockDeps) {
      * (daily records). Same validation, snapshot update and optimistic lock as every flock command.
      */
     ledger: { farmOf, todayOf, loadFlock, loadEvents, appendEvents, assertStatus, assertDate, assertCurrency, money },
+    hooks,
   };
 }
 

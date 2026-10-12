@@ -213,6 +213,42 @@ function contract(name: string, setup: () => Promise<{ repos: Repositories; rese
       expect(await repos.farms.listIds()).toEqual(expect.any(Array));
     });
 
+    it("health, biosecurity and content records round-trip through their schemas", async () => {
+      const farmId = newId();
+      const base = { farmId, createdBy: "u1", createdAt: now, updatedAt: now, version: 0 };
+      const med = { ...base, id: newId(), name: "Amoxicillin", type: "antibiotic" as const, withdrawalMeatDays: 7, withdrawalSource: "medicine_label" as const, label: { name: "Label", url: "https://example.com" } };
+      await repos.medicines.insert(med);
+      await repos.healthRecords.insert({
+        ...base, id: newId(), type: "treatment", date: "2026-10-01", flockId: "f1", title: "Cough", symptoms: ["coughing"], affectedBirds: 3,
+        assessment: { text: "Suspected", by: "Dr. Rao", source: "veterinarian" }, cost: { amountMinor: 1000, currency: "INR" }, followUpDate: "2026-10-05", followUpDone: false,
+        attachments: [{ assetId: newId(), name: "r.pdf" }],
+        treatments: [{ id: newId(), medicineId: med.id, medicineName: "Amoxicillin", startDate: "2026-10-01", durationDays: 5, endDate: "2026-10-05", withdrawalMeatDays: 7, withdrawalMeatUntil: "2026-10-12", withdrawalSource: "medicine_label", stockCostMinor: 500 }],
+      });
+      expect(await repos.healthRecords.find(farmId, { where: { followUpDone: false }, range: { field: "followUpDate", to: "2026-10-06" } })).toHaveLength(1);
+      expect(await repos.healthRecords.find(farmId, { exists: { treatments: true } })).toHaveLength(1);
+      const prog = { ...base, id: newId(), name: "P", flockTypes: ["broiler" as const], items: [{ dayOfAge: 7, vaccineName: "ND", route: "eye_drop" as const }], source: "Vet", active: true };
+      await repos.vaccinationProgrammes.insert(prog);
+      await repos.vaccinations.insert({ ...base, id: newId(), flockId: "f1", programmeId: prog.id, dayOfAge: 7, vaccineName: "ND", status: "done", dueDate: "2026-10-08", administeredDate: "2026-10-08", batches: [{ lotId: newId(), batchNumber: "B1", expiryDate: "2027-01-01", doses: 1000 }], stockCostMinor: 600 });
+      const tpl = { ...base, id: newId(), name: "Decl", kind: "visitor_declaration" as const, active: true, items: [{ id: "q1", text: "Q?", required: true, responseType: "yes_no" as const, failIf: "yes", createActionOnFail: true }] };
+      await repos.checklistTemplates.insert(tpl);
+      const result = { templateId: tpl.id, templateVersion: 0, answers: [{ itemId: "q1", text: "Q?", answer: true, passed: false }], failedCount: 1 };
+      await repos.visitors.insert({ ...base, id: newId(), name: "V", type: "supplier", previousPoultryContact: { hadContact: true, lastContactAt: now }, downtimeHours: 12, requiredDowntimeHours: 48, declaration: { declaredName: "V", declaredAt: now, checklist: result }, ppeUsed: ["boots"], footbathUsed: true, disinfected: false, flags: ["downtime_short", "declaration_failed"], checkInAt: now });
+      await repos.biosecurityLogs.insert({ ...base, id: newId(), type: "wild_bird_observation", date: "2026-10-01", wildBird: { description: "Crows", contactWithPoultry: false, contactWithFeedOrWater: true, deadWildBirdsFound: 2 }, product: { name: "Virkon", quantityUsed: 0.5, stockCostMinor: 450 }, checklist: result });
+      await repos.biosecurityLogs.insert({ ...base, id: newId(), type: "vehicle", date: "2026-10-01", vehicle: { registration: "UP14", disinfected: false, entryAt: now } });
+      await repos.cleaningTasks.insert({ ...base, id: newId(), title: "Clean", activity: "disinfection", schedule: "weekly", checklistTemplateId: tpl.id, nextDueDate: "2026-10-08", active: true });
+      const eq = { ...base, id: newId(), name: "Scale", type: "scale" as const, status: "in_service" as const };
+      await repos.equipment.insert(eq);
+      await repos.equipmentMovements.insert({ farmId, id: newId(), createdBy: "u1", createdAt: now, updatedAt: now, equipmentId: eq.id, date: "2026-10-01", toHouseId: "h1", disinfected: false });
+      await repos.tasks.insert({ ...base, id: newId(), kind: "corrective_action", title: "Fix", status: "open", priority: "high", related: { entity: "visitor", id: "v1" } });
+      expect(await repos.tasks.find(farmId, { where: { kind: "corrective_action", status: ["open", "in_progress"] } as never })).toHaveLength(1);
+
+      const article = { id: newId(), kind: "guide" as const, slug: `a-${farmId.slice(-8)}`, locale: "en", title: "T", regionCode: "GLOBAL", tags: ["health"], status: "published" as const, publishedAt: now, sources: [{ name: "WOAH", url: "https://www.woah.org" }], createdAt: now, updatedAt: now, version: 0 };
+      await repos.articles.upsert(article);
+      await repos.articles.upsert({ ...article, id: newId(), title: "T2" });
+      expect((await repos.articles.findBySlug(article.slug, "en"))?.title).toBe("T2");
+      expect((await repos.articles.findPublished({ tag: "health", regionCodes: ["GLOBAL"], locale: "en" })).some((a) => a.slug === article.slug)).toBe(true);
+    });
+
     it("sync: per-farm sequences are independent and changes list in order", async () => {
       const [a, b] = [newId(), newId()];
       expect([await repos.sync.nextSeq(a), await repos.sync.nextSeq(a), await repos.sync.nextSeq(b)]).toEqual([1, 2, 1]);

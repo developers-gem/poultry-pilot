@@ -11,7 +11,7 @@ import type {
   UserRecord,
 } from "../../ports/records.js";
 import type { Repositories, Tx, TxRunner } from "../../ports/repositories.js";
-import type { AlertRecord, ChickLotRecord, InventoryItemRecord, InventoryLotRecord, InventoryTransactionRecord, BirdWeightRecord, DailyRecordRecord, EggInventoryRecord, EggRecordRecord, FeedConsumptionRecord, FlockEventRecord, FlockRecord, HealthRecordRecord, HouseRecord, MediaAssetRecord, WaterRecordRecord } from "../../ports/records.js";
+import type { ArticleRecord, MedicineRecord, VaccinationProgrammeRecord, VaccinationRecord, ChecklistTemplateRecord, VisitorRecord, BiosecurityLogRecord, CleaningTaskRecord, EquipmentRecord, EquipmentMovementRecord, TaskRecord, AlertRecord, ChickLotRecord, InventoryItemRecord, InventoryLotRecord, InventoryTransactionRecord, BirdWeightRecord, DailyRecordRecord, EggInventoryRecord, EggRecordRecord, FeedConsumptionRecord, FlockEventRecord, FlockRecord, HealthRecordRecord, HouseRecord, MediaAssetRecord, WaterRecordRecord } from "../../ports/records.js";
 import { createMemFarmRepo } from "./farm-repo.js";
 
 /**
@@ -71,6 +71,17 @@ export interface MemoryStore {
   inventoryTransactions: Table<InventoryTransactionRecord>;
   chickLots: Table<ChickLotRecord>;
   alerts: Table<AlertRecord>;
+  medicines: Table<MedicineRecord>;
+  vaccinationProgrammes: Table<VaccinationProgrammeRecord>;
+  vaccinations: Table<VaccinationRecord>;
+  checklistTemplates: Table<ChecklistTemplateRecord>;
+  visitors: Table<VisitorRecord>;
+  biosecurityLogs: Table<BiosecurityLogRecord>;
+  cleaningTasks: Table<CleaningTaskRecord>;
+  equipment: Table<EquipmentRecord>;
+  equipmentMovements: Table<EquipmentMovementRecord>;
+  tasks: Table<TaskRecord>;
+  articles: Table<ArticleRecord>;
 }
 
 export function createMemoryRepositories(): { repos: Repositories; store: MemoryStore } {
@@ -102,6 +113,17 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
     inventoryTransactions: new Table(),
     chickLots: new Table(),
     alerts: new Table(),
+    medicines: new Table(),
+    vaccinationProgrammes: new Table(),
+    vaccinations: new Table(),
+    checklistTemplates: new Table(),
+    visitors: new Table(),
+    biosecurityLogs: new Table(),
+    cleaningTasks: new Table(),
+    equipment: new Table(),
+    equipmentMovements: new Table(),
+    tasks: new Table(),
+    articles: new Table(),
   };
   const transactional = [
     store.users,
@@ -130,6 +152,17 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
     store.inventoryTransactions,
     store.chickLots,
     store.alerts,
+    store.medicines,
+    store.vaccinationProgrammes,
+    store.vaccinations,
+    store.checklistTemplates,
+    store.visitors,
+    store.biosecurityLogs,
+    store.cleaningTasks,
+    store.equipment,
+    store.equipmentMovements,
+    store.tasks,
+    store.articles,
   ] as Table<unknown>[];
 
   let depth = 0;
@@ -360,6 +393,31 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
     inventoryTransactions: createMemFarmRepo(store.inventoryTransactions, { softDelete: false, versioned: false }),
     chickLots: createMemFarmRepo(store.chickLots, { softDelete: true, versioned: true }),
     alerts: createMemFarmRepo(store.alerts, { softDelete: false, versioned: true, unique: [["farmId", "dedupKey"]] }),
+    medicines: createMemFarmRepo(store.medicines, { softDelete: true, versioned: true, unique: [["farmId", "name"]] }),
+    vaccinationProgrammes: createMemFarmRepo(store.vaccinationProgrammes, { softDelete: true, versioned: true, unique: [["farmId", "name"]] }),
+    vaccinations: createMemFarmRepo(store.vaccinations, { softDelete: true, versioned: true }),
+    checklistTemplates: createMemFarmRepo(store.checklistTemplates, { softDelete: true, versioned: true, unique: [["farmId", "kind", "name"]] }),
+    visitors: createMemFarmRepo(store.visitors, { softDelete: true, versioned: true }),
+    biosecurityLogs: createMemFarmRepo(store.biosecurityLogs, { softDelete: true, versioned: true }),
+    cleaningTasks: createMemFarmRepo(store.cleaningTasks, { softDelete: true, versioned: true }),
+    equipment: createMemFarmRepo(store.equipment, { softDelete: true, versioned: true }),
+    equipmentMovements: createMemFarmRepo(store.equipmentMovements, { softDelete: false, versioned: false }),
+    tasks: createMemFarmRepo(store.tasks, { softDelete: true, versioned: true }),
+    articles: {
+      async findPublished(q) {
+        return store.articles
+          .all()
+          .filter((a) => a.status === "published" && a.locale === q.locale && q.regionCodes.includes(a.regionCode) && (!q.kind || a.kind === q.kind) && (!q.tag || a.tags?.includes(q.tag)))
+          .sort((a, b) => (b.publishedAt?.getTime() ?? 0) - (a.publishedAt?.getTime() ?? 0));
+      },
+      async findBySlug(slug, locale) {
+        return store.articles.all().find((a) => a.slug === slug && a.locale === locale) ?? null;
+      },
+      async upsert(rec) {
+        const existing = store.articles.all().find((a) => a.slug === rec.slug && a.locale === rec.locale);
+        store.articles.put(existing?.id ?? rec.id, { ...rec, id: existing?.id ?? rec.id });
+      },
+    },
     async locateDailyRecord(id) {
       const r = store.dailyRecords.get(id);
       return r && !r.deletedAt ? r.farmId : null;

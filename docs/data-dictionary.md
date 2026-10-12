@@ -3,7 +3,7 @@
 > Generated from the Mongoose schemas in `services/api/src/adapters/mongo/models`. Do not edit by hand:
 > run `pnpm --filter @poultrypilot/api docs:data-dictionary`. A test fails if this file is out of date.
 
-52 collections, 86 secondary indexes (plus the default `_id` index on each). Design rules and relationships: `docs/data-model.md`.
+54 collections, 89 secondary indexes (plus the default `_id` index on each). Design rules and relationships: `docs/data-model.md`.
 
 | Collection | Domain | Ownership | Indexes | Purpose |
 | --- | --- | --- | --- | --- |
@@ -25,15 +25,17 @@
 | [`inventory_items`](#inventory_items) | Inventory | farm | 1 | The stock catalog: feed, medicine, vaccines, disinfectant, litter, packaging, equipment supplies, spare parts and other consumables |
 | [`inventory_lots`](#inventory_lots) | Inventory | farm | 2 | A batch received into stock (a purchase, or a positive stock-count correction): supplier, batch number, expiry, storage location, unit cost and what remains |
 | [`inventory_transactions`](#inventory_transactions) | Inventory | farm, append-only | 2 | The stock ledger: receipts, issues, wastage, stock-count adjustments and reversals, each against one lot |
-| [`medicines`](#medicines) | Health | farm | 1 | Catalog of vaccines and medicines the farm uses, with withdrawal periods |
-| [`health_records`](#health_records) | Health | farm | 2 | Vet visits, observations, treatments, lab tests and post-mortems |
-| [`vaccinations`](#vaccinations) | Health | farm | 2 | A scheduled vaccination for a flock and, once given, its administration details |
+| [`medicines`](#medicines) | Health | farm | 1 | The farm's catalog of vaccines and medicines with default withdrawal periods taken from the product label or the farm's veterinarian |
+| [`health_records`](#health_records) | Health | farm | 3 | Farm health records: observations, veterinary visits, treatments, lab tests and post-mortems |
+| [`vaccination_programmes`](#vaccination_programmes) | Health | farm | 1 | A farm's own vaccination programme (from its veterinarian or hatchery), by bird age |
+| [`vaccinations`](#vaccinations) | Health | farm | 2 | A vaccination planned for a flock and, once given, how: batch numbers and expiry, doses used from stock, route, who gave it |
 | [`hatchery_batches`](#hatchery_batches) | Hatchery | farm | 2 | Eggs set together in an incubator |
 | [`hatchery_events`](#hatchery_events) | Hatchery | farm, append-only | 1 | What happened to a batch: set, candling counts, transfer to hatcher, hatch and grading counts, environment readings |
 | [`chicks`](#chicks) | Hatchery | farm | 1 | A lot of day-old chicks available to place or sell, from the farm's hatchery or bought in |
-| [`biosecurity_logs`](#biosecurity_logs) | Biosecurity and equipment | farm | 1 | Evidence that a biosecurity action happened: cleaning, disinfection, footbath change, pest control, vehicle wash |
-| [`visitors`](#visitors) | Biosecurity and equipment | farm | 1 | Visitor register: who entered, why, which houses, and their last contact with other poultry (for trace-back) |
-| [`cleaning_tasks`](#cleaning_tasks) | Biosecurity and equipment | farm | 1 | A recurring cleaning or disinfection routine with its checklist |
+| [`checklist_templates`](#checklist_templates) | Biosecurity and equipment | farm | 1 | A farm's own checklist (visitor declaration, PPE, footbath, cleaning, disinfection, vehicle, pest control, audit) |
+| [`biosecurity_logs`](#biosecurity_logs) | Biosecurity and equipment | farm | 1 | Evidence that a biosecurity activity happened: cleaning, disinfection, footbath change or check, vehicle movement, pest control, wild bird observation, or an audit |
+| [`visitors`](#visitors) | Biosecurity and equipment | farm | 1 | Visitor register: who entered, why, which houses, their declaration, last contact with other poultry and the downtime since, PPE and footbath use |
+| [`cleaning_tasks`](#cleaning_tasks) | Biosecurity and equipment | farm | 1 | A recurring cleaning or disinfection routine, optionally with a checklist template |
 | [`equipment`](#equipment) | Biosecurity and equipment | farm | 1 | Assets: incubators, feeders, heaters, generators, scales, vehicles |
 | [`equipment_movements`](#equipment_movements) | Biosecurity and equipment | farm, append-only | 1 | Equipment moving between houses or off the farm, with whether it was disinfected (a common disease route) |
 | [`expenses`](#expenses) | Money | farm | 3 | A bill or cost owed (accrual document) |
@@ -186,6 +188,7 @@ The tenant. Every farm-owned document carries this farm's _id as farmId.
 | `settings.unitSystem` | String | yes | one of: `metric`, `imperial` |  |
 | `settings.fcrIncludesMortalityWeight` | Boolean |  | default `false` |  |
 | `settings.workerEditWindowDays` | Number |  | max 7; default `1`; integer |  |
+| `settings.visitorDowntimeHours` | Number |  | max 10000 |  |
 
 No secondary indexes: read by `_id` only.
 
@@ -428,6 +431,7 @@ Eggs collected from one flock on one day, by grade. Saving it posts a 'collected
 | `broken` | Number |  | default `0`; integer |  |
 | `averageEggWeightG` | Number |  | max 150 |  |
 | `qualityNotes` | String |  | ≤ 500 chars |  |
+| `withheldUntil` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
 | `dailyRecordId` | String |  |  | `DailyRecord` |
 | `notes` | String |  | ≤ 1000 chars |  |
 
@@ -630,7 +634,7 @@ The stock ledger: receipts, issues, wastage, stock-count adjustments and reversa
 
 ### medicines
 
-Catalog of vaccines and medicines the farm uses, with withdrawal periods. Clinical facts only; stock lives in inventory_items.
+The farm's catalog of vaccines and medicines with default withdrawal periods taken from the product label or the farm's veterinarian. PoultryPilot ships no country rules; stock lives in inventory_items.
 
 - **Model:** `Medicine`
 - **Ownership:** Farm — every query must include farmId
@@ -646,6 +650,7 @@ Catalog of vaccines and medicines the farm uses, with withdrawal periods. Clinic
 | `doseUnit` | String |  | one of: `kg`, `g`, `l`, `ml`, `dose`, `piece`, `tray`, `bag`, `box`, `bottle` |  |
 | `withdrawalMeatDays` | Number |  | max 365; integer |  |
 | `withdrawalEggDays` | Number |  | max 365; integer |  |
+| `withdrawalSource` | String |  | one of: `medicine_label`, `veterinarian`, `other` |  |
 | `prescriptionRequired` | Boolean |  | default `false` |  |
 | `label` | object |  |  |  |
 | `label.name` | String | yes | ≤ 200 chars |  |
@@ -659,7 +664,7 @@ Catalog of vaccines and medicines the farm uses, with withdrawal periods. Clinic
 
 ### health_records
 
-Vet visits, observations, treatments, lab tests and post-mortems. Records what people observed and what a vet concluded; PoultryPilot never diagnoses.
+Farm health records: observations, veterinary visits, treatments, lab tests and post-mortems. Holds what people saw and what a named veterinarian, laboratory or staff member assessed; PoultryPilot never diagnoses or prescribes.
 
 - **Model:** `HealthRecord`
 - **Ownership:** Farm — every query must include farmId
@@ -672,43 +677,85 @@ Vet visits, observations, treatments, lab tests and post-mortems. Records what p
 | `type` | String | yes | one of: `treatment`, `vet_visit`, `observation`, `lab_test`, `post_mortem` |  |
 | `date` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
 | `title` | String | yes | ≤ 200 chars |  |
+| `symptoms` | array of String |  | ≤ 60 chars; lowercased |  |
 | `observedSigns` | String |  | ≤ 2000 chars |  |
 | `affectedBirds` | Number |  | integer |  |
+| `deadBirds` | Number |  | integer |  |
 | `vetName` | String |  | ≤ 120 chars |  |
 | `vetUserId` | String |  |  | `User` |
-| `diagnosisByVet` | String |  | ≤ 2000 chars |  |
+| `assessment` | object |  |  |  |
+| `assessment.text` | String |  | ≤ 2000 chars |  |
+| `assessment.by` | String | yes | ≤ 120 chars |  |
+| `assessment.source` | String | yes | one of: `veterinarian`, `laboratory`, `farm_staff` |  |
 | `lab` | object |  |  |  |
 | `lab.name` | String |  | ≤ 120 chars |  |
 | `lab.reference` | String |  | ≤ 60 chars |  |
 | `lab.result` | String |  | ≤ 4000 chars |  |
-| `treatment` | object |  |  |  |
-| `treatment.medicineId` | String | yes |  | `Medicine` |
-| `treatment.dose` | Number |  |  |  |
-| `treatment.doseUnit` | String |  | one of: `kg`, `g`, `l`, `ml`, `dose`, `piece`, `tray`, `bag`, `box`, `bottle` |  |
-| `treatment.route` | String |  | one of: `drinking_water`, `feed`, `injection`, `eye_drop`, `nasal`, `spray`, `wing_web`, `oral`, `topical`, `in_ovo` |  |
-| `treatment.startDate` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
-| `treatment.endDate` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
-| `treatment.withdrawalMeatUntil` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
-| `treatment.withdrawalEggsUntil` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
-| `treatment.prescribedBy` | String |  | ≤ 120 chars |  |
+| `treatments` | array of objects |  | custom validation |  |
+| `treatments[].id` | String | yes |  |  |
+| `treatments[].medicineId` | String |  |  | `Medicine` |
+| `treatments[].medicineName` | String | yes | ≤ 120 chars |  |
+| `treatments[].inventoryItemId` | String |  |  | `InventoryItem` |
+| `treatments[].quantityUsed` | Number |  |  |  |
+| `treatments[].dose` | String |  | ≤ 120 chars |  |
+| `treatments[].route` | String |  | one of: `drinking_water`, `feed`, `injection`, `eye_drop`, `nasal`, `spray`, `wing_web`, `oral`, `topical`, `in_ovo` |  |
+| `treatments[].frequency` | String |  | ≤ 120 chars |  |
+| `treatments[].startDate` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
+| `treatments[].durationDays` | Number | yes | min 1; max 365; integer |  |
+| `treatments[].endDate` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
+| `treatments[].withdrawalMeatDays` | Number |  | max 365; integer |  |
+| `treatments[].withdrawalEggDays` | Number |  | max 365; integer |  |
+| `treatments[].withdrawalSource` | String |  | one of: `medicine_label`, `veterinarian`, `other` |  |
+| `treatments[].withdrawalMeatUntil` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
+| `treatments[].withdrawalEggsUntil` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
+| `treatments[].prescribedBy` | String |  | ≤ 120 chars |  |
+| `treatments[].prescriptionReference` | String |  | ≤ 80 chars |  |
+| `treatments[].stockCostMinor` | Number |  | integer |  |
 | `cost` | object |  |  |  |
 | `cost.amountMinor` | Number | yes | integer |  |
 | `cost.currency` | String | yes | pattern `/^[A-Z]{3}$/` |  |
-| `expenseId` | String |  |  | `Expense` |
-| `attachments` | array of objects |  |  |  |
-| `attachments[].name` | String |  | ≤ 200 chars |  |
-| `attachments[].assetUrl` | String | yes | ≤ 1000 chars |  |
 | `followUpDate` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
+| `followUpDone` | Boolean |  | default `false` |  |
+| `attachments` | array of objects |  |  |  |
+| `attachments[].assetId` | String | yes |  | `MediaAsset` |
+| `attachments[].name` | String |  | ≤ 200 chars |  |
 | `dailyRecordId` | String |  |  | `DailyRecord` |
 
 | Index | Options | Serves |
 | --- | --- | --- |
 | farmId, flockId, date ↓ |  | Flock health history; active withdrawal check before a sale |
 | farmId, date ↓ |  | Farm-wide health log for vets and managers |
+| farmId, followUpDone, followUpDate | partial: {"followUpDate":{"$exists":true}} | Follow-ups due (reminders, alert job) |
+
+### vaccination_programmes
+
+A farm's own vaccination programme (from its veterinarian or hatchery), by bird age. Applying it to a flock creates scheduled vaccinations. No country programme is built in.
+
+- **Model:** `VaccinationProgramme`
+- **Ownership:** Farm — every query must include farmId
+- **Standard fields:** `_id` (UUIDv7 string), `farmId` (required), `createdBy` (required), `updatedBy`, `createdAt`, `updatedAt` (UTC, required), `version` (optimistic concurrency), `deletedAt`, `deletedBy` (soft delete)
+
+| Field | Type | Required | Constraints | References |
+| --- | --- | --- | --- | --- |
+| `name` | String | yes | ≤ 120 chars |  |
+| `flockTypes` | array of String |  | one of: `broiler`, `layer`, `breeder`, `chick`, `custom` |  |
+| `items` | array of objects | yes | custom validation |  |
+| `items[].dayOfAge` | Number | yes | max 2000; integer |  |
+| `items[].vaccineName` | String | yes | ≤ 120 chars |  |
+| `items[].medicineId` | String |  |  | `Medicine` |
+| `items[].targetDisease` | String |  | ≤ 120 chars |  |
+| `items[].route` | String |  | one of: `drinking_water`, `feed`, `injection`, `eye_drop`, `nasal`, `spray`, `wing_web`, `oral`, `topical`, `in_ovo` |  |
+| `items[].notes` | String |  | ≤ 300 chars |  |
+| `source` | String |  | ≤ 300 chars |  |
+| `active` | Boolean |  | default `true` |  |
+
+| Index | Options | Serves |
+| --- | --- | --- |
+| farmId, name | unique, live records only | Programme list (prefix); names unique within a farm |
 
 ### vaccinations
 
-A scheduled vaccination for a flock and, once given, its administration details. Overdue = scheduled and past due (derived).
+A vaccination planned for a flock and, once given, how: batch numbers and expiry, doses used from stock, route, who gave it. Overdue = scheduled and past due (derived).
 
 - **Model:** `Vaccination`
 - **Ownership:** Farm — every query must include farmId
@@ -717,21 +764,25 @@ A scheduled vaccination for a flock and, once given, its administration details.
 | Field | Type | Required | Constraints | References |
 | --- | --- | --- | --- | --- |
 | `flockId` | String | yes |  | `Flock` |
+| `programmeId` | String |  |  | `VaccinationProgramme` |
+| `dayOfAge` | Number |  | max 2000; integer |  |
 | `medicineId` | String |  |  | `Medicine` |
 | `vaccineName` | String | yes | ≤ 120 chars |  |
 | `targetDisease` | String |  | ≤ 120 chars |  |
-| `programmeName` | String |  | ≤ 120 chars |  |
 | `status` | String | yes | one of: `scheduled`, `done`, `skipped`, `cancelled`; default `"scheduled"` |  |
 | `dueDate` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
 | `administeredDate` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
-| `administeredBy` | String |  |  | `User` |
+| `administeredBy` | String |  | ≤ 120 chars |  |
 | `route` | String |  | one of: `drinking_water`, `feed`, `injection`, `eye_drop`, `nasal`, `spray`, `wing_web`, `oral`, `topical`, `in_ovo` |  |
-| `dose` | Number |  |  |  |
-| `doseUnit` | String |  | one of: `kg`, `g`, `l`, `ml`, `dose`, `piece`, `tray`, `bag`, `box`, `bottle` |  |
 | `birdsVaccinated` | Number |  | integer |  |
-| `lotNumber` | String |  | ≤ 60 chars |  |
-| `expiryDate` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
-| `inventoryTransactionId` | String |  |  | `InventoryTransaction` |
+| `inventoryItemId` | String |  |  | `InventoryItem` |
+| `dosesUsed` | Number |  |  |  |
+| `batches` | array of objects |  |  |  |
+| `batches[].lotId` | String |  |  | `InventoryLot` |
+| `batches[].batchNumber` | String |  | ≤ 60 chars |  |
+| `batches[].expiryDate` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
+| `batches[].doses` | Number |  |  |  |
+| `stockCostMinor` | Number |  | integer |  |
 | `skipReason` | String |  | ≤ 500 chars |  |
 | `notes` | String |  | ≤ 1000 chars |  |
 
@@ -845,9 +896,36 @@ A lot of day-old chicks available to place or sell, from the farm's hatchery or 
 
 ## Biosecurity and equipment
 
+### checklist_templates
+
+A farm's own checklist (visitor declaration, PPE, footbath, cleaning, disinfection, vehicle, pest control, audit). Items say which answer counts as a failure; failures create corrective actions. Editing bumps the version; records keep the version they used.
+
+- **Model:** `ChecklistTemplate`
+- **Ownership:** Farm — every query must include farmId
+- **Standard fields:** `_id` (UUIDv7 string), `farmId` (required), `createdBy` (required), `updatedBy`, `createdAt`, `updatedAt` (UTC, required), `version` (optimistic concurrency), `deletedAt`, `deletedBy` (soft delete)
+
+| Field | Type | Required | Constraints | References |
+| --- | --- | --- | --- | --- |
+| `name` | String | yes | ≤ 120 chars |  |
+| `kind` | String | yes | one of: `visitor_declaration`, `ppe`, `footbath`, `cleaning`, `disinfection`, `vehicle`, `pest_control`, `audit`, `general` |  |
+| `items` | array of objects | yes | custom validation |  |
+| `items[].id` | String | yes | ≤ 60 chars |  |
+| `items[].text` | String | yes | ≤ 300 chars |  |
+| `items[].required` | Boolean |  | default `true` |  |
+| `items[].responseType` | String | yes | one of: `yes_no`, `text`, `number`, `choice` |  |
+| `items[].choices` | array of String |  | ≤ 60 chars |  |
+| `items[].failIf` | String |  | ≤ 60 chars |  |
+| `items[].createActionOnFail` | Boolean |  | default `true` |  |
+| `active` | Boolean |  | default `true` |  |
+| `source` | String |  | ≤ 300 chars |  |
+
+| Index | Options | Serves |
+| --- | --- | --- |
+| farmId, kind, name | unique, live records only | Templates by kind for each form; names unique per kind |
+
 ### biosecurity_logs
 
-Evidence that a biosecurity action happened: cleaning, disinfection, footbath change, pest control, vehicle wash.
+Evidence that a biosecurity activity happened: cleaning, disinfection, footbath change or check, vehicle movement, pest control, wild bird observation, or an audit. Each type has its own section; any type can carry checklist answers.
 
 - **Model:** `BiosecurityLog`
 - **Ownership:** Farm — every query must include farmId
@@ -855,16 +933,54 @@ Evidence that a biosecurity action happened: cleaning, disinfection, footbath ch
 
 | Field | Type | Required | Constraints | References |
 | --- | --- | --- | --- | --- |
-| `type` | String | yes | one of: `cleaning`, `disinfection`, `visitor`, `vehicle`, `equipment`, `pest_control`, `footbath` |  |
+| `type` | String | yes | one of: `cleaning`, `disinfection`, `footbath`, `vehicle`, `pest_control`, `wild_bird_observation`, `audit` |  |
 | `date` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
 | `houseId` | String |  |  | `House` |
 | `cleaningTaskId` | String |  |  | `CleaningTask` |
 | `performedBy` | String |  | ≤ 120 chars |  |
-| `productUsed` | String |  | ≤ 120 chars |  |
-| `inventoryTransactionId` | String |  |  | `InventoryTransaction` |
-| `checklist` | array of objects |  |  |  |
-| `checklist[].item` | String | yes | ≤ 200 chars |  |
-| `checklist[].done` | Boolean |  | default `false` |  |
+| `product` | object |  |  |  |
+| `product.inventoryItemId` | String |  |  | `InventoryItem` |
+| `product.name` | String |  | ≤ 120 chars |  |
+| `product.quantityUsed` | Number |  |  |  |
+| `product.concentration` | String |  | ≤ 60 chars |  |
+| `product.stockCostMinor` | Number |  | integer |  |
+| `footbath` | object |  |  |  |
+| `footbath.action` | String | yes | one of: `changed`, `checked`, `topped_up` |  |
+| `footbath.disinfectant` | String |  | ≤ 120 chars |  |
+| `footbath.concentration` | String |  | ≤ 60 chars |  |
+| `vehicle` | object |  |  |  |
+| `vehicle.registration` | String | yes | ≤ 30 chars |  |
+| `vehicle.driver` | String |  | ≤ 120 chars |  |
+| `vehicle.company` | String |  | ≤ 120 chars |  |
+| `vehicle.purpose` | String |  | ≤ 200 chars |  |
+| `vehicle.disinfected` | Boolean |  | default `false` |  |
+| `vehicle.entryAt` | Date |  |  |  |
+| `vehicle.exitAt` | Date |  |  |  |
+| `vehicle.lastPoultryContactAt` | Date |  |  |  |
+| `pest` | object |  |  |  |
+| `pest.pestType` | String | yes | one of: `rodents`, `insects`, `wild_birds`, `other` |  |
+| `pest.method` | String |  | ≤ 120 chars |  |
+| `pest.stationsChecked` | Number |  | integer |  |
+| `pest.activityFound` | Boolean |  | default `false` |  |
+| `wildBird` | object |  |  |  |
+| `wildBird.description` | String | yes | ≤ 200 chars |  |
+| `wildBird.count` | Number |  | integer |  |
+| `wildBird.location` | String |  | ≤ 200 chars |  |
+| `wildBird.contactWithPoultry` | Boolean |  | default `false` |  |
+| `wildBird.contactWithFeedOrWater` | Boolean |  | default `false` |  |
+| `wildBird.deadWildBirdsFound` | Number |  | integer |  |
+| `checklist` | object |  |  |  |
+| `checklist.templateId` | String | yes |  | `ChecklistTemplate` |
+| `checklist.templateVersion` | Number | yes | integer |  |
+| `checklist.answers` | array of objects |  |  |  |
+| `checklist.answers[].itemId` | String | yes | ≤ 60 chars |  |
+| `checklist.answers[].text` | String | yes | ≤ 300 chars |  |
+| `checklist.answers[].answer` | Mixed | yes |  |  |
+| `checklist.answers[].passed` | Boolean | yes |  |  |
+| `checklist.failedCount` | Number |  | default `0`; integer |  |
+| `attachments` | array of objects |  |  |  |
+| `attachments[].assetId` | String | yes |  | `MediaAsset` |
+| `attachments[].name` | String |  | ≤ 200 chars |  |
 | `details` | String |  | ≤ 2000 chars |  |
 
 | Index | Options | Serves |
@@ -873,7 +989,7 @@ Evidence that a biosecurity action happened: cleaning, disinfection, footbath ch
 
 ### visitors
 
-Visitor register: who entered, why, which houses, and their last contact with other poultry (for trace-back).
+Visitor register: who entered, why, which houses, their declaration, last contact with other poultry and the downtime since, PPE and footbath use. Supports trace-back.
 
 - **Model:** `Visitor`
 - **Ownership:** Farm — every query must include farmId
@@ -888,9 +1004,29 @@ Visitor register: who entered, why, which houses, and their last contact with ot
 | `purpose` | String |  | ≤ 200 chars |  |
 | `vehicleRegistration` | String |  | ≤ 30 chars |  |
 | `housesVisited` | array of String |  |  | `House` |
-| `lastPoultryContactDate` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
-| `ppeProvided` | Boolean |  | default `false` |  |
+| `previousPoultryContact` | object |  |  |  |
+| `previousPoultryContact.hadContact` | Boolean | yes |  |  |
+| `previousPoultryContact.lastContactAt` | Date |  |  |  |
+| `previousPoultryContact.description` | String |  | ≤ 300 chars |  |
+| `downtimeHours` | Number |  | max 100000 |  |
+| `requiredDowntimeHours` | Number |  | max 10000 |  |
+| `declaration` | object |  |  |  |
+| `declaration.declaredName` | String | yes | ≤ 120 chars |  |
+| `declaration.declaredAt` | Date | yes |  |  |
+| `declaration.signatureAssetId` | String |  |  | `MediaAsset` |
+| `declaration.checklist` | object |  |  |  |
+| `declaration.checklist.templateId` | String | yes |  | `ChecklistTemplate` |
+| `declaration.checklist.templateVersion` | Number | yes | integer |  |
+| `declaration.checklist.answers` | array of objects |  |  |  |
+| `declaration.checklist.answers[].itemId` | String | yes | ≤ 60 chars |  |
+| `declaration.checklist.answers[].text` | String | yes | ≤ 300 chars |  |
+| `declaration.checklist.answers[].answer` | Mixed | yes |  |  |
+| `declaration.checklist.answers[].passed` | Boolean | yes |  |  |
+| `declaration.checklist.failedCount` | Number |  | default `0`; integer |  |
+| `ppeUsed` | array of String |  | ≤ 60 chars |  |
+| `footbathUsed` | Boolean |  | default `false` |  |
 | `disinfected` | Boolean |  | default `false` |  |
+| `flags` | array of String |  | one of: `downtime_short`, `declaration_failed` |  |
 | `checkInAt` | Date | yes |  |  |
 | `checkOutAt` | Date |  |  |  |
 | `hostUserId` | String |  |  | `User` |
@@ -902,7 +1038,7 @@ Visitor register: who entered, why, which houses, and their last contact with ot
 
 ### cleaning_tasks
 
-A recurring cleaning or disinfection routine with its checklist. Completing it writes a biosecurity_log and moves nextDueDate.
+A recurring cleaning or disinfection routine, optionally with a checklist template. Completing it writes a biosecurity_log (with the checklist answers) and moves nextDueDate.
 
 - **Model:** `CleaningTask`
 - **Ownership:** Farm — every query must include farmId
@@ -911,9 +1047,10 @@ A recurring cleaning or disinfection routine with its checklist. Completing it w
 | Field | Type | Required | Constraints | References |
 | --- | --- | --- | --- | --- |
 | `title` | String | yes | ≤ 200 chars |  |
+| `activity` | String | yes | one of: `cleaning`, `disinfection`; default `"cleaning"` |  |
 | `schedule` | String | yes | one of: `daily`, `weekly`, `monthly`, `between_flocks`, `one_off` |  |
 | `houseIds` | array of String |  |  | `House` |
-| `checklist` | array of String |  | ≤ 200 chars |  |
+| `checklistTemplateId` | String |  |  | `ChecklistTemplate` |
 | `assigneeUserId` | String |  |  | `User` |
 | `nextDueDate` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
 | `lastDoneDate` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
@@ -1281,6 +1418,7 @@ A piece of work assigned to someone on the farm, optionally linked to a flock, h
 
 | Field | Type | Required | Constraints | References |
 | --- | --- | --- | --- | --- |
+| `kind` | String | yes | one of: `general`, `corrective_action`, `follow_up`; default `"general"` |  |
 | `title` | String | yes | ≤ 200 chars |  |
 | `description` | String |  | ≤ 2000 chars |  |
 | `assigneeUserId` | String |  |  | `User` |
@@ -1294,6 +1432,9 @@ A piece of work assigned to someone on the farm, optionally linked to a flock, h
 | `related.id` | String | yes |  |  |
 | `completedAt` | Date |  |  |  |
 | `completedBy` | String |  |  | `User` |
+| `resolutionNotes` | String |  | ≤ 2000 chars |  |
+| `verifiedAt` | Date |  |  |  |
+| `verifiedBy` | String |  |  | `User` |
 
 | Index | Options | Serves |
 | --- | --- | --- |
@@ -1312,7 +1453,7 @@ A farm's configuration of one alert type: on/off, thresholds, scope and who is n
 
 | Field | Type | Required | Constraints | References |
 | --- | --- | --- | --- | --- |
-| `ruleType` | String | yes | one of: `mortality_spike`, `egg_drop`, `feed_change`, `missing_record`, `heat_stress`, `low_feed_stock`, `low_inventory`, `vaccination_due`, `withdrawal_active`, `expiry_soon`, `expired_stock`, `water_abnormal` |  |
+| `ruleType` | String | yes | one of: `mortality_spike`, `egg_drop`, `feed_change`, `missing_record`, `heat_stress`, `low_feed_stock`, `low_inventory`, `vaccination_due`, `withdrawal_active`, `expiry_soon`, `expired_stock`, `water_abnormal`, `health_follow_up`, `biosecurity_breach`, `wild_bird_contact`, `checklist_failed` |  |
 | `enabled` | Boolean |  | default `true` |  |
 | `parameters` | map of Number |  |  |  |
 | `parameters.$*` | Number |  |  |  |
@@ -1336,7 +1477,7 @@ Something that needs attention, raised by the server-side alert job. States fact
 
 | Field | Type | Required | Constraints | References |
 | --- | --- | --- | --- | --- |
-| `ruleType` | String | yes | one of: `mortality_spike`, `egg_drop`, `feed_change`, `missing_record`, `heat_stress`, `low_feed_stock`, `low_inventory`, `vaccination_due`, `withdrawal_active`, `expiry_soon`, `expired_stock`, `water_abnormal` |  |
+| `ruleType` | String | yes | one of: `mortality_spike`, `egg_drop`, `feed_change`, `missing_record`, `heat_stress`, `low_feed_stock`, `low_inventory`, `vaccination_due`, `withdrawal_active`, `expiry_soon`, `expired_stock`, `water_abnormal`, `health_follow_up`, `biosecurity_breach`, `wild_bird_contact`, `checklist_failed` |  |
 | `severity` | String | yes | one of: `info`, `warning`, `critical` |  |
 | `status` | String | yes | one of: `open`, `acknowledged`, `resolved`; default `"open"` |  |
 | `flockId` | String |  |  | `Flock` |
@@ -1648,7 +1789,7 @@ A photo uploaded by a farm member (daily records, health records). The bytes liv
 
 | Field | Type | Required | Constraints | References |
 | --- | --- | --- | --- | --- |
-| `contentType` | String | yes | one of: `image/jpeg`, `image/png`, `image/webp` |  |
+| `contentType` | String | yes | one of: `image/jpeg`, `image/png`, `image/webp`, `application/pdf` |  |
 | `sizeBytes` | Number | yes | min 1; max 10000000; integer |  |
 | `sha256` | String | yes | ≤ 64 chars |  |
 | `storageKey` | String | yes | ≤ 300 chars |  |
@@ -1713,13 +1854,16 @@ Every reference between collections, derived from the schemas.
 | `health_records` | `flockId` | `flocks` | many-to-one |
 | `health_records` | `houseId` | `houses` | many-to-one |
 | `health_records` | `vetUserId` | `users` | many-to-one |
-| `health_records` | `treatment.medicineId` | `medicines` | many-to-one |
-| `health_records` | `expenseId` | `expenses` | many-to-one |
+| `health_records` | `treatments[].medicineId` | `medicines` | many-to-one |
+| `health_records` | `treatments[].inventoryItemId` | `inventory_items` | many-to-one |
+| `health_records` | `attachments[].assetId` | `media_assets` | many-to-one |
 | `health_records` | `dailyRecordId` | `daily_records` | many-to-one |
+| `vaccination_programmes` | `items[].medicineId` | `medicines` | many-to-one |
 | `vaccinations` | `flockId` | `flocks` | many-to-one |
+| `vaccinations` | `programmeId` | `vaccination_programmes` | many-to-one |
 | `vaccinations` | `medicineId` | `medicines` | many-to-one |
-| `vaccinations` | `administeredBy` | `users` | many-to-one |
-| `vaccinations` | `inventoryTransactionId` | `inventory_transactions` | many-to-one |
+| `vaccinations` | `inventoryItemId` | `inventory_items` | many-to-one |
+| `vaccinations` | `batches[].lotId` | `inventory_lots` | many-to-one |
 | `hatchery_batches` | `sourceFlockId` | `flocks` | many-to-one |
 | `hatchery_batches` | `incubatorId` | `equipment` | many-to-one |
 | `hatchery_events` | `batchId` | `hatchery_batches` | many-to-one |
@@ -1729,10 +1873,15 @@ Every reference between collections, derived from the schemas.
 | `chicks` | `placedFlockIds` | `flocks` | many-to-many |
 | `biosecurity_logs` | `houseId` | `houses` | many-to-one |
 | `biosecurity_logs` | `cleaningTaskId` | `cleaning_tasks` | many-to-one |
-| `biosecurity_logs` | `inventoryTransactionId` | `inventory_transactions` | many-to-one |
+| `biosecurity_logs` | `product.inventoryItemId` | `inventory_items` | many-to-one |
+| `biosecurity_logs` | `checklist.templateId` | `checklist_templates` | many-to-one |
+| `biosecurity_logs` | `attachments[].assetId` | `media_assets` | many-to-one |
 | `visitors` | `housesVisited` | `houses` | many-to-many |
+| `visitors` | `declaration.signatureAssetId` | `media_assets` | many-to-one |
+| `visitors` | `declaration.checklist.templateId` | `checklist_templates` | many-to-one |
 | `visitors` | `hostUserId` | `users` | many-to-one |
 | `cleaning_tasks` | `houseIds` | `houses` | many-to-many |
+| `cleaning_tasks` | `checklistTemplateId` | `checklist_templates` | many-to-one |
 | `cleaning_tasks` | `assigneeUserId` | `users` | many-to-one |
 | `equipment` | `houseId` | `houses` | many-to-one |
 | `equipment_movements` | `equipmentId` | `equipment` | many-to-one |
@@ -1763,6 +1912,7 @@ Every reference between collections, derived from the schemas.
 | `tasks` | `flockId` | `flocks` | many-to-one |
 | `tasks` | `houseId` | `houses` | many-to-one |
 | `tasks` | `completedBy` | `users` | many-to-one |
+| `tasks` | `verifiedBy` | `users` | many-to-one |
 | `tasks` | `related.id` | any farm record | many-to-one (Polymorphic by related.entity) |
 | `alert_rules` | `flockIds` | `flocks` | many-to-many |
 | `alert_rules` | `houseIds` | `houses` | many-to-many |

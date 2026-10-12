@@ -45,6 +45,8 @@ export interface DailyRecordDeps {
   flocks: FlockService;
   feed: FeedService;
   alerts: AlertService;
+  /** Marks eggs laid during an egg withdrawal period as withheld (FlockHealth). */
+  afterEggsWritten?: (ctx: FarmContext, flockId: string, tx: Tx) => Promise<void>;
 }
 
 type Fields = DailyRecordFields;
@@ -269,6 +271,7 @@ export function createDailyRecordService(d: DailyRecordDeps) {
 
     // 4. Eggs and their stock postings.
     await writeEggs(ctx, flock, date, record.id, f.eggs, now, tx);
+    if (f.eggs) await d.afterEggsWritten?.(ctx, flock.id, tx);
 
     // 5. Health observations (records of what was seen; never a diagnosis).
     const oldObs = await repos.healthRecords.find(ctx.farmId, { where: { dailyRecordId: record.id } }, tx);
@@ -425,6 +428,7 @@ export function createDailyRecordService(d: DailyRecordDeps) {
               ...(egg.byGrade ? { byGrade: egg.byGrade as Record<string, number> } : {}),
               ...(egg.averageEggWeightG !== undefined ? { averageEggWeightG: egg.averageEggWeightG } : {}),
               ...(egg.qualityNotes ? { qualityNotes: egg.qualityNotes } : {}),
+              ...(egg.withheldUntil ? { withheldUntil: egg.withheldUntil } : {}),
               henDayPercent: henDayPercent(egg.collected, aliveStart),
             },
           }

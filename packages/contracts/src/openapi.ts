@@ -247,6 +247,58 @@ post("/farms/invitations/accept", "Accept an emailed farm invitation", bodyOf(S.
   r("post", "/alerts/{alertId}/acknowledge", "Alerts", "Acknowledge an alert", z.object({ farmId: V.Id, alertId: V.Id }), {}, { 200: json(any, "Acknowledged") });
 }
 
+// ---- FlockHealth, BioSecure Farm, content ------------------------------------
+{
+  const P = `${API_PREFIX}/farms/{farmId}`;
+  const any = z.record(z.unknown());
+  const items = z.object({ items: z.array(any) });
+  const idp = z.object({ farmId: V.Id, id: V.Id });
+  const r = (method: "get" | "post" | "put" | "delete", path: string, tag: string, summary: string, params: z.AnyZodObject, request: Record<string, unknown>, ok: Record<string, unknown>) =>
+    registry.registerPath({ method, path: `${P}${path}`, tags: [tag], summary, security: secured, request: { params, ...request }, responses: { ...ok, ...errors } } as never);
+  const H = "FlockHealth";
+  r("get", "/health/medicines", H, "The farm's medicine and vaccine catalog with withdrawal periods (from label or vet)", farmParams, {}, { 200: json(items, "Medicines") });
+  r("post", "/health/medicines", H, "Add a medicine", farmParams, bodyOf(V.CreateMedicineRequest), { 201: json(any, "Created") });
+  r("put", "/health/medicines/{id}", H, "Replace a medicine", idp, bodyOf(V.UpdateMedicineRequest), { 200: json(any, "Updated") });
+  r("get", "/health/records", H, "Health records: observations, vet visits, treatments, lab tests, post-mortems", farmParams, { query: V.HealthRecordListQuery }, { 200: json(items, "Records") });
+  r("post", "/health/records", H, "Record an observation, visit, treatment, lab test or post-mortem (assessments are attributed; nothing is diagnosed)", farmParams, bodyOf(V.CreateHealthRecordRequest), { 201: json(any, "Created") });
+  r("get", "/health/records/{id}", H, "One health record with attachment links", idp, {}, { 200: json(any, "Record") });
+  r("put", "/health/records/{id}", H, "Replace a health record", idp, bodyOf(V.UpdateHealthRecordRequest), { 200: json(any, "Updated") });
+  r("delete", "/health/records/{id}", H, "Delete a record; its medicine returns to stock and its withdrawal periods lift", idp, {}, { 204: { description: "Deleted" } });
+  r("post", "/health/records/{id}/follow-up-done", H, "Mark the follow-up done", idp, {}, { 200: json(any, "Updated") });
+  r("get", "/health/reminders", H, "Vaccinations due or overdue, follow-ups, withdrawal end dates", farmParams, { query: V.RemindersQuery }, { 200: json(any, "Reminders") });
+  r("get", "/health/withdrawals/{flockId}", H, "Withdrawal periods in force for a flock", z.object({ farmId: V.Id, flockId: V.Id }), {}, { 200: json(any, "Withdrawals") });
+  r("get", "/health/programmes", H, "The farm's vaccination programmes", farmParams, {}, { 200: json(items, "Programmes") });
+  r("post", "/health/programmes", H, "Add a vaccination programme (from the farm's vet or hatchery)", farmParams, bodyOf(V.CreateProgrammeRequest), { 201: json(any, "Created") });
+  r("post", "/health/programmes/apply/{flockId}", H, "Schedule a programme for a flock by bird age", z.object({ farmId: V.Id, flockId: V.Id }), bodyOf(V.ApplyProgrammeRequest), { 201: json(any, "Scheduled") });
+  r("get", "/health/vaccinations", H, "Vaccinations with derived state (scheduled, due, overdue, done, skipped)", farmParams, { query: V.VaccinationListQuery }, { 200: json(items, "Vaccinations") });
+  r("post", "/health/vaccinations", H, "Schedule a vaccination", farmParams, bodyOf(V.ScheduleVaccinationRequest), { 201: json(any, "Scheduled") });
+  r("post", "/health/vaccinations/{id}/administer", H, "Record a vaccination as given (batches and expiry from stock; expired batches refused)", idp, bodyOf(V.AdministerVaccinationRequest), { 200: json(any, "Given") });
+  r("post", "/health/vaccinations/{id}/skip", H, "Skip a vaccination with a reason", idp, bodyOf(V.SkipVaccinationRequest), { 200: json(any, "Skipped") });
+  const B = "BioSecure Farm";
+  r("get", "/biosecurity/summary", B, "Biosecurity at a glance", farmParams, {}, { 200: json(any, "Summary") });
+  r("get", "/biosecurity/checklists", B, "The farm's checklists", farmParams, { query: V.ChecklistTemplateQuery }, { 200: json(items, "Checklists") });
+  r("post", "/biosecurity/checklists", B, "Add a checklist", farmParams, bodyOf(V.CreateChecklistTemplateRequest), { 201: json(any, "Created") });
+  r("post", "/biosecurity/checklists/starter", B, "Add generic starter checklists (editable; no country rules)", farmParams, {}, { 201: json(any, "Added") });
+  r("put", "/biosecurity/checklists/{id}", B, "Replace a checklist (bumps its version)", idp, bodyOf(V.UpdateChecklistTemplateRequest), { 200: json(any, "Updated") });
+  r("get", "/biosecurity/visitors", B, "Visitor register", farmParams, { query: V.VisitorListQuery }, { 200: json(items, "Visitors") });
+  r("post", "/biosecurity/visitors", B, "Check a visitor in (declaration, previous poultry contact, PPE, footbath)", farmParams, bodyOf(V.VisitorCheckInRequest), { 201: json(any, "Checked in"), 422: json(S.ErrorEnvelope, "Declaration incomplete") });
+  r("post", "/biosecurity/visitors/{id}/check-out", B, "Check a visitor out", idp, bodyOf(V.VisitorCheckOutRequest), { 200: json(any, "Checked out") });
+  r("get", "/biosecurity/logs", B, "Biosecurity logs", farmParams, { query: V.BiosecurityLogQuery }, { 200: json(items, "Logs") });
+  r("post", "/biosecurity/logs", B, "Record cleaning, disinfection, footbath, vehicle, pest control, wild bird observation or audit", farmParams, bodyOf(V.BiosecurityLogRequest), { 201: json(any, "Recorded") });
+  r("get", "/biosecurity/equipment", B, "Equipment", farmParams, {}, { 200: json(items, "Equipment") });
+  r("post", "/biosecurity/equipment", B, "Add equipment", farmParams, bodyOf(V.EquipmentRequest), { 201: json(any, "Created") });
+  r("post", "/biosecurity/equipment/{id}/moves", B, "Record an equipment movement", idp, bodyOf(V.EquipmentMoveRequest), { 201: json(any, "Moved") });
+  r("get", "/biosecurity/cleaning-schedules", B, "Cleaning and disinfection schedules", farmParams, {}, { 200: json(items, "Schedules") });
+  r("post", "/biosecurity/cleaning-schedules", B, "Add a schedule", farmParams, bodyOf(V.CleaningScheduleRequest), { 201: json(any, "Created") });
+  r("post", "/biosecurity/cleaning-schedules/{id}/complete", B, "Complete a scheduled cleaning (writes the log, moves the next due date)", idp, bodyOf(V.CompleteCleaningRequest), { 201: json(any, "Completed") });
+  r("get", "/biosecurity/corrective-actions", B, "Corrective actions", farmParams, { query: V.ActionListQuery }, { 200: json(items, "Actions") });
+  r("post", "/biosecurity/corrective-actions", B, "Raise a corrective action", farmParams, bodyOf(V.CorrectiveActionRequest), { 201: json(any, "Created") });
+  r("post", "/biosecurity/corrective-actions/{id}/complete", B, "Complete an action", idp, bodyOf(V.CompleteActionRequest), { 200: json(any, "Completed") });
+  r("post", "/biosecurity/corrective-actions/{id}/verify", B, "Verify an action (not by the person who completed it)", idp, {}, { 200: json(any, "Verified") });
+  r("get", "/content/articles", "Content", "Published educational articles (global and the farm's country), each with sources", farmParams, { query: V.ArticleListQuery }, { 200: json(items, "Articles") });
+  r("get", "/content/articles/{slug}", "Content", "One article with its body and sources", z.object({ farmId: V.Id, slug: z.string() }), {}, { 200: json(any, "Article") });
+}
+
 // ---- sync -----------------------------------------------------------------
 registry.registerPath({
   method: "get",

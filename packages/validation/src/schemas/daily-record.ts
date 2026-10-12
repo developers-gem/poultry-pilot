@@ -182,7 +182,7 @@ export const DailyRecordView = z.object({
   humidityPercent: z.number().optional(),
   lightingHours: z.number().optional(),
   eggs: z
-    .object({ collected: z.number(), broken: z.number(), byGrade: z.record(z.number()).optional(), averageEggWeightG: z.number().optional(), qualityNotes: z.string().optional(), henDayPercent: z.number().nullable() })
+    .object({ collected: z.number(), broken: z.number(), byGrade: z.record(z.number()).optional(), averageEggWeightG: z.number().optional(), qualityNotes: z.string().optional(), henDayPercent: z.number().nullable(), withheldUntil: z.string().optional() })
     .optional(),
   averageWeight: z.object({ averageWeightG: z.number(), sampleSize: z.number().optional(), eventId: z.string() }).optional(),
   healthObservations: z.array(z.object({ id: z.string(), signs: z.string(), affectedBirds: z.number().optional() })),

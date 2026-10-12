@@ -7,3 +7,5 @@ export * from "./schemas/flock.js";
 export * from "./schemas/sync.js";
 export * from "./schemas/daily-record.js";
 export * from "./schemas/inventory.js";
+export * from "./schemas/health.js";
+export * from "./schemas/biosecurity.js";

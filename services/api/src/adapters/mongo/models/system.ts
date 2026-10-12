@@ -112,7 +112,7 @@ export const MediaAssetModel = defineCollection({
   description:
     "A photo uploaded by a farm member (daily records, health records). The bytes live in object storage under storageKey; this document is the farm-scoped index and access check.",
   fields: {
-    contentType: enumOf(["image/jpeg", "image/png", "image/webp"], { required: true }),
+    contentType: enumOf(["image/jpeg", "image/png", "image/webp", "application/pdf"], { required: true }),
     sizeBytes: int({ required: true, min: 1, max: 10_000_000 }),
     sha256: str({ required: true, max: 64 }),
     storageKey: str({ required: true, max: 300 }),

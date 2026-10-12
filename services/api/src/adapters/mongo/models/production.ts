@@ -241,6 +241,8 @@ export const EggRecordModel = defineCollection({
     broken: int({ default: 0 }),
     averageEggWeightG: num({ max: 150 }),
     qualityNotes: str({ max: 500 }),
+    /** Laid during an egg withdrawal period: must not be sold. The date is the withdrawal's last day. */
+    withheldUntil: localDate(),
     dailyRecordId: ref("DailyRecord"),
     notes: text(1000),
   },

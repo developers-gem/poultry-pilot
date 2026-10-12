@@ -92,6 +92,11 @@ export const ArticleModel = defineCollection({
         if (!this.get("publishedAt")) this.invalidate("publishedAt", "Published news and disease notices need a publication date");
         if (!(this.get("sources") as unknown[])?.length) this.invalidate("sources", "Published news and disease notices need at least one source");
       }
+      // Educational health and biosecurity content must cite where it comes from.
+      const tags = (this.get("tags") as string[] | undefined) ?? [];
+      if (this.get("status") === "published" && (tags.includes("health") || tags.includes("biosecurity")) && !(this.get("sources") as unknown[])?.length) {
+        this.invalidate("sources", "Published health and biosecurity articles need at least one source");
+      }
     }),
 });
 
