@@ -1,4 +1,4 @@
-import { MEMBERSHIP_STATUSES, ROLES, SESSION_PLATFORMS, UNIT_SYSTEMS, USER_STATUSES } from "@poultrypilot/constants";
+import { MEMBERSHIP_STATUSES, ROLES, SESSION_PLATFORMS, UNIT_SYSTEMS, USER_STATUSES, PLATFORM_ROLES } from "@poultrypilot/constants";
 import { Schema } from "mongoose";
 import { GeoPointSchema, bool, defineCollection, enumOf, instant, int, num, ref, str, text } from "./base.js";
 
@@ -15,6 +15,8 @@ export const UserModel = defineCollection({
     email: str({ required: true, max: 254, lowercase: true }),
     fullName: str({ required: true, max: 120 }),
     phone: str({ max: 30 }),
+    /** PoultryPilot staff roles for global content; granted by an operator, never by farms. */
+    platformRoles: { type: [enumOf(PLATFORM_ROLES)], default: undefined },
     locale: str({ max: 10 }),
     passwordHash: { type: String },
     googleSub: { type: String },

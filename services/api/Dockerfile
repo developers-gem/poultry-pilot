@@ -9,7 +9,8 @@ COPY services/api ./services/api
 RUN pnpm install --frozen-lockfile --filter @poultrypilot/api...
 RUN pnpm --filter @poultrypilot/api build \
  && pnpm --filter @poultrypilot/api deploy --prod /out \
- && cp -r services/api/dist /out/dist
+ && cp -r services/api/dist /out/dist \
+ && cp -r services/api/assets /out/assets
 
 FROM node:22-alpine
 ENV NODE_ENV=production

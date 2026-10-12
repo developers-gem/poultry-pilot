@@ -11,6 +11,8 @@ import type {
   SessionRecord,
   SyncChangeRecord,
   ArticleRecord,
+  GlossaryTermRecord,
+  CourseRecord,
   MarketListingRecord,
   OrderRecord,
   NotificationRecord,
@@ -81,6 +83,9 @@ import {
   NotificationPreferenceModel,
   WeatherObservationModel,
   WeatherCacheModel,
+  GlossaryTermModel,
+  TrainingCourseModel,
+  TrainingProgressModel,
 } from "./models/index.js";
 import { createMongoFarmRepo } from "./farm-repo.js";
 
@@ -115,6 +120,45 @@ function toUpdate(patch: Record<string, unknown>) {
     else $set[k] = v;
   }
   return { ...(Object.keys($set).length ? { $set } : {}), ...(Object.keys($unset).length ? { $unset } : {}) };
+}
+
+/**
+ * Global content repos. Writes validate the whole document first (updateOne would skip the publishing rules in the
+ * schema's validate hook), then apply only if the version still matches.
+ */
+function createMongoContentRepo<T extends { id: string; version: number }>(model: Model<any>, titleField: string): import("../../ports/repositories.js").ContentRepo<T> {
+  const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return {
+    async find(q) {
+      const filter: Record<string, unknown> = {};
+      if (q.status !== undefined) filter["status"] = Array.isArray(q.status) ? { $in: q.status } : q.status;
+      if (q.kind) filter["kind"] = q.kind;
+      if (q.category) filter["category"] = q.category;
+      if (q.locale) filter["locale"] = q.locale;
+      if (q.regionCodes) filter["regionCode"] = { $in: q.regionCodes };
+      if (q.text) filter[titleField] = { $regex: esc(q.text), $options: "i" };
+      const sortBy = q.sortBy ?? "updatedAt";
+      const dir = sortBy === "order" || sortBy === "term" ? 1 : -1;
+      const docs = await model.find(filter).sort({ [sortBy]: dir, _id: 1 }).limit(q.limit).lean();
+      return docs.map((d) => fromDoc<T>(d));
+    },
+    findById: (id) => findOne<T>(model, { _id: id }),
+    findBySlug: (slug, locale) => findOne<T>(model, { slug, locale }),
+    async insert(rec) {
+      await model.create([toDoc(rec)]);
+    },
+    async update(id, patch, expectedVersion) {
+      const cur = await model.findOne({ _id: id }).lean();
+      if (!cur || (cur as unknown as { version: number }).version !== expectedVersion) return null;
+      const merged: Record<string, unknown> = { ...(cur as object), ...patch, version: expectedVersion + 1 };
+      for (const [k, v] of Object.entries(patch)) if (v === undefined) delete merged[k];
+      delete merged["id"];
+      await new model(merged).validate();
+      const r = await model.updateOne({ _id: id, version: expectedVersion }, toUpdate({ ...(patch as Record<string, unknown>), version: expectedVersion + 1 }));
+      if (r.matchedCount === 0) return null;
+      return fromDoc<T>(await model.findOne({ _id: id }).lean());
+    },
+  };
 }
 
 async function findOne<T>(model: Model<any>, filter: Record<string, unknown>, tx?: Tx): Promise<T | null> {
@@ -446,17 +490,16 @@ export function createMongoRepositories(connection = mongoose.connection): Repos
         return (doc as unknown as { value: number }).value;
       },
     },
-    articles: {
-      async findPublished(q) {
-        const docs = await ArticleModel.find({ status: "published", locale: q.locale, regionCode: { $in: q.regionCodes }, ...(q.kind ? { kind: q.kind } : {}), ...(q.tag ? { tags: q.tag } : {}) }).sort({ publishedAt: -1 }).lean();
-        return docs.map((d) => fromDoc<ArticleRecord>(d));
+    articles: { ...createMongoContentRepo<ArticleRecord>(ArticleModel, "title"), findBySourceUrl: (url) => findOne<ArticleRecord>(ArticleModel, { sourceUrl: url }) },
+    glossary: createMongoContentRepo<GlossaryTermRecord>(GlossaryTermModel, "term"),
+    courses: createMongoContentRepo<CourseRecord>(TrainingCourseModel, "title"),
+    trainingProgress: {
+      async complete(userId, courseId, lessonId, at) {
+        await TrainingProgressModel.updateOne({ userId, lessonId }, { $setOnInsert: { _id: `${userId}:${courseId}:${lessonId}`, userId, courseId, lessonId, completedAt: at, createdAt: at, updatedAt: at } }, { upsert: true });
       },
-      findBySlug: (slug, locale) => findOne<ArticleRecord>(ArticleModel, { slug, locale }),
-      async upsert(rec) {
-        // updateOne skips document validation, so the publishing rules are checked here as well.
-        await new ArticleModel({ ...rec, _id: rec.id, id: undefined }).validate();
-        const { id, ...rest } = rec;
-        await ArticleModel.updateOne({ slug: rec.slug, locale: rec.locale }, { $set: rest, $setOnInsert: { _id: id } }, { upsert: true, runValidators: true });
+      async forUser(userId, courseId) {
+        const docs = await TrainingProgressModel.find({ userId, ...(courseId ? { courseId } : {}) }).lean();
+        return docs.map((d) => ({ courseId: d.courseId as string, lessonId: d.lessonId as string, completedAt: d.completedAt as Date }));
       },
     },
     // Cross-farm by design: returns only the farmId, which the caller then checks membership for.

@@ -296,7 +296,7 @@ post("/farms/invitations/accept", "Accept an emailed farm invitation", bodyOf(S.
   r("post", "/biosecurity/corrective-actions/{id}/complete", B, "Complete an action", idp, bodyOf(V.CompleteActionRequest), { 200: json(any, "Completed") });
   r("post", "/biosecurity/corrective-actions/{id}/verify", B, "Verify an action (not by the person who completed it)", idp, {}, { 200: json(any, "Verified") });
   r("get", "/content/articles", "Content", "Published educational articles (global and the farm's country), each with sources", farmParams, { query: V.ArticleListQuery }, { 200: json(items, "Articles") });
-  r("get", "/content/articles/{slug}", "Content", "One article with its body and sources", z.object({ farmId: V.Id, slug: z.string() }), {}, { 200: json(any, "Article") });
+  r("get", "/content/articles/{slug}", "Content", "One published article with content, references and attribution", z.object({ farmId: V.Id, slug: z.string() }), {}, { 200: json(any, "Article") });
 }
 
 // ---- HatcheryHub, chick orders, ChickStart, calendar ------------------------
@@ -429,6 +429,41 @@ post("/farms/invitations/accept", "Accept an emailed farm invitation", bodyOf(S.
   r("delete", "/push-devices/{id}", N, "Remove a device", z.object({ id: V.Id }), {}, { 204: { description: "Removed" } }, M);
   r("get", "/notification-preferences", N, "Your push and email preferences", z.object({}), {}, { 200: json(any, "Preferences") }, M);
   r("put", "/notification-preferences", N, "Set push and email on/off, minimum severity, muted rules", z.object({}), bodyOf(V.NotificationPreferencesRequest), { 200: json(any, "Preferences") }, M);
+}
+
+// ---- Knowledge platform and reports --------------------------------------------
+{
+  const any = z.record(z.unknown());
+  const items = z.object({ items: z.array(any) });
+  const r = (method: "get" | "post" | "put", path: string, tag: string, summary: string, params: z.AnyZodObject, request: Record<string, unknown>, ok: Record<string, unknown>) =>
+    registry.registerPath({ method, path: `${API_PREFIX}${path}`, tags: [tag], summary, security: secured, request: { params, ...request }, responses: { ...ok, ...errors } } as never);
+  const none = z.object({});
+  const K = "Knowledge";
+  r("get", "/content/articles", K, "Published facts, guides, news and disease information for a region", none, { query: V.ContentArticleQuery }, { 200: json(items, "Articles") });
+  r("get", "/content/articles/{slug}", K, "One published article with content, references and attribution", V.SlugParams, { query: V.LocaleQuery }, { 200: json(any, "Article") });
+  r("get", "/content/news", K, "News for a region, newest publication first", none, { query: V.NewsQuery }, { 200: json(items, "News") });
+  r("get", "/content/facts/today", K, "Fact of the day", none, { query: V.FactQuery }, { 200: json(any, "Fact") });
+  r("get", "/content/glossary", K, "Glossary search", none, { query: V.GlossaryQuery }, { 200: json(items, "Terms") });
+  r("get", "/content/courses", K, "Training courses with your progress", none, { query: V.CourseQuery }, { 200: json(items, "Courses") });
+  r("get", "/content/courses/{slug}", K, "A course with its lessons and your progress", V.SlugParams, { query: V.LocaleQuery }, { 200: json(any, "Course") });
+  r("post", "/content/courses/{slug}/lessons/{lessonId}/complete", K, "Mark a lesson done", V.LessonParams, { query: V.LocaleQuery }, { 200: json(any, "Course") });
+  const E = "Knowledge editorial";
+  r("get", "/admin/content/articles", E, "All articles by status (content editors)", none, { query: V.EditorArticleQuery }, { 200: json(items, "Articles") });
+  r("post", "/admin/content/articles", E, "Create a draft", none, bodyOf(V.ArticleRequest), { 201: json(any, "Draft") });
+  r("get", "/admin/content/articles/{id}", E, "One article, any status", V.IdParams, {}, { 200: json(any, "Article") });
+  r("put", "/admin/content/articles/{id}", E, "Replace an article (published ones: publishers only)", V.IdParams, bodyOf(V.UpdateArticleRequest), { 200: json(any, "Article") });
+  r("post", "/admin/content/articles/{id}/submit", E, "Draft → in review (publishing rules checked)", V.IdParams, {}, { 200: json(any, "Article") });
+  r("post", "/admin/content/articles/{id}/publish", E, "In review → published (publishers; health content needs a second person)", V.IdParams, {}, { 200: json(any, "Article") });
+  r("post", "/admin/content/articles/{id}/reject", E, "Send back to draft", V.IdParams, bodyOf(V.RejectRequest), { 200: json(any, "Article") });
+  r("post", "/admin/content/articles/{id}/archive", E, "Archive (hidden from readers)", V.IdParams, {}, { 200: json(any, "Article") });
+  r("post", "/admin/content/import", E, "Import external items for review (one per source URL; teasers only)", none, bodyOf(V.ImportRequest), { 201: json(any, "Imported") });
+  r("put", "/admin/content/glossary", E, "Create or update a glossary term", none, bodyOf(V.GlossaryRequest), { 200: json(any, "Term") });
+  r("put", "/admin/content/courses", E, "Create or update a course and its lessons", none, bodyOf(V.CourseRequest), { 200: json(any, "Course") });
+  const R = "Reports";
+  r("get", "/farms/{farmId}/reports", R, "Reports this person may export", farmParams, {}, { 200: json(items, "Catalog") });
+  r("get", "/farms/{farmId}/reports/{type}", R, "Generate a report from live data as PDF, CSV, Excel or JSON (each report needs its own permission)", z.object({ farmId: V.Id, type: V.ReportType }), { query: V.ReportQuery }, {
+    200: { description: "The report file (application/pdf, text/csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet) or JSON" },
+  });
 }
 
 // ---- sync -----------------------------------------------------------------

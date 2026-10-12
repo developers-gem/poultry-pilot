@@ -178,11 +178,17 @@ describe("document validation", () => {
     await expect(e.validate()).rejects.toThrow(/egg grades/);
   });
 
-  it("refuses to publish news without a source and publication date", async () => {
-    const a = new M.ArticleModel({ _id: "a-1", kind: "news", slug: "outbreak", locale: "en", title: "Outbreak", regionCode: "IN-UP", status: "published" });
-    await expect(a.validate()).rejects.toThrow(/source|publication date/);
-    const ok = new M.ArticleModel({ _id: "a-2", kind: "news", slug: "o2", locale: "en", title: "T", regionCode: "IN-UP", status: "published", publishedAt: new Date(), sources: [{ name: "State animal husbandry department", url: "https://example.gov.in" }] });
+  it("refuses to publish external news without its source, URL, publication date and summary", async () => {
+    const a = new M.ArticleModel({ _id: "a-1", kind: "news", origin: "external", slug: "outbreak", locale: "en", title: "Outbreak", regionCode: "IN-UP", status: "published" });
+    const err = await a.validate().catch((e: Error) => e);
+    expect(String(err)).toMatch(/summary/);
+    expect(String(err)).toMatch(/source's name/);
+    expect(String(err)).toMatch(/source URL/);
+    expect(String(err)).toMatch(/publication date/);
+    const ok = new M.ArticleModel({ _id: "a-2", kind: "news", origin: "external", slug: "o2", locale: "en", title: "T", summary: "S", source: "State animal husbandry department", sourceUrl: "https://example.gov.in/notice", publicationDate: "2026-10-01", regionCode: "IN-UP", category: "policy", status: "published" });
     await expect(ok.validate()).resolves.toBeUndefined();
+    ok.set("sourceUrl", "javascript:alert(1)");
+    await expect(ok.validate()).rejects.toThrow(/sourceUrl/);
   });
 
   it("refuses to publish a health or biosecurity article without sources", async () => {

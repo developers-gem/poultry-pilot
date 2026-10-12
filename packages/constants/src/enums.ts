@@ -62,7 +62,7 @@ export const LISTING_CATEGORIES = [
 /** Biosecurity log entries. Visitors and equipment movements have their own collections. */
 export const BIOSECURITY_ENTRY_TYPES = ["cleaning", "disinfection", "footbath", "vehicle", "pest_control", "wild_bird_observation", "audit"] as const;
 export const ALERT_SEVERITIES = ["info", "warning", "critical"] as const;
-export const CONTENT_KINDS = ["lesson", "article", "glossary_term", "news", "disease_notice"] as const;
+export const CONTENT_KINDS = ["lesson", "article", "glossary_term", "news", "disease"] as const;
 /** Farm roles, highest authority first. Display names: Owner, Admin, Farm manager, Supervisor, Worker, Accountant, Vet. */
 export const ROLES = ["owner", "admin", "farm_manager", "supervisor", "worker", "accountant", "vet"] as const;
 export const MEMBERSHIP_STATUSES = ["invited", "active", "revoked"] as const;

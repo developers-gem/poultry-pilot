@@ -36,6 +36,23 @@ const Env = z
     LOGIN_MAX_FAILED_ATTEMPTS: z.coerce.number().int().min(3).max(100).default(10),
     /** Directory for uploaded photos in development. Production should use an S3-compatible adapter. */
     MEDIA_DIR: z.string().default("./data/media"),
+    /**
+     * News feeds to import for editorial review, as JSON:
+     * [{"url":"https://…/rss","source":"Publisher","regionCode":"IN","category":"markets"}]. Empty: no import.
+     */
+    NEWS_FEEDS: z
+      .string()
+      .default("[]")
+      .transform((v, ctx) => {
+        try {
+          const list = JSON.parse(v) as unknown;
+          if (!Array.isArray(list)) throw new Error("not a list");
+          return list as import("../adapters/news-feed.js").FeedConfig[];
+        } catch {
+          ctx.addIssue({ code: "custom", message: "NEWS_FEEDS must be a JSON list of feeds" });
+          return z.NEVER;
+        }
+      }),
     LOGIN_LOCK_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
 
     CORS_ORIGINS: csv("http://localhost:5173"),

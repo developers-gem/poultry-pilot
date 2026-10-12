@@ -23,6 +23,7 @@ import { createNotificationService } from "./services/notification.service.js";
 import { createWeatherService } from "./services/weather.service.js";
 import { createIntelligenceService } from "./services/intelligence.service.js";
 import { createDashboardService } from "./services/dashboard.service.js";
+import { createReportService } from "./services/report.service.js";
 import type { NotificationProvider, WeatherProvider } from "./ports/external.js";
 import { FeedConsumptionRequest } from "@poultrypilot/validation";
 import type { HealthChecks } from "./ports/health.js";
@@ -185,6 +186,7 @@ export function buildContainer(d: ContainerDeps) {
   });
 
   const intelligence = createIntelligenceService({ repos: d.repos, clock, alerts, rules, flocks, weather });
+  const reports = createReportService({ repos: d.repos, clock, audit, flocks, finance, hatchery, inventory, feed });
   const dashboard = createDashboardService({ repos: d.repos, clock, dailyRecords, weather, calendar, inventory, feed, hatchery, finance, flocks, intelligence, rules });
 
   const FeedCommand = FeedConsumptionRequest;
@@ -196,7 +198,7 @@ export function buildContainer(d: ContainerDeps) {
     },
   });
 
-  return { ...d, clock, startedAt: clock.now(), accessTokens, audit, sync, auth, farms, houses, flocks, dailyRecords, media, inventory, feed, alerts, flockHealth, biosecurity, content, hatchery, chickStart, calendar, finance, market, rules, notifications, weather, intelligence, dashboard };
+  return { ...d, clock, startedAt: clock.now(), accessTokens, audit, sync, auth, farms, houses, flocks, dailyRecords, media, inventory, feed, alerts, flockHealth, biosecurity, content, hatchery, chickStart, calendar, finance, market, rules, notifications, weather, intelligence, dashboard, reports };
 }
 
 export type Container = ReturnType<typeof buildContainer>;

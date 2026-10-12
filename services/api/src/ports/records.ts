@@ -7,6 +7,7 @@ export interface UserRecord {
   email: string;
   fullName: string;
   phone?: string;
+  platformRoles?: ("content_editor" | "content_publisher")[];
   passwordHash?: string;
   googleSub?: string;
   emailVerified: boolean;
@@ -645,22 +646,78 @@ export interface TaskRecord extends Editable {
   verifiedBy?: string;
 }
 
+type ContentStatus = "draft" | "in_review" | "published" | "archived";
+type Category = (typeof import("@poultrypilot/constants").CONTENT_CATEGORIES)[number];
+type SourceRef = { name: string; url?: string; retrievedAt?: Date };
+
 export interface ArticleRecord {
   id: string;
-  kind: "fact" | "guide" | "news" | "disease_notice";
+  kind: "fact" | "guide" | "news" | "disease";
+  origin: "original" | "external";
   slug: string;
   locale: string;
   title: string;
   summary?: string;
-  body?: string;
+  content?: string;
+  category: Category;
+  author?: string;
+  source?: string;
+  sourceUrl?: string;
+  publicationDate?: string;
   regionCode: string;
   tags?: string[];
-  status: "draft" | "in_review" | "published" | "archived";
+  disease?: { species?: string[]; signs?: string[]; transmission?: string; prevention?: string; reportingNote?: string };
+  status: ContentStatus;
+  publishedAt?: Date;
+  submittedBy?: string;
+  reviewedBy?: string;
+  reviewedAt?: Date;
+  expiresAt?: Date;
+  sources: SourceRef[];
+  createdBy?: string;
+  updatedBy?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  version: number;
+}
+
+export interface GlossaryTermRecord {
+  id: string;
+  slug: string;
+  locale: string;
+  term: string;
+  definition?: string;
+  category: string;
+  relatedSlugs?: string[];
+  regionCode: string;
+  status: ContentStatus;
+  sources: SourceRef[];
+  createdBy?: string;
+  updatedBy?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  version: number;
+}
+
+export interface CourseRecord {
+  id: string;
+  slug: string;
+  locale: string;
+  title: string;
+  summary?: string;
+  level: "beginner" | "intermediate" | "advanced";
+  order: number;
+  category: Category;
+  regionCode: string;
+  author?: string;
+  lessons: { lessonId: string; title: string; content?: string; minutes?: number; order: number }[];
+  status: ContentStatus;
   publishedAt?: Date;
   reviewedBy?: string;
   reviewedAt?: Date;
-  sources: { name: string; url?: string; retrievedAt?: Date }[];
+  sources: SourceRef[];
   createdBy?: string;
+  updatedBy?: string;
   createdAt: Date;
   updatedAt: Date;
   version: number;

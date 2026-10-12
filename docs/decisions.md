@@ -155,3 +155,16 @@ Each is cheap to change until the phase named.
 | D91 | Weather | Backend-only behind a provider port (Open-Meteo by default); cached 1 hour per ~5 km location; daily observations kept as history and used as the farm's weather baseline; stale cache served when the provider fails |
 | D92 | Notifications | Providers per channel behind a port; in-app always stored; push and email queued with retries and backoff; recipients by rule roles and money permission; personal preferences and mutes; cooldown except on escalation |
 | D93 | Dashboard | One call, sections by permission, each section isolated so a failure (e.g. weather) never breaks the rest |
+
+## Added with the knowledge and reporting platform
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| D94 | External articles | Title, summary, content, source, sourceUrl, publicationDate, region, category, author, status; cannot be published without source, URL, date and summary (request schema, service and MongoDB schema) |
+| D95 | Copyright | External items keep PoultryPilot's own summary plus the publisher's teaser and link; full source text is never stored |
+| D96 | Editorial roles | Platform staff roles (content_editor, content_publisher), separate from farm roles; health, biosecurity and disease content needs a second person to publish |
+| D97 | News delivery | News lives in the database (imported for review or written by editors) and reaches apps only through the API; nothing is hard-coded in components |
+| D98 | Region filtering | Readers see GLOBAL, their country and their region; no region means global only |
+| D99 | Reports | One format-neutral document per report, rendered to PDF, CSV or Excel from live data; each report needs its permission (route and service), money and stock sections omitted with a note for people without that access; every export audited |
+| D100 | Spreadsheet safety | Text cells starting with = + - @ tab or CR are prefixed with an apostrophe in CSV and Excel |
+| D101 | Seed content | Seed articles' reviewed wording and sources are carried forward verbatim across model changes |

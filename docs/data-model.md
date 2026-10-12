@@ -2,7 +2,7 @@
 
 How the MongoDB collections fit together and the rules every collection follows. The field-by-field reference is the generated [data dictionary](data-dictionary.md); schemas live in `services/api/src/adapters/mongo/models/`.
 
-63 collections: the 56 product collections, plus 7 for authentication and infrastructure (`sessions`, `refresh_tokens`, `one_time_tokens`, `sync_changes`, `idempotency_keys`, `counters`, `media_assets`). 103 secondary indexes, each tied to a named query.
+63 collections: the 56 product collections, plus 7 for authentication and infrastructure (`sessions`, `refresh_tokens`, `one_time_tokens`, `sync_changes`, `idempotency_keys`, `counters`, `media_assets`). 104 secondary indexes, each tied to a named query.
 
 ## Conventions
 
@@ -94,6 +94,10 @@ When a record changes, the service writes these in **one transaction** (MongoDB 
 | Biosecurity log | `biosecurity_logs` + `inventory_transactions` for products + `tasks` / alerts for problems found |
 | Complete a cleaning schedule | `biosecurity_logs` + `cleaning_tasks.lastDoneDate/nextDueDate` |
 | Move equipment | `equipment_movements` + `equipment.houseId`; corrective action if not disinfected |
+| Editorial workflow | `articles.status` draft → in_review → published → archived (`submittedBy`, `reviewedBy`, `version`) |
+| News import | `articles` (origin external, status in_review), unique by `sourceUrl` |
+| Lesson completed | `training_progress` (one row per person and lesson) |
+| Report exported | `audit_logs` (type, format, period); nothing else is written |
 | Any alert raised (any module) | checked against `alert_rules` (on/off, scope, severity) → `alerts` → `notifications` (in-app delivered; push and email queued) |
 | Delivery worker | `notifications.status/attempts/nextAttemptAt`; invalid `push_devices` disabled |
 | Weather fetched | `weather_cache` (1 hour) + `weather_observations` (past days upserted) |

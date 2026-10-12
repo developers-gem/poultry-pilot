@@ -3,7 +3,7 @@
 > Generated from the Mongoose schemas in `services/api/src/adapters/mongo/models`. Do not edit by hand:
 > run `pnpm --filter @poultrypilot/api docs:data-dictionary`. A test fails if this file is out of date.
 
-63 collections, 103 secondary indexes (plus the default `_id` index on each). Design rules and relationships: `docs/data-model.md`.
+63 collections, 104 secondary indexes (plus the default `_id` index on each). Design rules and relationships: `docs/data-model.md`.
 
 | Collection | Domain | Ownership | Indexes | Purpose |
 | --- | --- | --- | --- | --- |
@@ -62,7 +62,7 @@
 | [`weather_cache`](#weather_cache) | Operations | global | 2 | Provider responses cached per rounded location (about 1 km) and kind, shared by every farm near that point |
 | [`training_courses`](#training_courses) | Content | global | 2 | A course and its lessons (embedded: always read together, a few lessons each) |
 | [`training_progress`](#training_progress) | Content | user | 1 | A lesson a person has completed |
-| [`articles`](#articles) | Content | global | 2 | Facts, guides, news and disease notices |
+| [`articles`](#articles) | Content | global | 3 | Facts, poultry management guides, news and disease information |
 | [`glossary_terms`](#glossary_terms) | Content | global | 2 | Plain-language definitions of poultry terms, searchable |
 | [`audit_logs`](#audit_logs) | System | system | 3 | Who changed what, when, from which device |
 | [`sync_operations`](#sync_operations) | System | farm | 1 | Each offline mutation a device pushed, with its outcome |
@@ -86,6 +86,7 @@ A person who signs in. Belongs to farms through farm_members, never directly.
 | `email` | String | yes | ≤ 254 chars; lowercased |  |
 | `fullName` | String | yes | ≤ 120 chars |  |
 | `phone` | String |  | ≤ 30 chars |  |
+| `platformRoles` | array of String |  | one of: `content_editor`, `content_publisher` |  |
 | `locale` | String |  | ≤ 10 chars |  |
 | `passwordHash` | String |  |  |  |
 | `googleSub` | String |  |  |  |
@@ -1943,9 +1944,12 @@ A course and its lessons (embedded: always read together, a few lessons each). H
 | `lessons` | array of objects |  |  |  |
 | `lessons[].lessonId` | String | yes | ≤ 80 chars |  |
 | `lessons[].title` | String | yes | ≤ 150 chars |  |
-| `lessons[].body` | String |  | ≤ 20000 chars |  |
+| `lessons[].content` | String |  | ≤ 20000 chars |  |
 | `lessons[].minutes` | Number |  | max 120; integer |  |
 | `lessons[].order` | Number |  | default `0`; integer |  |
+| `category` | String | yes | one of: `biosecurity`, `health`, `nutrition`, `housing`, `management`, `hatchery`, `welfare`, `markets`, `policy`, `business`, `general`; default `"management"` |  |
+| `regionCode` | String | yes | pattern `/^(GLOBAL\\|[A-Z]{2}(-[A-Z0-9]{1,3})?)$/`; default `"GLOBAL"` |  |
+| `author` | String |  | ≤ 120 chars |  |
 | `status` | String | yes | one of: `draft`, `in_review`, `published`, `archived`; default `"draft"` |  |
 | `publishedAt` | Date |  |  |  |
 | `reviewedBy` | String |  | ≤ 120 chars |  |
@@ -1983,7 +1987,7 @@ A lesson a person has completed. Personal, not farm-owned: progress follows the 
 
 ### articles
 
-Facts, guides, news and disease notices. News and disease notices must carry a source, a publication date and a region before they can be published.
+Facts, poultry management guides, news and disease information. External articles carry title, summary, content, source, source URL, publication date, region, category, author and status; they cannot be published without source, URL and date. Health, biosecurity and disease articles must cite references.
 
 - **Model:** `Article`
 - **Ownership:** Global — shared reference data
@@ -1991,16 +1995,29 @@ Facts, guides, news and disease notices. News and disease notices must carry a s
 
 | Field | Type | Required | Constraints | References |
 | --- | --- | --- | --- | --- |
-| `kind` | String | yes | one of: `fact`, `guide`, `news`, `disease_notice` |  |
+| `kind` | String | yes | one of: `fact`, `guide`, `news`, `disease` |  |
+| `origin` | String | yes | one of: `original`, `external`; default `"original"` |  |
 | `slug` | String | yes | ≤ 120 chars; lowercased |  |
 | `locale` | String | yes | ≤ 10 chars |  |
 | `title` | String | yes | ≤ 200 chars |  |
 | `summary` | String |  | ≤ 600 chars |  |
-| `body` | String |  | ≤ 50000 chars |  |
+| `content` | String |  | ≤ 50000 chars |  |
+| `category` | String | yes | one of: `biosecurity`, `health`, `nutrition`, `housing`, `management`, `hatchery`, `welfare`, `markets`, `policy`, `business`, `general`; default `"general"` |  |
+| `author` | String |  | ≤ 120 chars |  |
+| `source` | String |  | ≤ 160 chars |  |
+| `sourceUrl` | String |  | pattern `/^https?:\/\/\S+$/`; ≤ 2000 chars |  |
+| `publicationDate` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
 | `regionCode` | String | yes | pattern `/^(GLOBAL\\|[A-Z]{2}(-[A-Z0-9]{1,3})?)$/`; default `"GLOBAL"` |  |
 | `tags` | array of String |  | ≤ 40 chars; lowercased |  |
+| `disease` | object |  |  |  |
+| `disease.species` | array of String |  | ≤ 40 chars |  |
+| `disease.signs` | array of String |  | ≤ 200 chars |  |
+| `disease.transmission` | String |  | ≤ 2000 chars |  |
+| `disease.prevention` | String |  | ≤ 2000 chars |  |
+| `disease.reportingNote` | String |  | ≤ 500 chars |  |
 | `status` | String | yes | one of: `draft`, `in_review`, `published`, `archived`; default `"draft"` |  |
 | `publishedAt` | Date |  |  |  |
+| `submittedBy` | String |  |  | `User` |
 | `reviewedBy` | String |  | ≤ 120 chars |  |
 | `reviewedAt` | Date |  |  |  |
 | `expiresAt` | Date |  |  |  |
@@ -2012,7 +2029,8 @@ Facts, guides, news and disease notices. News and disease notices must carry a s
 | Index | Options | Serves |
 | --- | --- | --- |
 | slug, locale | unique | Open an article by slug |
-| status, kind, locale, regionCode, publishedAt ↓ |  | Feed for a kind in my language and region (regionCode $in [mine, GLOBAL]), newest first |
+| status, kind, locale, regionCode, publicationDate ↓ |  | Feed for a kind in my language and region (regionCode $in [mine, GLOBAL]), newest first |
+| sourceUrl | unique, partial: {"sourceUrl":{"$type":"string"}} | Import de-duplication: one article per external URL |
 
 ### glossary_terms
 
@@ -2030,6 +2048,7 @@ Plain-language definitions of poultry terms, searchable.
 | `definition` | String |  | ≤ 2000 chars |  |
 | `category` | String | yes | ≤ 60 chars |  |
 | `relatedSlugs` | array of String |  | ≤ 80 chars |  |
+| `regionCode` | String | yes | pattern `/^(GLOBAL\\|[A-Z]{2}(-[A-Z0-9]{1,3})?)$/`; default `"GLOBAL"` |  |
 | `status` | String | yes | one of: `draft`, `in_review`, `published`, `archived`; default `"draft"` |  |
 | `sources` | array of objects |  |  |  |
 | `sources[].name` | String | yes | ≤ 200 chars |  |
@@ -2334,6 +2353,7 @@ Every reference between collections, derived from the schemas.
 | `training_progress` | `userId` | `users` | many-to-one |
 | `training_progress` | `courseId` | `training_courses` | many-to-one |
 | `training_progress` | `lessonId` | `TrainingCourse.lessons.lessonId` | many-to-one (Embedded lesson id) |
+| `articles` | `submittedBy` | `users` | many-to-one |
 | `audit_logs` | `actorUserId` | `users` | many-to-one |
 | `audit_logs` | `entityId` | any record | many-to-one (Polymorphic by entity) |
 | `sync_operations` | `userId` | `users` | many-to-one |

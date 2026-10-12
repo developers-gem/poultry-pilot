@@ -73,3 +73,24 @@ export function scheduleDelivery(c: Pick<Container, "notifications">, logger: Lo
   timer.unref();
   return () => clearInterval(timer);
 }
+
+/** Every 6 hours: import configured news feeds for editorial review. One feed failing does not stop the others. */
+export function scheduleNewsImport(c: Pick<Container, "content">, feeds: import("../adapters/news-feed.js").FeedConfig[], logger: Logger, everyMs = 6 * 3_600_000): () => void {
+  if (!feeds.length) return () => {};
+  const run = async () => {
+    const { fetchFeed } = await import("../adapters/news-feed.js");
+    for (const f of feeds) {
+      try {
+        const items = await fetchFeed(f);
+        const r = await c.content.importExternal(null, items.map((i) => ({ title: i.title, sourceUrl: i.link, source: f.source, regionCode: f.regionCode, category: f.category, ...(i.summary ? { summary: i.summary } : {}), ...(i.publicationDate ? { publicationDate: i.publicationDate } : {}), ...(i.author ? { author: i.author } : {}) })));
+        logger.info({ feed: f.url, ...r }, "news feed imported");
+      } catch (err) {
+        logger.error({ err, feed: f.url }, "news feed import failed");
+      }
+    }
+  };
+  void run();
+  const timer = setInterval(() => void run(), everyMs);
+  timer.unref();
+  return () => clearInterval(timer);
+}

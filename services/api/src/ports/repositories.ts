@@ -36,6 +36,8 @@ import type {
   EquipmentMovementRecord,
   TaskRecord,
   ArticleRecord,
+  GlossaryTermRecord,
+  CourseRecord,
   HatcheryBatchRecord,
   HatcheryEventRecord,
   BuyerRecord,
@@ -187,6 +189,29 @@ export interface FarmRepo<T extends { id: string; farmId: string }> {
   aggregate(farmId: string, query: FarmQuery<T>, by: (keyof T & string)[], sums: (keyof T & string)[]): Promise<AggregateRow[]>;
 }
 
+/** Global content: list with filters, open by id or slug, and versioned writes. */
+export interface ContentQuery {
+  status?: string | string[];
+  kind?: string;
+  category?: string;
+  locale?: string;
+  /** Matches any of these region codes. */
+  regionCodes?: string[];
+  /** Case-insensitive match on the title (or term). */
+  text?: string;
+  /** Newest first by this field. */
+  sortBy?: "publicationDate" | "publishedAt" | "updatedAt" | "order" | "term";
+  limit: number;
+}
+export interface ContentRepo<T extends { id: string; version: number }> {
+  find(q: ContentQuery): Promise<T[]>;
+  findById(id: string): Promise<T | null>;
+  findBySlug(slug: string, locale: string): Promise<T | null>;
+  insert(rec: T): Promise<void>;
+  /** Applies only if the stored version matches; returns the new record or null on conflict. */
+  update(id: string, patch: Partial<T>, expectedVersion: number): Promise<T | null>;
+}
+
 export interface Repositories {
   tx: TxRunner;
   users: UsersRepo;
@@ -289,10 +314,12 @@ export interface Repositories {
   /** Atomic per-farm sequences (order numbers). */
   counters: { next(name: string, farmId: string, tx?: Tx): Promise<number> };
   /** Global educational content (not farm-owned). */
-  articles: {
-    findPublished(q: { kind?: ArticleRecord["kind"]; tag?: string; regionCodes: string[]; locale: string }): Promise<ArticleRecord[]>;
-    findBySlug(slug: string, locale: string): Promise<ArticleRecord | null>;
-    upsert(rec: ArticleRecord): Promise<void>;
+  articles: ContentRepo<ArticleRecord> & { findBySourceUrl(url: string): Promise<ArticleRecord | null> };
+  glossary: ContentRepo<GlossaryTermRecord>;
+  courses: ContentRepo<CourseRecord>;
+  trainingProgress: {
+    complete(userId: string, courseId: string, lessonId: string, at: Date): Promise<void>;
+    forUser(userId: string, courseId?: string): Promise<{ courseId: string; lessonId: string; completedAt: Date }[]>;
   };
   /**
    * The only by-id lookup that does not know the farm: used by /daily-records/:id routes to find which farm a

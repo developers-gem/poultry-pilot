@@ -18,6 +18,8 @@ import { calendarRoutes, chickOrderRoutes, chickStartRoutes, hatcheryRoutes } fr
 import { buyerMarketRoutes, chickOrderActions, financeRoutes, sellerMarketRoutes } from "./http/routes/finance.routes.js";
 import { appointmentRoutes, intelligenceRoutes, myNotificationRoutes } from "./http/routes/intelligence.routes.js";
 import { runFarmChecks } from "./jobs/alert-job.js";
+import { editorialContentRoutes, readerContentRoutes } from "./http/routes/content.routes.js";
+import { reportRoutes } from "./http/routes/report.routes.js";
 import { syncRoutes } from "./http/routes/sync.routes.js";
 import { systemRoutes } from "./http/routes/system.routes.js";
 
@@ -104,6 +106,9 @@ export function createApp(c: Container): Express {
   v1.use("/farms/:farmId/finance", ...secured, financeRoutes(c.finance, c.farms));
   v1.use("/farms/:farmId/market", ...secured, sellerMarketRoutes(c.market, c.farms));
   v1.use("/market", ...secured, buyerMarketRoutes(c.market));
+  v1.use("/content", ...secured, readerContentRoutes(c.content));
+  v1.use("/farms/:farmId/reports", ...secured, reportRoutes(c.reports, c.farms));
+  v1.use("/admin/content", ...secured, editorialContentRoutes(c.content));
   v1.use("/farms/:farmId", ...secured, intelligenceRoutes({ dashboard: c.dashboard, rules: c.rules, weather: c.weather }, c.farms));
   v1.use("/farms/:farmId/chickstart", ...secured, chickStartRoutes(c.chickStart, c.farms));
   v1.use("/farms/:farmId/calendar", ...secured, calendarRoutes(c.calendar, c.farms));

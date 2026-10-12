@@ -3,7 +3,7 @@ import { localDiskMediaStorage } from "./adapters/storage.js";
 import { argon2Hasher, googleVerifier, logEmailSender } from "./adapters/external.js";
 import { createMongoRepositories } from "./adapters/mongo/index.js";
 import { createApp } from "./app.js";
-import { scheduleAlertJob, scheduleDelivery } from "./jobs/alert-job.js";
+import { scheduleAlertJob, scheduleDelivery, scheduleNewsImport } from "./jobs/alert-job.js";
 import { openMeteoProvider } from "./adapters/weather.js";
 import { emailNotificationProvider, logPushProvider } from "./adapters/notify.js";
 import { loadEnv } from "./config/env.js";
@@ -74,6 +74,7 @@ async function main(): Promise<void> {
   // Expiry alerts depend on the calendar, so stock alerts are re-checked hourly for every farm.
   const stopAlertJob = scheduleAlertJob(container, logger);
   const stopDelivery = scheduleDelivery(container, logger);
+  const stopNews = scheduleNewsImport(container, env.NEWS_FEEDS, logger);
   // Educational content ships with the API; loading it is idempotent.
   await container.content.seed().catch((err) => logger.error({ err }, "content seed failed"));
 
@@ -89,6 +90,7 @@ async function main(): Promise<void> {
     force.unref();
     stopAlertJob();
     stopDelivery();
+    stopNews();
     // Stop accepting new connections; idle keep-alive sockets are closed now so close() can finish
     // once in-flight requests complete.
     const closed = new Promise<void>((resolve) => server.close(() => resolve()));

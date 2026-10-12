@@ -242,11 +242,26 @@ function contract(name: string, setup: () => Promise<{ repos: Repositories; rese
       await repos.tasks.insert({ ...base, id: newId(), kind: "corrective_action", title: "Fix", status: "open", priority: "high", related: { entity: "visitor", id: "v1" } });
       expect(await repos.tasks.find(farmId, { where: { kind: "corrective_action", status: ["open", "in_progress"] } as never })).toHaveLength(1);
 
-      const article = { id: newId(), kind: "guide" as const, slug: `a-${farmId.slice(-8)}`, locale: "en", title: "T", regionCode: "GLOBAL", tags: ["health"], status: "published" as const, publishedAt: now, sources: [{ name: "WOAH", url: "https://www.woah.org" }], createdAt: now, updatedAt: now, version: 0 };
-      await repos.articles.upsert(article);
-      await repos.articles.upsert({ ...article, id: newId(), title: "T2" });
-      expect((await repos.articles.findBySlug(article.slug, "en"))?.title).toBe("T2");
-      expect((await repos.articles.findPublished({ tag: "health", regionCodes: ["GLOBAL"], locale: "en" })).some((a) => a.slug === article.slug)).toBe(true);
+      const tag = farmId.slice(-8);
+      const article = { id: newId(), kind: "guide" as const, origin: "original" as const, category: "health" as const, slug: `a-${tag}`, locale: "en", title: `Title ${tag}`, summary: "S", content: "C", regionCode: "GLOBAL", tags: ["health"], status: "published" as const, publishedAt: now, sources: [{ name: "WOAH", url: "https://www.woah.org" }], createdAt: now, updatedAt: now, version: 0 };
+      await repos.articles.insert(article);
+      await expect(repos.articles.insert({ ...article, id: newId() })).rejects.toMatchObject({ code: 11000 });
+      expect((await repos.articles.update(article.id, { title: `T2 ${tag}` }, 0))?.version).toBe(1);
+      expect(await repos.articles.update(article.id, { title: "stale" }, 0)).toBeNull();
+      expect((await repos.articles.findBySlug(article.slug, "en"))?.title).toBe(`T2 ${tag}`);
+      expect((await repos.articles.find({ status: "published", regionCodes: ["GLOBAL"], locale: "en", text: `t2 ${tag}`, limit: 10 })).map((a) => a.id)).toEqual([article.id]);
+      // The publishing rules run on updates too (MongoDB validates the merged document; memory leaves it to the service).
+      const ext = { ...article, id: newId(), slug: `n-${tag}`, kind: "news" as const, origin: "external" as const, category: "markets" as const, tags: [], sources: [], source: "Pub", sourceUrl: `https://example.org/${tag}`, publicationDate: "2026-10-01", status: "in_review" as const };
+      await repos.articles.insert(ext);
+      expect((await repos.articles.findBySourceUrl(`https://example.org/${tag}`))?.id).toBe(ext.id);
+      await repos.glossary.insert({ id: newId(), slug: `g-${tag}`, locale: "en", term: `Broiler ${tag}`, definition: "A chicken raised for meat", category: "birds", regionCode: "GLOBAL", status: "published", sources: [], createdAt: now, updatedAt: now, version: 0 });
+      expect((await repos.glossary.find({ status: "published", text: `broiler ${tag}`, sortBy: "term", limit: 5 })).length).toBe(1);
+      const course = { id: newId(), slug: `c-${tag}`, locale: "en", title: "Course", level: "beginner" as const, order: 0, category: "management" as const, regionCode: "GLOBAL", lessons: [{ lessonId: "l1", title: "L1", content: "x", minutes: 5, order: 0 }], status: "published" as const, sources: [], createdAt: now, updatedAt: now, version: 0 };
+      await repos.courses.insert(course);
+      const user = newId();
+      await repos.trainingProgress.complete(user, course.id, "l1", now);
+      await repos.trainingProgress.complete(user, course.id, "l1", now);
+      expect(await repos.trainingProgress.forUser(user, course.id)).toHaveLength(1);
     });
 
     it("hatchery, order and ChickStart records round-trip through their schemas", async () => {

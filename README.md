@@ -172,3 +172,7 @@ Bills and purchases (payables), incomes and sales (receivables), payments, refun
 ## Intelligence layer
 
 Fourteen configurable alert rules (mortality, egg production, feed, water, weight, FCR, stock, expiry, vaccination, vet appointment, hatch, delivery, overdue payment, weather), judged against each farm's own history rather than universal thresholds; absolute limits apply only when a farm sets them. Weather through the backend with a cache and stored history. In-app, push and email notifications through replaceable providers, with preferences, cooldown and retries. `GET /farms/:farmId/dashboard`, `/analytics` and `/alerts`. Details: `docs/intelligence.md`.
+
+## Knowledge and reports
+
+Training courses with lessons and personal progress, facts, news, a glossary, disease information and management guides, filtered by region. Externally sourced articles carry source, link, date, region, category and author, and pass an editorial review before readers see them; news is imported from feeds for review and reaches the apps only through the API. Nine farm reports (farm, flock, egg, feed, health, hatchery, biosecurity, financial, marketplace) are generated on the server from live data as PDF, CSV or Excel, each behind its own permission. Details: `docs/knowledge-reports.md`.

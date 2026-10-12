@@ -1,6 +1,6 @@
-import { ARTICLE_KINDS, CONTENT_STATUSES } from "@poultrypilot/constants";
+import { ARTICLE_KINDS, ARTICLE_ORIGINS, CONTENT_CATEGORIES, CONTENT_STATUSES } from "@poultrypilot/constants";
 import { Schema } from "mongoose";
-import { SourceSchema, defineCollection, enumOf, instant, int, ref, str, text } from "./base.js";
+import { SourceSchema, defineCollection, enumOf, instant, int, localDate, ref, str, text } from "./base.js";
 
 const D = "Content";
 const regionCode = { type: String, required: true, match: /^(GLOBAL|[A-Z]{2}(-[A-Z0-9]{1,3})?)$/, default: "GLOBAL" };
@@ -23,12 +23,15 @@ export const TrainingCourseModel = defineCollection({
     lessons: {
       type: [
         new Schema(
-          { lessonId: str({ required: true, max: 80 }), title: str({ required: true, max: 150 }), body: text(20_000), minutes: int({ max: 120 }), order: int({ default: 0 }) },
+          { lessonId: str({ required: true, max: 80 }), title: str({ required: true, max: 150 }), content: text(20_000), minutes: int({ max: 120 }), order: int({ default: 0 }) },
           { _id: false },
         ),
       ],
       default: [],
     },
+    category: enumOf(CONTENT_CATEGORIES, { required: true, default: "management" }),
+    regionCode,
+    author: str({ max: 120 }),
     status: enumOf(CONTENT_STATUSES, { required: true, default: "draft" }),
     publishedAt: instant(),
     reviewedBy: str({ max: 120 }),
@@ -64,39 +67,68 @@ export const ArticleModel = defineCollection({
   ownership: "global",
   versioned: true,
   description:
-    "Facts, guides, news and disease notices. News and disease notices must carry a source, a publication date and a region before they can be published.",
+    "Facts, poultry management guides, news and disease information. External articles carry title, summary, content, source, source URL, publication date, region, category, author and status; they cannot be published without source, URL and date. Health, biosecurity and disease articles must cite references.",
   fields: {
     kind: enumOf(ARTICLE_KINDS, { required: true }),
+    origin: enumOf(ARTICLE_ORIGINS, { required: true, default: "original" }),
     slug: str({ required: true, max: 120, lowercase: true }),
     locale: str({ required: true, max: 10 }),
     title: str({ required: true, max: 200 }),
     summary: text(600),
-    body: text(50_000),
+    /** The article text. For external items, PoultryPilot's own summary or commentary, never a copy of the source. */
+    content: text(50_000),
+    category: enumOf(CONTENT_CATEGORIES, { required: true, default: "general" }),
+    author: str({ max: 120 }),
+    /** External articles: the publisher and the original URL and date. */
+    source: str({ max: 160 }),
+    sourceUrl: { type: String, maxlength: 2000, match: /^https?:\/\/\S+$/ },
+    publicationDate: localDate(),
     regionCode,
     tags: { type: [str({ max: 40, lowercase: true })], default: undefined },
+    /** Disease information: structured so the apps can show it consistently. Never dosing or treatment instructions. */
+    disease: {
+      type: new Schema(
+        {
+          species: { type: [str({ max: 40 })], default: undefined },
+          signs: { type: [str({ max: 200 })], default: undefined },
+          transmission: text(2000),
+          prevention: text(2000),
+          /** e.g. "Notifiable in many countries: report suspected cases to your veterinary authority." */
+          reportingNote: text(500),
+        },
+        { _id: false },
+      ),
+    },
     status: enumOf(CONTENT_STATUSES, { required: true, default: "draft" }),
     publishedAt: instant(),
+    submittedBy: ref("User"),
     reviewedBy: str({ max: 120 }),
     reviewedAt: instant(),
     expiresAt: instant(),
+    /** References (additional sources). */
     sources,
   },
   indexes: [
     { fields: { slug: 1, locale: 1 }, options: { unique: true }, why: "Open an article by slug" },
-    { fields: { status: 1, kind: 1, locale: 1, regionCode: 1, publishedAt: -1 }, why: "Feed for a kind in my language and region (regionCode $in [mine, GLOBAL]), newest first" },
+    { fields: { status: 1, kind: 1, locale: 1, regionCode: 1, publicationDate: -1 }, why: "Feed for a kind in my language and region (regionCode $in [mine, GLOBAL]), newest first" },
+    { fields: { sourceUrl: 1 }, options: { unique: true, partialFilterExpression: { sourceUrl: { $type: "string" } } }, why: "Import de-duplication: one article per external URL" },
   ],
   configure: (schema) =>
     schema.pre("validate", function () {
+      if (this.get("status") !== "published") return;
       const kind = this.get("kind") as string;
-      if (this.get("status") === "published" && (kind === "news" || kind === "disease_notice")) {
-        if (!this.get("publishedAt")) this.invalidate("publishedAt", "Published news and disease notices need a publication date");
-        if (!(this.get("sources") as unknown[])?.length) this.invalidate("sources", "Published news and disease notices need at least one source");
+      const refs = (this.get("sources") as unknown[])?.length ?? 0;
+      if (!this.get("summary")) this.invalidate("summary", "Published articles need a summary");
+      if (this.get("origin") === "external") {
+        if (!this.get("source")) this.invalidate("source", "External articles need the source's name");
+        if (!this.get("sourceUrl")) this.invalidate("sourceUrl", "External articles need the source URL");
+        if (!this.get("publicationDate")) this.invalidate("publicationDate", "External articles need the publication date");
       }
-      // Educational health and biosecurity content must cite where it comes from.
+      if (kind === "news" && !this.get("publicationDate")) this.invalidate("publicationDate", "News needs a publication date");
+      // Educational health, biosecurity and disease content must cite where it comes from.
       const tags = (this.get("tags") as string[] | undefined) ?? [];
-      if (this.get("status") === "published" && (tags.includes("health") || tags.includes("biosecurity")) && !(this.get("sources") as unknown[])?.length) {
-        this.invalidate("sources", "Published health and biosecurity articles need at least one source");
-      }
+      const healthy = kind === "disease" || ["health", "biosecurity"].includes(this.get("category") as string) || tags.includes("health") || tags.includes("biosecurity");
+      if (healthy && !refs && this.get("origin") !== "external") this.invalidate("sources", "Published health and biosecurity articles need at least one source");
     }),
 });
 
@@ -114,6 +146,7 @@ export const GlossaryTermModel = defineCollection({
     definition: text(2000),
     category: str({ required: true, max: 60 }),
     relatedSlugs: { type: [str({ max: 80 })], default: undefined },
+    regionCode,
     status: enumOf(CONTENT_STATUSES, { required: true, default: "draft" }),
     sources,
   },

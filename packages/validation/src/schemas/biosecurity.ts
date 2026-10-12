@@ -130,4 +130,3 @@ export const CorrectiveActionRequest = z
 export const CompleteActionRequest = z.object({ resolutionNotes: z.string().trim().min(3).max(2000) }).strict();
 export const ActionListQuery = z.object({ status: TaskStatus.optional(), kind: z.enum(["corrective_action", "follow_up", "general"]).default("corrective_action") });
 
-export const ArticleListQuery = z.object({ kind: z.enum(["fact", "guide", "news", "disease_notice"]).optional(), tag: z.string().max(40).optional(), region: z.string().max(10).optional(), locale: z.string().max(10).default("en") });

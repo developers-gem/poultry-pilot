@@ -328,11 +328,11 @@ describe("educational content and tenancy", () => {
     await s.ctx.container.content.seed(); // idempotent
     const list = (await s.call("get", "/content/articles?tag=health")).body.items;
     expect(list.map((a: { slug: string }) => a.slug).sort()).toEqual(["when-to-call-your-veterinarian", "withdrawal-periods"]);
-    for (const a of list) expect(a.sources.length).toBeGreaterThan(0);
     const one = (await s.call("get", "/content/articles/withdrawal-periods")).body;
-    expect(one.body).toMatch(/does not supply withdrawal periods/);
-    expect(one.body).toMatch(/not veterinary advice/);
-    expect(one.regionCode).toBe("GLOBAL");
+    expect(one.references.length).toBeGreaterThan(0);
+    expect(one.content).toMatch(/does not supply withdrawal periods/);
+    expect(one.content).toMatch(/not veterinary advice/);
+    expect(one.region).toBe("GLOBAL");
     expect((await s.call("get", "/content/articles/nope")).status).toBe(404);
   });
 

@@ -11,7 +11,7 @@ import type {
   UserRecord,
 } from "../../ports/records.js";
 import type { Repositories, Tx, TxRunner } from "../../ports/repositories.js";
-import type { AlertRuleRecord, NotificationRecord, PushDeviceRecord, NotificationPreferenceRecord, WeatherObservationRecord, WeatherCacheRecord, SupplierRecord, MoneyAccountRecord, ExpenseRecord, IncomeRecord, RecurringExpenseRecord, TransactionRecord, MarketListingRecord, OrderPaymentRecord, HatcheryBatchRecord, HatcheryEventRecord, BuyerRecord, OrderRecord, BroodingProfileRecord, ChickArrivalRecord, BrooderCheckRecord, ArticleRecord, MedicineRecord, VaccinationProgrammeRecord, VaccinationRecord, ChecklistTemplateRecord, VisitorRecord, BiosecurityLogRecord, CleaningTaskRecord, EquipmentRecord, EquipmentMovementRecord, TaskRecord, AlertRecord, ChickLotRecord, InventoryItemRecord, InventoryLotRecord, InventoryTransactionRecord, BirdWeightRecord, DailyRecordRecord, EggInventoryRecord, EggRecordRecord, FeedConsumptionRecord, FlockEventRecord, FlockRecord, HealthRecordRecord, HouseRecord, MediaAssetRecord, WaterRecordRecord } from "../../ports/records.js";
+import type { GlossaryTermRecord, CourseRecord, AlertRuleRecord, NotificationRecord, PushDeviceRecord, NotificationPreferenceRecord, WeatherObservationRecord, WeatherCacheRecord, SupplierRecord, MoneyAccountRecord, ExpenseRecord, IncomeRecord, RecurringExpenseRecord, TransactionRecord, MarketListingRecord, OrderPaymentRecord, HatcheryBatchRecord, HatcheryEventRecord, BuyerRecord, OrderRecord, BroodingProfileRecord, ChickArrivalRecord, BrooderCheckRecord, ArticleRecord, MedicineRecord, VaccinationProgrammeRecord, VaccinationRecord, ChecklistTemplateRecord, VisitorRecord, BiosecurityLogRecord, CleaningTaskRecord, EquipmentRecord, EquipmentMovementRecord, TaskRecord, AlertRecord, ChickLotRecord, InventoryItemRecord, InventoryLotRecord, InventoryTransactionRecord, BirdWeightRecord, DailyRecordRecord, EggInventoryRecord, EggRecordRecord, FeedConsumptionRecord, FlockEventRecord, FlockRecord, HealthRecordRecord, HouseRecord, MediaAssetRecord, WaterRecordRecord } from "../../ports/records.js";
 import { createMemFarmRepo } from "./farm-repo.js";
 
 /**
@@ -82,6 +82,9 @@ export interface MemoryStore {
   equipmentMovements: Table<EquipmentMovementRecord>;
   tasks: Table<TaskRecord>;
   articles: Table<ArticleRecord>;
+  glossary: Table<GlossaryTermRecord>;
+  courses: Table<CourseRecord>;
+  trainingProgress: Table<{ userId: string; courseId: string; lessonId: string; completedAt: Date }>;
   hatcheryBatches: Table<HatcheryBatchRecord>;
   hatcheryEvents: Table<HatcheryEventRecord>;
   buyers: Table<BuyerRecord>;
@@ -146,6 +149,9 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
     equipmentMovements: new Table(),
     tasks: new Table(),
     articles: new Table(),
+    glossary: new Table(),
+    courses: new Table(),
+    trainingProgress: new Table(),
     hatcheryBatches: new Table(),
     hatcheryEvents: new Table(),
     buyers: new Table(),
@@ -207,6 +213,9 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
     store.equipmentMovements,
     store.tasks,
     store.articles,
+    store.glossary,
+    store.courses,
+    store.trainingProgress,
     store.hatcheryBatches,
     store.hatcheryEvents,
     store.buyers,
@@ -594,19 +603,19 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
         return n;
       },
     },
-    articles: {
-      async findPublished(q) {
-        return store.articles
-          .all()
-          .filter((a) => a.status === "published" && a.locale === q.locale && q.regionCodes.includes(a.regionCode) && (!q.kind || a.kind === q.kind) && (!q.tag || a.tags?.includes(q.tag)))
-          .sort((a, b) => (b.publishedAt?.getTime() ?? 0) - (a.publishedAt?.getTime() ?? 0));
+    articles: { ...createMemContentRepo(store.articles, "title"), async findBySourceUrl(url) {
+      const r = store.articles.all().find((a) => a.sourceUrl === url);
+      return r ? structuredClone(r) : null;
+    } },
+    glossary: createMemContentRepo(store.glossary, "term"),
+    courses: createMemContentRepo(store.courses, "title"),
+    trainingProgress: {
+      async complete(userId, courseId, lessonId, at) {
+        const exists = store.trainingProgress.all().find((p) => p.userId === userId && p.lessonId === lessonId && p.courseId === courseId);
+        if (!exists) store.trainingProgress.put(`${userId}:${courseId}:${lessonId}`, { userId, courseId, lessonId, completedAt: at });
       },
-      async findBySlug(slug, locale) {
-        return store.articles.all().find((a) => a.slug === slug && a.locale === locale) ?? null;
-      },
-      async upsert(rec) {
-        const existing = store.articles.all().find((a) => a.slug === rec.slug && a.locale === rec.locale);
-        store.articles.put(existing?.id ?? rec.id, { ...rec, id: existing?.id ?? rec.id });
+      async forUser(userId, courseId) {
+        return store.trainingProgress.all().filter((p) => p.userId === userId && (!courseId || p.courseId === courseId)).map((p) => ({ ...p }));
       },
     },
     async locateDailyRecord(id) {
@@ -615,6 +624,51 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
     },
   };
   return { repos, store };
+}
+
+/** Global content (articles, glossary, courses): unique by slug + locale, versioned writes. */
+function createMemContentRepo<T extends { id: string; slug: string; locale: string; version: number; status: string; regionCode: string }>(table: Table<T>, titleField: string): import("../../ports/repositories.js").ContentRepo<T> {
+  const f = (r: T) => r as unknown as Record<string, unknown>;
+  return {
+    async find(q) {
+      const statuses = q.status === undefined ? null : Array.isArray(q.status) ? q.status : [q.status];
+      const t = q.text?.toLowerCase();
+      const sortBy = q.sortBy ?? "updatedAt";
+      const key = (r: T) => {
+        const v = f(r)[sortBy];
+        return v instanceof Date ? v.getTime() : (v as string | number | undefined) ?? "";
+      };
+      const asc = sortBy === "order" || sortBy === "term";
+      return table
+        .all()
+        .filter((r) => (!statuses || statuses.includes(r.status)) && (!q.kind || f(r)["kind"] === q.kind) && (!q.category || f(r)["category"] === q.category) && (!q.locale || r.locale === q.locale) && (!q.regionCodes || q.regionCodes.includes(r.regionCode)) && (!t || String(f(r)[titleField] ?? "").toLowerCase().includes(t)))
+        .sort((a, b) => (key(a) < key(b) ? (asc ? -1 : 1) : key(a) > key(b) ? (asc ? 1 : -1) : 0))
+        .slice(0, q.limit)
+        .map((r) => structuredClone(r));
+    },
+    async findById(id) {
+      const r = table.get(id);
+      return r ? structuredClone(r) : null;
+    },
+    async findBySlug(slug, locale) {
+      const r = table.all().find((x) => x.slug === slug && x.locale === locale);
+      return r ? structuredClone(r) : null;
+    },
+    async insert(rec) {
+      if (table.all().some((x) => x.slug === rec.slug && x.locale === rec.locale)) throw duplicate("slug_1_locale_1");
+      if (f(rec)["sourceUrl"] && table.all().some((x) => f(x)["sourceUrl"] === f(rec)["sourceUrl"])) throw duplicate("sourceUrl_1");
+      table.put(rec.id, structuredClone(rec));
+    },
+    async update(id, patch, expectedVersion) {
+      const cur = table.get(id);
+      if (!cur || cur.version !== expectedVersion) return null;
+      if (patch.slug && table.all().some((x) => x.id !== id && x.slug === patch.slug && x.locale === (patch.locale ?? cur.locale))) throw duplicate("slug_1_locale_1");
+      const next = { ...cur, ...patch, version: expectedVersion + 1 } as T;
+      for (const [k, v] of Object.entries(patch)) if (v === undefined) delete (next as Record<string, unknown>)[k];
+      table.put(id, structuredClone(next));
+      return structuredClone(next);
+    },
+  };
 }
 
 function duplicate(index: string) {

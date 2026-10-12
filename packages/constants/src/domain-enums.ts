@@ -147,7 +147,16 @@ export const RULE_KEYS = [
 export const WEATHER_KINDS = ["current", "hourly", "daily"] as const;
 
 // content & system
-export const ARTICLE_KINDS = ["fact", "guide", "news", "disease_notice"] as const;
+/** Article kinds: short facts, poultry management guides, news, disease information. */
+export const ARTICLE_KINDS = ["fact", "guide", "news", "disease"] as const;
+/** Where an article comes from: written for PoultryPilot, or summarising an external source. */
+export const ARTICLE_ORIGINS = ["original", "external"] as const;
+export const CONTENT_CATEGORIES = ["biosecurity", "health", "nutrition", "housing", "management", "hatchery", "welfare", "markets", "policy", "business", "general"] as const;
+/** Platform staff roles for global content (not farm roles). Editors draft; publishers review and publish. */
+export const PLATFORM_ROLES = ["content_editor", "content_publisher"] as const;
+/** Reports a farm can export. */
+export const REPORT_TYPES = ["farm", "flock", "egg", "feed", "health", "hatchery", "biosecurity", "financial", "marketplace"] as const;
+export const REPORT_FORMATS = ["pdf", "csv", "xlsx", "json"] as const;
 export const CONTENT_STATUSES = ["draft", "in_review", "published", "archived"] as const;
 export const SYNC_OPERATION_STATUSES = ["accepted", "rejected", "conflict"] as const;
 
