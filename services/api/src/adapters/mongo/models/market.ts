@@ -93,6 +93,8 @@ export const OrderModel = defineCollection({
     buyerUserId: ref("User"),
     buyerFarmId: ref("Farm"),
     listingId: ref("MarketListing"),
+    /** A booking against a hatch not yet graded; delivery draws from that batch's chick lot. */
+    hatcheryBatchId: ref("HatcheryBatch"),
     lines: {
       type: [OrderLineSchema],
       required: true,

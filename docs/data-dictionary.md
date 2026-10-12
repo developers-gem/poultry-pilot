@@ -3,7 +3,7 @@
 > Generated from the Mongoose schemas in `services/api/src/adapters/mongo/models`. Do not edit by hand:
 > run `pnpm --filter @poultrypilot/api docs:data-dictionary`. A test fails if this file is out of date.
 
-54 collections, 89 secondary indexes (plus the default `_id` index on each). Design rules and relationships: `docs/data-model.md`.
+57 collections, 92 secondary indexes (plus the default `_id` index on each). Design rules and relationships: `docs/data-model.md`.
 
 | Collection | Domain | Ownership | Indexes | Purpose |
 | --- | --- | --- | --- | --- |
@@ -29,15 +29,18 @@
 | [`health_records`](#health_records) | Health | farm | 3 | Farm health records: observations, veterinary visits, treatments, lab tests and post-mortems |
 | [`vaccination_programmes`](#vaccination_programmes) | Health | farm | 1 | A farm's own vaccination programme (from its veterinarian or hatchery), by bird age |
 | [`vaccinations`](#vaccinations) | Health | farm | 2 | A vaccination planned for a flock and, once given, how: batch numbers and expiry, doses used from stock, route, who gave it |
-| [`hatchery_batches`](#hatchery_batches) | Hatchery | farm | 2 | Eggs set together in an incubator |
-| [`hatchery_events`](#hatchery_events) | Hatchery | farm, append-only | 1 | What happened to a batch: set, candling counts, transfer to hatcher, hatch and grading counts, environment readings |
-| [`chicks`](#chicks) | Hatchery | farm | 1 | A lot of day-old chicks available to place or sell, from the farm's hatchery or bought in |
 | [`checklist_templates`](#checklist_templates) | Biosecurity and equipment | farm | 1 | A farm's own checklist (visitor declaration, PPE, footbath, cleaning, disinfection, vehicle, pest control, audit) |
 | [`biosecurity_logs`](#biosecurity_logs) | Biosecurity and equipment | farm | 1 | Evidence that a biosecurity activity happened: cleaning, disinfection, footbath change or check, vehicle movement, pest control, wild bird observation, or an audit |
 | [`visitors`](#visitors) | Biosecurity and equipment | farm | 1 | Visitor register: who entered, why, which houses, their declaration, last contact with other poultry and the downtime since, PPE and footbath use |
 | [`cleaning_tasks`](#cleaning_tasks) | Biosecurity and equipment | farm | 1 | A recurring cleaning or disinfection routine, optionally with a checklist template |
 | [`equipment`](#equipment) | Biosecurity and equipment | farm | 1 | Assets: incubators, feeders, heaters, generators, scales, vehicles |
 | [`equipment_movements`](#equipment_movements) | Biosecurity and equipment | farm, append-only | 1 | Equipment moving between houses or off the farm, with whether it was disinfected (a common disease route) |
+| [`hatchery_batches`](#hatchery_batches) | Hatchery | farm | 2 | Eggs selected and set together |
+| [`hatchery_events`](#hatchery_events) | Hatchery | farm, append-only | 1 | The hatchery ledger: setting, candling, transfer to the hatcher, hatch, chick grading, machine readings and notes |
+| [`chicks`](#chicks) | Hatchery | farm | 1 | A lot of day-old chicks available to place or sell, from the farm's hatchery or bought in |
+| [`brooding_profiles`](#brooding_profiles) | ChickStart | farm | 1 | The farm's brooding targets by day of age (temperature at chick level, humidity, target weight), taken from its breed guide or veterinarian |
+| [`chick_arrivals`](#chick_arrivals) | ChickStart | farm | 1 | A planned delivery of chicks into a house: preparation checklist, then the arrival itself (count, dead on arrival, chick weight and quality) |
+| [`brooder_checks`](#brooder_checks) | ChickStart | farm | 1 | A check of young chicks: temperature at chick level, humidity, behaviour, feed and water, crop fill, with optional checklist answers |
 | [`expenses`](#expenses) | Money | farm | 3 | A bill or cost owed (accrual document) |
 | [`recurring_expenses`](#recurring_expenses) | Money | farm | 1 | A repeating bill (electricity, wages, rent) |
 | [`transactions`](#transactions) | Money | farm, append-only | 3 | The cash ledger: money actually received or paid |
@@ -456,7 +459,7 @@ Egg stock ledger. Each movement adds (collected, positive adjustment) or removes
 | `grade` | String |  | one of: `large`, `medium`, `small`, `cracked`, `dirty`, `double_yolk` |  |
 | `quantityDelta` | Number | yes | min -10000000; integer |  |
 | `flockId` | String |  |  | `Flock` |
-| `sourceType` | String | yes | one of: `egg_record`, `order`, `manual` |  |
+| `sourceType` | String | yes | one of: `egg_record`, `order`, `manual`, `hatchery_batch` |  |
 | `sourceId` | String |  |  |  |
 | `reversalOf` | String |  |  | `EggInventory` |
 | `note` | String |  | ≤ 500 chars |  |
@@ -791,109 +794,6 @@ A vaccination planned for a flock and, once given, how: batch numbers and expiry
 | farmId, status, dueDate |  | Upcoming and overdue vaccinations across the farm (calendar, reminder job) |
 | farmId, flockId, dueDate |  | A flock's vaccination programme |
 
-## Hatchery
-
-### hatchery_batches
-
-Eggs set together in an incubator. Results are recorded as hatchery_events; hatched chicks become a chick lot.
-
-- **Model:** `HatcheryBatch`
-- **Ownership:** Farm — every query must include farmId
-- **Standard fields:** `_id` (UUIDv7 string), `farmId` (required), `createdBy` (required), `updatedBy`, `createdAt`, `updatedAt` (UTC, required), `version` (optimistic concurrency), `deletedAt`, `deletedBy` (soft delete)
-
-| Field | Type | Required | Constraints | References |
-| --- | --- | --- | --- | --- |
-| `code` | String | yes | ≤ 40 chars |  |
-| `species` | String | yes | one of: `chicken`, `duck`, `turkey`, `quail`, `guinea_fowl`; default `"chicken"` |  |
-| `breed` | String |  | ≤ 120 chars |  |
-| `eggSource` | String | yes | one of: `own_flock`, `purchased` |  |
-| `sourceFlockId` | String |  |  | `Flock` |
-| `supplier` | String |  | ≤ 120 chars |  |
-| `incubatorId` | String |  |  | `Equipment` |
-| `setDate` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
-| `incubationDays` | Number | yes | min 10; max 40; integer |  |
-| `expectedHatchDate` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
-| `eggsSet` | Number | yes | min 1; integer |  |
-| `status` | String | yes | one of: `incubating`, `in_hatcher`, `hatched`, `cancelled`; default `"incubating"` |  |
-| `results` | object |  |  |  |
-| `results.infertile` | Number |  | integer |  |
-| `results.earlyDead` | Number |  | integer |  |
-| `results.fertile` | Number |  | integer |  |
-| `results.deadInShell` | Number |  | integer |  |
-| `results.hatched` | Number |  | integer |  |
-| `results.culled` | Number |  | integer |  |
-| `eggCost` | object |  |  |  |
-| `eggCost.amountMinor` | Number | yes | integer |  |
-| `eggCost.currency` | String | yes | pattern `/^[A-Z]{3}$/` |  |
-| `notes` | String |  | ≤ 1000 chars |  |
-
-| Index | Options | Serves |
-| --- | --- | --- |
-| farmId, status, expectedHatchDate |  | Incubating batches and hatches due (dashboard, calendar) |
-| farmId, code | unique | Batch codes unique within a farm; lookup by code from egg labels |
-
-### hatchery_events
-
-What happened to a batch: set, candling counts, transfer to hatcher, hatch and grading counts, environment readings.
-
-- **Model:** `HatcheryEvent`
-- **Ownership:** Farm — every query must include farmId
-- **Standard fields:** `_id` (UUIDv7 string), `farmId` (required), `createdBy` (required), `updatedBy`, `createdAt`, `updatedAt` (UTC, required), `version` (optimistic concurrency)
-- **Append-only:** never updated or deleted; corrections are new entries with `reversalOf`
-
-| Field | Type | Required | Constraints | References |
-| --- | --- | --- | --- | --- |
-| `batchId` | String | yes |  | `HatcheryBatch` |
-| `type` | String | yes | one of: `set`, `candling`, `transfer_to_hatcher`, `hatch`, `chick_grading`, `environment_reading`, `note`, `cancelled` |  |
-| `date` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
-| `counts` | object |  |  |  |
-| `counts.candled` | Number |  | integer |  |
-| `counts.infertile` | Number |  | integer |  |
-| `counts.earlyDead` | Number |  | integer |  |
-| `counts.deadInShell` | Number |  | integer |  |
-| `counts.hatched` | Number |  | integer |  |
-| `counts.gradeA` | Number |  | integer |  |
-| `counts.culled` | Number |  | integer |  |
-| `temperatureC` | Number |  | max 50 |  |
-| `humidityPercent` | Number |  | max 100 |  |
-| `chickLotId` | String |  |  | `ChickLot` |
-| `reversalOf` | String |  |  | `HatcheryEvent` |
-| `note` | String |  | ≤ 1000 chars |  |
-
-| Index | Options | Serves |
-| --- | --- | --- |
-| farmId, batchId, date |  | Timeline of one batch |
-
-### chicks
-
-A lot of day-old chicks available to place or sell, from the farm's hatchery or bought in. Placements (flock_events) and chick sales (orders) draw it down.
-
-- **Model:** `ChickLot`
-- **Ownership:** Farm — every query must include farmId
-- **Standard fields:** `_id` (UUIDv7 string), `farmId` (required), `createdBy` (required), `updatedBy`, `createdAt`, `updatedAt` (UTC, required), `version` (optimistic concurrency), `deletedAt`, `deletedBy` (soft delete)
-
-| Field | Type | Required | Constraints | References |
-| --- | --- | --- | --- | --- |
-| `source` | String | yes | one of: `own_hatchery`, `purchased` |  |
-| `hatcheryBatchId` | String |  |  | `HatcheryBatch` |
-| `supplier` | String |  | ≤ 120 chars |  |
-| `species` | String | yes | one of: `chicken`, `duck`, `turkey`, `quail`, `guinea_fowl`; default `"chicken"` |  |
-| `breed` | String |  | ≤ 120 chars |  |
-| `hatchDate` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
-| `quantity` | Number | yes | min 1; integer |  |
-| `remaining` | Number | yes | integer |  |
-| `status` | String | yes | one of: `available`, `depleted`, `closed`; default `"available"` |  |
-| `vaccinationsAtHatch` | array of String |  | ≤ 120 chars |  |
-| `placedFlockIds` | array of String |  |  | `Flock` |
-| `unitCost` | object |  |  |  |
-| `unitCost.amountMinor` | Number | yes | integer |  |
-| `unitCost.currency` | String | yes | pattern `/^[A-Z]{3}$/` |  |
-| `notes` | String |  | ≤ 1000 chars |  |
-
-| Index | Options | Serves |
-| --- | --- | --- |
-| farmId, status, hatchDate ↓ |  | Available chick lots for placement or sale |
-
 ## Biosecurity and equipment
 
 ### checklist_templates
@@ -907,7 +807,7 @@ A farm's own checklist (visitor declaration, PPE, footbath, cleaning, disinfecti
 | Field | Type | Required | Constraints | References |
 | --- | --- | --- | --- | --- |
 | `name` | String | yes | ≤ 120 chars |  |
-| `kind` | String | yes | one of: `visitor_declaration`, `ppe`, `footbath`, `cleaning`, `disinfection`, `vehicle`, `pest_control`, `audit`, `general` |  |
+| `kind` | String | yes | one of: `visitor_declaration`, `ppe`, `footbath`, `cleaning`, `disinfection`, `vehicle`, `pest_control`, `audit`, `general`, `arrival_preparation`, `brooder_check` |  |
 | `items` | array of objects | yes | custom validation |  |
 | `items[].id` | String | yes | ≤ 60 chars |  |
 | `items[].text` | String | yes | ≤ 300 chars |  |
@@ -1113,6 +1013,253 @@ Equipment moving between houses or off the farm, with whether it was disinfected
 | --- | --- | --- |
 | farmId, equipmentId, date ↓ |  | Movement history of one item (trace-back) |
 
+## Hatchery
+
+### hatchery_batches
+
+Eggs selected and set together. Holds the egg source, selection rejects and setting details; counts and rates are derived from hatchery_events. Grading creates a chick lot.
+
+- **Model:** `HatcheryBatch`
+- **Ownership:** Farm — every query must include farmId
+- **Standard fields:** `_id` (UUIDv7 string), `farmId` (required), `createdBy` (required), `updatedBy`, `createdAt`, `updatedAt` (UTC, required), `version` (optimistic concurrency), `deletedAt`, `deletedBy` (soft delete)
+
+| Field | Type | Required | Constraints | References |
+| --- | --- | --- | --- | --- |
+| `code` | String | yes | ≤ 40 chars |  |
+| `species` | String | yes | one of: `chicken`, `duck`, `turkey`, `quail`, `guinea_fowl`; default `"chicken"` |  |
+| `breed` | String |  | ≤ 120 chars |  |
+| `eggSource` | String | yes | one of: `own_flock`, `purchased` |  |
+| `sourceFlockId` | String |  |  | `Flock` |
+| `eggGrade` | String |  | one of: `large`, `medium`, `small`, `cracked`, `dirty`, `double_yolk` |  |
+| `supplier` | String |  | ≤ 120 chars |  |
+| `eggsReceived` | Number | yes | min 1; integer |  |
+| `rejects` | map of Mixed |  |  |  |
+| `rejects.$*` | Number |  |  |  |
+| `eggsSet` | Number | yes | min 1; integer |  |
+| `incubatorId` | String |  |  | `Equipment` |
+| `hatcherId` | String |  |  | `Equipment` |
+| `setDate` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
+| `incubationDays` | Number | yes | min 10; max 40; integer |  |
+| `expectedTransferDate` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
+| `expectedHatchDate` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
+| `status` | String | yes | one of: `incubating`, `in_hatcher`, `hatched`, `cancelled`; default `"incubating"` |  |
+| `results` | object |  |  |  |
+| `results.infertile` | Number |  | integer |  |
+| `results.cracked` | Number |  | integer |  |
+| `results.deadEmbryo` | Number |  | integer |  |
+| `results.transferred` | Number |  | integer |  |
+| `results.hatched` | Number |  | integer |  |
+| `results.deadInShell` | Number |  | integer |  |
+| `results.culled` | Number |  | integer |  |
+| `results.saleable` | Number |  | integer |  |
+| `results.inIncubation` | Number |  | integer |  |
+| `results.fertilityPercent` | Number |  | max 100 |  |
+| `results.hatchabilityPercent` | Number |  | max 100 |  |
+| `results.saleableChickPercent` | Number |  | max 100 |  |
+| `results.lossPercent` | Number |  | max 100 |  |
+| `eggCost` | object |  |  |  |
+| `eggCost.amountMinor` | Number | yes | integer |  |
+| `eggCost.currency` | String | yes | pattern `/^[A-Z]{3}$/` |  |
+| `otherCost` | object |  |  |  |
+| `otherCost.amountMinor` | Number | yes | integer |  |
+| `otherCost.currency` | String | yes | pattern `/^[A-Z]{3}$/` |  |
+| `chickLotId` | String |  |  | `ChickLot` |
+| `cancelledReason` | String |  | ≤ 300 chars |  |
+| `notes` | String |  | ≤ 1000 chars |  |
+
+| Index | Options | Serves |
+| --- | --- | --- |
+| farmId, status, expectedHatchDate |  | Incubating batches and hatches due (dashboard, calendar) |
+| farmId, code | unique, live records only | Batch codes unique within a farm; lookup by code from egg trays |
+
+### hatchery_events
+
+The hatchery ledger: setting, candling, transfer to the hatcher, hatch, chick grading, machine readings and notes. Counts move only through these; a reversal cancels the latest counted event.
+
+- **Model:** `HatcheryEvent`
+- **Ownership:** Farm — every query must include farmId
+- **Standard fields:** `_id` (UUIDv7 string), `farmId` (required), `createdBy` (required), `updatedBy`, `createdAt`, `updatedAt` (UTC, required), `version` (optimistic concurrency)
+- **Append-only:** never updated or deleted; corrections are new entries with `reversalOf`
+
+| Field | Type | Required | Constraints | References |
+| --- | --- | --- | --- | --- |
+| `batchId` | String | yes |  | `HatcheryBatch` |
+| `type` | String | yes | one of: `set`, `candling`, `transfer_to_hatcher`, `hatch`, `chick_grading`, `environment_reading`, `note`, `cancelled`, `reversal` |  |
+| `date` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
+| `counts` | object |  |  |  |
+| `counts.infertile` | Number |  | integer |  |
+| `counts.cracked` | Number |  | integer |  |
+| `counts.deadEmbryo` | Number |  | integer |  |
+| `counts.hatched` | Number |  | integer |  |
+| `counts.deadInShell` | Number |  | integer |  |
+| `counts.saleable` | Number |  | integer |  |
+| `counts.culled` | Number |  | integer |  |
+| `machine` | String |  | one of: `setter`, `hatcher` |  |
+| `temperatureC` | Number |  | max 50 |  |
+| `humidityPercent` | Number |  | max 100 |  |
+| `chickLotId` | String |  |  | `ChickLot` |
+| `reversalOf` | String |  |  | `HatcheryEvent` |
+| `note` | String |  | ≤ 1000 chars |  |
+
+| Index | Options | Serves |
+| --- | --- | --- |
+| farmId, batchId, date |  | Timeline of one batch |
+
+### chicks
+
+A lot of day-old chicks available to place or sell, from the farm's hatchery or bought in. Placements (flock_events) and chick sales (orders) draw it down.
+
+- **Model:** `ChickLot`
+- **Ownership:** Farm — every query must include farmId
+- **Standard fields:** `_id` (UUIDv7 string), `farmId` (required), `createdBy` (required), `updatedBy`, `createdAt`, `updatedAt` (UTC, required), `version` (optimistic concurrency), `deletedAt`, `deletedBy` (soft delete)
+
+| Field | Type | Required | Constraints | References |
+| --- | --- | --- | --- | --- |
+| `source` | String | yes | one of: `own_hatchery`, `purchased` |  |
+| `hatcheryBatchId` | String |  |  | `HatcheryBatch` |
+| `supplier` | String |  | ≤ 120 chars |  |
+| `species` | String | yes | one of: `chicken`, `duck`, `turkey`, `quail`, `guinea_fowl`; default `"chicken"` |  |
+| `breed` | String |  | ≤ 120 chars |  |
+| `hatchDate` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
+| `quantity` | Number | yes | min 1; integer |  |
+| `remaining` | Number | yes | integer |  |
+| `status` | String | yes | one of: `available`, `depleted`, `closed`; default `"available"` |  |
+| `vaccinationsAtHatch` | array of String |  | ≤ 120 chars |  |
+| `placedFlockIds` | array of String |  |  | `Flock` |
+| `unitCost` | object |  |  |  |
+| `unitCost.amountMinor` | Number | yes | integer |  |
+| `unitCost.currency` | String | yes | pattern `/^[A-Z]{3}$/` |  |
+| `notes` | String |  | ≤ 1000 chars |  |
+
+| Index | Options | Serves |
+| --- | --- | --- |
+| farmId, status, hatchDate ↓ |  | Available chick lots for placement or sale |
+
+## ChickStart
+
+### brooding_profiles
+
+The farm's brooding targets by day of age (temperature at chick level, humidity, target weight), taken from its breed guide or veterinarian. Brooder checks are compared with it. No targets are built in.
+
+- **Model:** `BroodingProfile`
+- **Ownership:** Farm — every query must include farmId
+- **Standard fields:** `_id` (UUIDv7 string), `farmId` (required), `createdBy` (required), `updatedBy`, `createdAt`, `updatedAt` (UTC, required), `version` (optimistic concurrency), `deletedAt`, `deletedBy` (soft delete)
+
+| Field | Type | Required | Constraints | References |
+| --- | --- | --- | --- | --- |
+| `name` | String | yes | ≤ 120 chars |  |
+| `flockTypes` | array of String |  | one of: `broiler`, `layer`, `breeder`, `chick`, `custom` |  |
+| `bands` | array of objects | yes | custom validation |  |
+| `bands[].fromDay` | Number | yes | max 120; integer |  |
+| `bands[].toDay` | Number | yes | max 120; integer |  |
+| `bands[].tempMinC` | Number |  | max 45 |  |
+| `bands[].tempMaxC` | Number |  | max 45 |  |
+| `bands[].humidityMin` | Number |  | max 100 |  |
+| `bands[].humidityMax` | Number |  | max 100 |  |
+| `bands[].targetWeightG` | Number |  | max 10000 |  |
+| `source` | String |  | ≤ 300 chars |  |
+| `isDefault` | Boolean |  | default `false` |  |
+
+| Index | Options | Serves |
+| --- | --- | --- |
+| farmId, name | unique, live records only | Profile list (prefix); names unique within a farm |
+
+### chick_arrivals
+
+A planned delivery of chicks into a house: preparation checklist, then the arrival itself (count, dead on arrival, chick weight and quality). Arrival places the chicks into a flock.
+
+- **Model:** `ChickArrival`
+- **Ownership:** Farm — every query must include farmId
+- **Standard fields:** `_id` (UUIDv7 string), `farmId` (required), `createdBy` (required), `updatedBy`, `createdAt`, `updatedAt` (UTC, required), `version` (optimistic concurrency), `deletedAt`, `deletedBy` (soft delete)
+
+| Field | Type | Required | Constraints | References |
+| --- | --- | --- | --- | --- |
+| `houseId` | String | yes |  | `House` |
+| `expectedDate` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
+| `expectedCount` | Number | yes | min 1; integer |  |
+| `source` | String | yes | one of: `own_hatchery`, `chick_lot`, `supplier` |  |
+| `hatcheryBatchId` | String |  |  | `HatcheryBatch` |
+| `chickLotId` | String |  |  | `ChickLot` |
+| `supplier` | String |  | ≤ 120 chars |  |
+| `flockType` | String | yes | one of: `broiler`, `layer`, `breeder`, `chick`, `custom` |  |
+| `breed` | String |  | ≤ 120 chars |  |
+| `broodingProfileId` | String |  |  | `BroodingProfile` |
+| `status` | String | yes | one of: `planned`, `arrived`, `cancelled`; default `"planned"` |  |
+| `preparation` | object |  |  |  |
+| `preparation.checklist` | object | yes |  |  |
+| `preparation.checklist.templateId` | String | yes |  | `ChecklistTemplate` |
+| `preparation.checklist.templateVersion` | Number | yes | integer |  |
+| `preparation.checklist.answers` | array of objects |  |  |  |
+| `preparation.checklist.answers[].itemId` | String | yes | ≤ 60 chars |  |
+| `preparation.checklist.answers[].text` | String | yes | ≤ 300 chars |  |
+| `preparation.checklist.answers[].answer` | Mixed | yes |  |  |
+| `preparation.checklist.answers[].passed` | Boolean | yes |  |  |
+| `preparation.checklist.failedCount` | Number |  | default `0`; integer |  |
+| `preparation.completedAt` | Date | yes |  |  |
+| `preparation.completedBy` | String |  |  | `User` |
+| `arrival` | object |  |  |  |
+| `arrival.arrivedAt` | Date | yes |  |  |
+| `arrival.received` | Number | yes | min 1; integer |  |
+| `arrival.deadOnArrival` | Number |  | default `0`; integer |  |
+| `arrival.averageWeightG` | Number |  | max 200 |  |
+| `arrival.sampleSize` | Number |  | integer |  |
+| `arrival.qualityNotes` | String |  | ≤ 500 chars |  |
+| `arrival.checklist` | object |  |  |  |
+| `arrival.checklist.templateId` | String | yes |  | `ChecklistTemplate` |
+| `arrival.checklist.templateVersion` | Number | yes | integer |  |
+| `arrival.checklist.answers` | array of objects |  |  |  |
+| `arrival.checklist.answers[].itemId` | String | yes | ≤ 60 chars |  |
+| `arrival.checklist.answers[].text` | String | yes | ≤ 300 chars |  |
+| `arrival.checklist.answers[].answer` | Mixed | yes |  |  |
+| `arrival.checklist.answers[].passed` | Boolean | yes |  |  |
+| `arrival.checklist.failedCount` | Number |  | default `0`; integer |  |
+| `flockId` | String |  |  | `Flock` |
+| `cancelledReason` | String |  | ≤ 300 chars |  |
+| `notes` | String |  | ≤ 1000 chars |  |
+
+| Index | Options | Serves |
+| --- | --- | --- |
+| farmId, status, expectedDate |  | Upcoming arrivals (calendar, preparation reminders) |
+
+### brooder_checks
+
+A check of young chicks: temperature at chick level, humidity, behaviour, feed and water, crop fill, with optional checklist answers. Flags come from the farm's brooding profile for that day of age.
+
+- **Model:** `BrooderCheck`
+- **Ownership:** Farm — every query must include farmId
+- **Standard fields:** `_id` (UUIDv7 string), `farmId` (required), `createdBy` (required), `updatedBy`, `createdAt`, `updatedAt` (UTC, required), `version` (optimistic concurrency), `deletedAt`, `deletedBy` (soft delete)
+
+| Field | Type | Required | Constraints | References |
+| --- | --- | --- | --- | --- |
+| `flockId` | String | yes |  | `Flock` |
+| `houseId` | String |  |  | `House` |
+| `checkedAt` | Date | yes |  |  |
+| `date` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
+| `dayOfAge` | Number | yes | max 2000; integer |  |
+| `temperatureC` | Number |  | min -10; max 60 |  |
+| `humidityPercent` | Number |  | max 100 |  |
+| `behaviour` | String |  | one of: `comfortable`, `huddling`, `spread_out`, `panting`, `avoiding_area` |  |
+| `feedAvailable` | Boolean |  |  |  |
+| `waterAvailable` | Boolean |  |  |  |
+| `cropFill` | object |  |  |  |
+| `cropFill.sampled` | Number | yes | min 1; integer |  |
+| `cropFill.full` | Number | yes | integer |  |
+| `checklist` | object |  |  |  |
+| `checklist.templateId` | String | yes |  | `ChecklistTemplate` |
+| `checklist.templateVersion` | Number | yes | integer |  |
+| `checklist.answers` | array of objects |  |  |  |
+| `checklist.answers[].itemId` | String | yes | ≤ 60 chars |  |
+| `checklist.answers[].text` | String | yes | ≤ 300 chars |  |
+| `checklist.answers[].answer` | Mixed | yes |  |  |
+| `checklist.answers[].passed` | Boolean | yes |  |  |
+| `checklist.failedCount` | Number |  | default `0`; integer |  |
+| `flags` | array of String |  | one of: `temperature_low`, `temperature_high`, `humidity_low`, `humidity_high`, `behaviour`, `no_feed`, `no_water` |  |
+| `notes` | String |  | ≤ 1000 chars |  |
+
+| Index | Options | Serves |
+| --- | --- | --- |
+| farmId, flockId, checkedAt ↓ |  | A flock's brooder checks, newest first (brooding view) |
+
 ## Money
 
 ### expenses
@@ -1300,6 +1447,7 @@ A sale by the farm (farmId = seller), recorded directly or placed by a marketpla
 | `buyerUserId` | String |  |  | `User` |
 | `buyerFarmId` | String |  |  | `Farm` |
 | `listingId` | String |  |  | `MarketListing` |
+| `hatcheryBatchId` | String |  |  | `HatcheryBatch` |
 | `lines` | array of objects | yes | custom validation |  |
 | `lines[].category` | String | yes | one of: `live_birds`, `dressed_birds`, `eggs`, `day_old_chicks`, `hatching_eggs`, `manure`, `other` |  |
 | `lines[].description` | String | yes | ≤ 200 chars |  |
@@ -1453,7 +1601,7 @@ A farm's configuration of one alert type: on/off, thresholds, scope and who is n
 
 | Field | Type | Required | Constraints | References |
 | --- | --- | --- | --- | --- |
-| `ruleType` | String | yes | one of: `mortality_spike`, `egg_drop`, `feed_change`, `missing_record`, `heat_stress`, `low_feed_stock`, `low_inventory`, `vaccination_due`, `withdrawal_active`, `expiry_soon`, `expired_stock`, `water_abnormal`, `health_follow_up`, `biosecurity_breach`, `wild_bird_contact`, `checklist_failed` |  |
+| `ruleType` | String | yes | one of: `mortality_spike`, `egg_drop`, `feed_change`, `missing_record`, `heat_stress`, `low_feed_stock`, `low_inventory`, `vaccination_due`, `withdrawal_active`, `expiry_soon`, `expired_stock`, `water_abnormal`, `health_follow_up`, `biosecurity_breach`, `wild_bird_contact`, `checklist_failed`, `brooding_conditions`, `hatch_due` |  |
 | `enabled` | Boolean |  | default `true` |  |
 | `parameters` | map of Number |  |  |  |
 | `parameters.$*` | Number |  |  |  |
@@ -1477,7 +1625,7 @@ Something that needs attention, raised by the server-side alert job. States fact
 
 | Field | Type | Required | Constraints | References |
 | --- | --- | --- | --- | --- |
-| `ruleType` | String | yes | one of: `mortality_spike`, `egg_drop`, `feed_change`, `missing_record`, `heat_stress`, `low_feed_stock`, `low_inventory`, `vaccination_due`, `withdrawal_active`, `expiry_soon`, `expired_stock`, `water_abnormal`, `health_follow_up`, `biosecurity_breach`, `wild_bird_contact`, `checklist_failed` |  |
+| `ruleType` | String | yes | one of: `mortality_spike`, `egg_drop`, `feed_change`, `missing_record`, `heat_stress`, `low_feed_stock`, `low_inventory`, `vaccination_due`, `withdrawal_active`, `expiry_soon`, `expired_stock`, `water_abnormal`, `health_follow_up`, `biosecurity_breach`, `wild_bird_contact`, `checklist_failed`, `brooding_conditions`, `hatch_due` |  |
 | `severity` | String | yes | one of: `info`, `warning`, `critical` |  |
 | `status` | String | yes | one of: `open`, `acknowledged`, `resolved`; default `"open"` |  |
 | `flockId` | String |  |  | `Flock` |
@@ -1864,13 +2012,6 @@ Every reference between collections, derived from the schemas.
 | `vaccinations` | `medicineId` | `medicines` | many-to-one |
 | `vaccinations` | `inventoryItemId` | `inventory_items` | many-to-one |
 | `vaccinations` | `batches[].lotId` | `inventory_lots` | many-to-one |
-| `hatchery_batches` | `sourceFlockId` | `flocks` | many-to-one |
-| `hatchery_batches` | `incubatorId` | `equipment` | many-to-one |
-| `hatchery_events` | `batchId` | `hatchery_batches` | many-to-one |
-| `hatchery_events` | `chickLotId` | `chicks` | many-to-one |
-| `hatchery_events` | `reversalOf` | `hatchery_events` | many-to-one |
-| `chicks` | `hatcheryBatchId` | `hatchery_batches` | many-to-one |
-| `chicks` | `placedFlockIds` | `flocks` | many-to-many |
 | `biosecurity_logs` | `houseId` | `houses` | many-to-one |
 | `biosecurity_logs` | `cleaningTaskId` | `cleaning_tasks` | many-to-one |
 | `biosecurity_logs` | `product.inventoryItemId` | `inventory_items` | many-to-one |
@@ -1888,6 +2029,26 @@ Every reference between collections, derived from the schemas.
 | `equipment_movements` | `fromHouseId` | `houses` | many-to-one |
 | `equipment_movements` | `toHouseId` | `houses` | many-to-one |
 | `equipment_movements` | `reversalOf` | `equipment_movements` | many-to-one |
+| `hatchery_batches` | `sourceFlockId` | `flocks` | many-to-one |
+| `hatchery_batches` | `incubatorId` | `equipment` | many-to-one |
+| `hatchery_batches` | `hatcherId` | `equipment` | many-to-one |
+| `hatchery_batches` | `chickLotId` | `chicks` | many-to-one |
+| `hatchery_events` | `batchId` | `hatchery_batches` | many-to-one |
+| `hatchery_events` | `chickLotId` | `chicks` | many-to-one |
+| `hatchery_events` | `reversalOf` | `hatchery_events` | many-to-one |
+| `chicks` | `hatcheryBatchId` | `hatchery_batches` | many-to-one |
+| `chicks` | `placedFlockIds` | `flocks` | many-to-many |
+| `chick_arrivals` | `houseId` | `houses` | many-to-one |
+| `chick_arrivals` | `hatcheryBatchId` | `hatchery_batches` | many-to-one |
+| `chick_arrivals` | `chickLotId` | `chicks` | many-to-one |
+| `chick_arrivals` | `broodingProfileId` | `brooding_profiles` | many-to-one |
+| `chick_arrivals` | `preparation.checklist.templateId` | `checklist_templates` | many-to-one |
+| `chick_arrivals` | `preparation.completedBy` | `users` | many-to-one |
+| `chick_arrivals` | `arrival.checklist.templateId` | `checklist_templates` | many-to-one |
+| `chick_arrivals` | `flockId` | `flocks` | many-to-one |
+| `brooder_checks` | `flockId` | `flocks` | many-to-one |
+| `brooder_checks` | `houseId` | `houses` | many-to-one |
+| `brooder_checks` | `checklist.templateId` | `checklist_templates` | many-to-one |
 | `expenses` | `flockId` | `flocks` | many-to-one |
 | `expenses` | `houseId` | `houses` | many-to-one |
 | `expenses` | `recurringExpenseId` | `recurring_expenses` | many-to-one |
@@ -1902,6 +2063,7 @@ Every reference between collections, derived from the schemas.
 | `orders` | `buyerUserId` | `users` | many-to-one |
 | `orders` | `buyerFarmId` | `farms` | many-to-one |
 | `orders` | `listingId` | `market_listings` | many-to-one |
+| `orders` | `hatcheryBatchId` | `hatchery_batches` | many-to-one |
 | `orders` | `lines[].flockId` | `flocks` | many-to-one |
 | `orders` | `lines[].chickLotId` | `chicks` | many-to-one |
 | `orders` | `statusHistory[].by` | `users` | many-to-one |

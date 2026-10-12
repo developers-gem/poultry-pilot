@@ -183,6 +183,9 @@ export function createBiosecurityService(d: { repos: Repositories; clock: Clock;
   }
 
   return {
+    /** Shared with ChickStart: evaluate answers against a farm checklist, raising actions and an alert on failures. */
+    runChecklist,
+
     // ---- checklists
 
     async createTemplate(ctx: FarmContext, input: CreateTemplateType & { id?: string }) {

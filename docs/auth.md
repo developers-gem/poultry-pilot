@@ -86,6 +86,9 @@ The table is generated from `packages/constants/src/permissions.ts`; the API enf
 | `market.read` | ✓ | ✓ | ✓ |  |  | ✓ |  |
 | `market.manage` | ✓ | ✓ | ✓ |  |  |  |  |
 | `payment.record` | ✓ | ✓ | ✓ |  |  | ✓ |  |
+| `hatchery.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `hatchery.record` | ✓ | ✓ | ✓ | ✓ | ✓ |  |  |
+| `hatchery.manage` | ✓ | ✓ | ✓ |  |  |  |  |
 | `inventory.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `inventory.issue` | ✓ | ✓ | ✓ | ✓ | ✓ |  | ✓ |
 | `inventory.manage` | ✓ | ✓ | ✓ |  |  | ✓ |  |

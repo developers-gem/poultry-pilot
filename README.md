@@ -161,4 +161,8 @@ One stock engine for feed, medicine, vaccines, disinfectant, litter, packaging, 
 
 Health records (observations, vet visits, treatments, lab tests, post-mortems) with symptom tags, attributed assessments, attachments and costs; treatments with dose, route, duration and withdrawal periods from the label or the vet; vaccination programmes by bird age with batches and expiry from stock; meat withdrawals block sales; withheld eggs are flagged; reminders and alerts for vaccinations and follow-ups. BioSecure: farm-configurable checklists, visitor register with declaration and downtime, footbath, cleaning, disinfection, vehicle, pest control and wild bird logs, equipment movement, corrective actions with verification. No diagnosis, no prescriptions, no country rules built in; educational articles cite their sources. Details: `docs/health-biosecurity.md`.
 
-Money and market services are not implemented yet; their collections are.
+## HatcheryHub and ChickStart
+
+Hatchery batches from egg source and selection through setting, candling, transfer, hatch and grading, with every egg accounted for and fertility, hatchability, saleable-chick and loss percentages; graded chicks become a costed chick lot; chick orders (also booked ahead of the hatch) and delivery draw from it. ChickStart: arrival plans with house-preparation checklists, arrival that places the chicks, brooder checks judged against the farm's own brooding profile, and a day-by-day brooding view. A farm calendar (JSON and iCalendar) shows expected transfers and hatches, chick deliveries and arrivals, vaccinations, cleaning and follow-ups. Details: `docs/hatchery-chickstart.md`.
+
+Money (ledger, expenses, payments) and the public marketplace are not implemented yet; their collections are.

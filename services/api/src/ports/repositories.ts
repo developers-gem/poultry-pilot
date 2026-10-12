@@ -36,6 +36,13 @@ import type {
   EquipmentMovementRecord,
   TaskRecord,
   ArticleRecord,
+  HatcheryBatchRecord,
+  HatcheryEventRecord,
+  BuyerRecord,
+  OrderRecord,
+  BroodingProfileRecord,
+  ChickArrivalRecord,
+  BrooderCheckRecord,
 } from "./records.js";
 
 /**
@@ -208,6 +215,16 @@ export interface Repositories {
   /** Append-only. */
   equipmentMovements: FarmRepo<EquipmentMovementRecord>;
   tasks: FarmRepo<TaskRecord>;
+  hatcheryBatches: FarmRepo<HatcheryBatchRecord>;
+  /** Append-only. */
+  hatcheryEvents: FarmRepo<HatcheryEventRecord>;
+  buyers: FarmRepo<BuyerRecord>;
+  orders: FarmRepo<OrderRecord>;
+  broodingProfiles: FarmRepo<BroodingProfileRecord>;
+  chickArrivals: FarmRepo<ChickArrivalRecord>;
+  brooderChecks: FarmRepo<BrooderCheckRecord>;
+  /** Atomic per-farm sequences (order numbers). */
+  counters: { next(name: string, farmId: string, tx?: Tx): Promise<number> };
   /** Global educational content (not farm-owned). */
   articles: {
     findPublished(q: { kind?: ArticleRecord["kind"]; tag?: string; regionCodes: string[]; locale: string }): Promise<ArticleRecord[]>;

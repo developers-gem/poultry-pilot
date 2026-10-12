@@ -2,7 +2,7 @@
 
 How the MongoDB collections fit together and the rules every collection follows. The field-by-field reference is the generated [data dictionary](data-dictionary.md); schemas live in `services/api/src/adapters/mongo/models/`.
 
-54 collections: the 47 product collections, plus 7 for authentication and infrastructure (`sessions`, `refresh_tokens`, `one_time_tokens`, `sync_changes`, `idempotency_keys`, `counters`, `media_assets`). 89 secondary indexes, each tied to a named query.
+57 collections: the 50 product collections, plus 7 for authentication and infrastructure (`sessions`, `refresh_tokens`, `one_time_tokens`, `sync_changes`, `idempotency_keys`, `counters`, `media_assets`). 92 secondary indexes, each tied to a named query.
 
 ## Conventions
 
@@ -21,7 +21,7 @@ How the MongoDB collections fit together and the rules every collection follows.
 
 | Ownership | Collections | Standard fields | Access rule |
 | --- | --- | --- | --- |
-| Farm | 39 collections, e.g. flocks, daily_records, inventory_lots, checklist_templates, sync_operations | `farmId`, `createdBy` (required), `updatedBy`, `version`, soft delete unless append-only | Every query includes `farmId`; the `requireFarmScope` plugin throws if it is missing. Indexes start with `farmId` |
+| Farm | 42 collections, e.g. flocks, daily_records, inventory_lots, hatchery_batches, chick_arrivals, sync_operations | `farmId`, `createdBy` (required), `updatedBy`, `version`, soft delete unless append-only | Every query includes `farmId`; the `requireFarmScope` plugin throws if it is missing. Indexes start with `farmId` |
 | Tenant | farms | `createdBy`, `version`, soft delete | Read by `_id` after a membership check |
 | User | users, sessions, refresh/one-time tokens, notifications, training_progress | per collection | Queried by `userId` of the signed-in person |
 | Global | training_courses, articles, glossary_terms, market_prices, weather_cache | `createdBy`/`updatedBy` optional (staff or import job) | Readable by any signed-in user; written by staff tools or jobs |
@@ -56,7 +56,7 @@ Each fact has one home. Some values are also kept as **derived snapshots** for f
 | `water_records.flags`, `baselineLitres` | DailyRecordService on save | the litres, pH and dissolved solids against the farm limits and the previous days |
 | Egg stock per grade | aggregation, no snapshot | sum of `egg_inventory.quantityDelta` |
 | `chicks.remaining` | HatcheryService / FlockService / OrderService | `chicks.quantity` − placements − chick sales |
-| `hatchery_batches.results` | HatcheryService | `hatchery_events.counts` |
+| `hatchery_batches.results` (counts and rates), `status` | HatcheryService in the same transaction as each event | `hatchery_events.counts` (effective, after reversals) |
 | `health_records.treatments[].endDate`, `withdrawal*Until` | HealthService on save | start + duration; end + withdrawal days (treatment override, else the medicine's catalog entry; none if neither) |
 | `egg_records.withheldUntil` | HealthService when treatments or eggs change | egg withdrawal windows of the flock's treatments |
 | `visitors.downtimeHours`, `flags` | BiosecurityService at check-in | last poultry contact vs check-in, the farm's `visitorDowntimeHours`, declaration checklist |
@@ -91,7 +91,12 @@ When a record changes, the service writes these in **one transaction** (MongoDB 
 | Move equipment | `equipment_movements` + `equipment.houseId`; corrective action if not disinfected |
 | Deliver an order | `orders.status/statusHistory` + stock postings: `egg_inventory` (sold), `flock_events` (sale) or `chicks.remaining` |
 | Receive a payment | `order_payments` + `transactions` (income) → `orders.amountPaid/paymentStatus` |
-| Hatch results | `hatchery_events` → `hatchery_batches.results/status`; creates a `chicks` lot |
+| Set a hatchery batch | `hatchery_batches` + `hatchery_events` (set) + `egg_inventory` (own-flock hatching eggs leave stock) |
+| Candling, transfer, hatch | `hatchery_events` → `hatchery_batches.results/status` |
+| Grade chicks | `hatchery_events` + a `chicks` lot (costed per saleable chick) |
+| Deliver a chick order | `orders.status/statusHistory/deliveredDate` + `chicks.remaining` |
+| Chick arrival (ChickStart) | `chick_arrivals` + `flocks` + placement `flock_events` + `chicks.remaining`, one transaction |
+| Brooder check | `brooder_checks` (+ `brooding_conditions` alert when flagged) |
 | Alert job finds a problem | `alerts` (unique dedupKey) + `notifications` per recipient and channel |
 | Offline mutation pushed | `sync_operations` (outcome, exactly once) + whatever the command writes |
 
@@ -180,9 +185,16 @@ erDiagram
   flocks ||--o{ health_records : history
   medicines ||--o{ health_records : "treatment uses"
   vaccinations |o--o| inventory_transactions : "dose issued"
+  flocks ||--o{ hatchery_batches : "hatching eggs from"
   hatchery_batches ||--o{ hatchery_events : timeline
-  hatchery_batches ||--o| chicks : "hatches into"
+  hatchery_batches ||--o| chicks : "graded into"
+  hatchery_batches ||--o{ orders : "booked on"
+  chicks ||--o{ orders : "delivered from"
   chicks ||--o{ flock_events : "placed as"
+  chicks ||--o{ chick_arrivals : "arrive as"
+  chick_arrivals ||--o| flocks : "placed into"
+  brooding_profiles ||--o{ chick_arrivals : targets
+  flocks ||--o{ brooder_checks : "checked in"
   equipment ||--o{ hatchery_batches : incubator
 ```
 

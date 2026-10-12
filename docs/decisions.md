@@ -113,3 +113,16 @@ Each is cheap to change until the phase named.
 | D64 | Health costs | Vet fees and medicine/vaccine stock used flow into flock cost through a flock-engine hook |
 | D65 | Educational content | Published health and biosecurity articles must cite sources (model, repository and loader); seed articles need veterinary review and link checks before launch |
 | D66 | Route namespaces | Every module owns a unique prefix (`/health`, `/biosecurity`, …); the idempotency middleware also runs once per request |
+
+## Added with HatcheryHub and ChickStart
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| D67 | Hatchery ledger | Batch counts derived from `hatchery_events`; stage order enforced; hatch and grading must account for every egg and chick; corrections undo the latest stage |
+| D68 | Fertility | fertile ÷ (eggs set − cracked): cracked eggs' fertility is unknown; hatchability = hatched ÷ fertile, with hatch of set also reported |
+| D69 | Hatching eggs | Own-flock eggs leave egg stock at setting (refused beyond stock); selection rejects are recorded by reason and never set |
+| D70 | Chick availability | Free chicks = lot remaining − open orders on the lot or on the batch it came from; delivery draws the lot |
+| D71 | Brooding targets | Farm-defined profiles with a source; none built in; without a profile, checks are recorded but not judged |
+| D72 | Arrival = placement | A ChickStart arrival creates the flock and draws the chick lot in the same transaction |
+| D73 | Nested transactions | The MongoDB runner joins an active transaction (AsyncLocalStorage), matching the memory adapter |
+| D74 | Calendar | Built on request from source records (never stored); iCalendar download for phone calendars |

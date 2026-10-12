@@ -299,6 +299,47 @@ post("/farms/invitations/accept", "Accept an emailed farm invitation", bodyOf(S.
   r("get", "/content/articles/{slug}", "Content", "One article with its body and sources", z.object({ farmId: V.Id, slug: z.string() }), {}, { 200: json(any, "Article") });
 }
 
+// ---- HatcheryHub, chick orders, ChickStart, calendar ------------------------
+{
+  const P = `${API_PREFIX}/farms/{farmId}`;
+  const any = z.record(z.unknown());
+  const items = z.object({ items: z.array(any) });
+  const idp = z.object({ farmId: V.Id, id: V.Id });
+  const r = (method: "get" | "post", path: string, tag: string, summary: string, params: z.AnyZodObject, request: Record<string, unknown>, ok: Record<string, unknown>) =>
+    registry.registerPath({ method, path: `${P}${path}`, tags: [tag], summary, security: secured, request: { params, ...request }, responses: { ...ok, ...errors } } as never);
+  const H = "HatcheryHub";
+  r("get", "/hatchery/summary", H, "Performance over completed batches: fertility, hatchability, saleable and loss %", farmParams, { query: V.HatcherySummaryQuery }, { 200: json(any, "Summary") });
+  r("get", "/hatchery/batches", H, "Batches with counts and rates", farmParams, { query: V.BatchListQuery }, { 200: json(items, "Batches") });
+  r("post", "/hatchery/batches", H, "Egg source, selection and setting (own-flock eggs drawn from stock)", farmParams, bodyOf(V.CreateHatcheryBatchRequest), { 201: json(any, "Set") });
+  r("get", "/hatchery/batches/{id}", H, "A batch with its timeline", idp, {}, { 200: json(any, "Batch") });
+  r("post", "/hatchery/batches/{id}/candling", H, "Candling: infertile, dead embryo, cracked", idp, bodyOf(V.CandlingRequest), { 201: json(any, "Recorded") });
+  r("post", "/hatchery/batches/{id}/transfer", H, "Transfer to the hatcher", idp, bodyOf(V.TransferToHatcherRequest), { 201: json(any, "Recorded") });
+  r("post", "/hatchery/batches/{id}/hatch", H, "Hatch: hatched and dead in shell (must account for every egg)", idp, bodyOf(V.HatchRequest), { 201: json(any, "Recorded") });
+  r("post", "/hatchery/batches/{id}/grading", H, "Chick grading: saleable and culled; creates the chick lot", idp, bodyOf(V.GradingRequest), { 201: json(any, "Graded") });
+  r("post", "/hatchery/batches/{id}/readings", H, "Setter or hatcher temperature and humidity", idp, bodyOf(V.MachineReadingRequest), { 201: json(any, "Recorded") });
+  r("post", "/hatchery/batches/{id}/reverse", H, "Undo the latest stage", idp, bodyOf(V.ReasonRequest), { 201: json(any, "Reversed") });
+  r("post", "/hatchery/batches/{id}/cancel", H, "Cancel a batch before it hatches", idp, bodyOf(V.ReasonRequest), { 200: json(any, "Cancelled") });
+  r("get", "/buyers", "Orders", "Buyers", farmParams, {}, { 200: json(items, "Buyers") });
+  r("post", "/buyers", "Orders", "Add a buyer", farmParams, bodyOf(V.BuyerRequest), { 201: json(any, "Created") });
+  r("get", "/chick-orders", "Orders", "Chick orders", farmParams, { query: V.OrderListQuery }, { 200: json(items, "Orders") });
+  r("post", "/chick-orders", "Orders", "Order chicks from a lot, or book against a batch still incubating", farmParams, bodyOf(V.ChickOrderRequest), { 201: json(any, "Created"), 422: json(S.ErrorEnvelope, "Not enough free chicks") });
+  r("post", "/chick-orders/{id}/confirm", "Orders", "Confirm an order", idp, {}, { 200: json(any, "Confirmed") });
+  r("post", "/chick-orders/{id}/cancel", "Orders", "Cancel an order", idp, bodyOf(V.ReasonRequest), { 200: json(any, "Cancelled") });
+  r("post", "/chick-orders/{id}/deliver", "Orders", "Deliver: draws the chicks from the lot", idp, bodyOf(V.DeliverOrderRequest), { 200: json(any, "Delivered") });
+  const C = "ChickStart";
+  r("get", "/chickstart/profiles", C, "Brooding profiles (the farm's own targets by day of age)", farmParams, {}, { 200: json(items, "Profiles") });
+  r("post", "/chickstart/profiles", C, "Add a brooding profile", farmParams, bodyOf(V.BroodingProfileRequest), { 201: json(any, "Created") });
+  r("get", "/chickstart/arrivals", C, "Planned and past chick arrivals", farmParams, { query: V.ArrivalListQuery }, { 200: json(items, "Arrivals") });
+  r("post", "/chickstart/arrivals", C, "Plan a chick arrival", farmParams, bodyOf(V.PlanArrivalRequest), { 201: json(any, "Planned") });
+  r("post", "/chickstart/arrivals/{id}/preparation", C, "House and arrival preparation checklist", idp, bodyOf(V.PreparationRequest), { 200: json(any, "Prepared") });
+  r("post", "/chickstart/arrivals/{id}/arrive", C, "Record the arrival and place the chicks into a new flock", idp, bodyOf(V.ArriveRequest), { 201: json(any, "Arrived") });
+  r("post", "/chickstart/arrivals/{id}/cancel", C, "Cancel a planned arrival", idp, bodyOf(V.ReasonRequest), { 200: json(any, "Cancelled") });
+  r("post", "/chickstart/checks", C, "Brooder check, judged against the farm's profile", farmParams, bodyOf(V.BrooderCheckRequest), { 201: json(any, "Recorded") });
+  r("get", "/chickstart/flocks/{flockId}", C, "The brooding period day by day", z.object({ farmId: V.Id, flockId: V.Id }), { query: V.BroodingViewQuery }, { 200: json(any, "Brooding view") });
+  r("get", "/calendar", "Calendar", "Expected transfers and hatches, chick deliveries and arrivals, vaccinations, cleaning, follow-ups", farmParams, { query: V.CalendarQuery }, { 200: json(any, "Events") });
+  r("get", "/calendar/ics", "Calendar", "The same events as an iCalendar file", farmParams, { query: V.CalendarQuery }, { 200: { description: "text/calendar" } });
+}
+
 // ---- sync -----------------------------------------------------------------
 registry.registerPath({
   method: "get",

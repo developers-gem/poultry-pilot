@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import mongoose, { type ClientSession, type Model } from "mongoose";
 import type {
   AuditEventRecord,
@@ -52,6 +53,13 @@ import {
   EquipmentMovementModel,
   TaskModel,
   ArticleModel,
+  HatcheryBatchModel,
+  HatcheryEventModel,
+  BuyerModel,
+  OrderModel,
+  BroodingProfileModel,
+  ChickArrivalModel,
+  BrooderCheckModel,
 } from "./models/index.js";
 import { createMongoFarmRepo } from "./farm-repo.js";
 
@@ -92,16 +100,23 @@ async function findOne<T>(model: Model<any>, filter: Record<string, unknown>, tx
   return fromDoc<T | null>(await model.findOne(filter, null, s(tx)).lean());
 }
 
+/** The session of the transaction in progress, so a nested tx.run joins it (same behaviour as the memory adapter). */
+const activeSession = new AsyncLocalStorage<ClientSession>();
+
 export function createMongoRepositories(connection = mongoose.connection): Repositories {
   return {
     tx: {
       async run(fn) {
+        const outer = activeSession.getStore();
+        if (outer) return fn({ session: outer }); // nested: join the outer transaction
         const session = await connection.startSession();
         try {
           let result!: Awaited<ReturnType<typeof fn>>;
-          await session.withTransaction(async () => {
-            result = await fn({ session });
-          });
+          await activeSession.run(session, () =>
+            session.withTransaction(async () => {
+              result = await fn({ session });
+            }),
+          );
           return result;
         } finally {
           await session.endSession();
@@ -291,6 +306,20 @@ export function createMongoRepositories(connection = mongoose.connection): Repos
     equipment: createMongoFarmRepo(EquipmentModel, { softDelete: true, versioned: true }),
     equipmentMovements: createMongoFarmRepo(EquipmentMovementModel, { softDelete: false, versioned: false }),
     tasks: createMongoFarmRepo(TaskModel, { softDelete: true, versioned: true }),
+    hatcheryBatches: createMongoFarmRepo(HatcheryBatchModel, { softDelete: true, versioned: true }),
+    hatcheryEvents: createMongoFarmRepo(HatcheryEventModel, { softDelete: false, versioned: false }),
+    buyers: createMongoFarmRepo(BuyerModel, { softDelete: true, versioned: true }),
+    orders: createMongoFarmRepo(OrderModel, { softDelete: true, versioned: true }),
+    broodingProfiles: createMongoFarmRepo(BroodingProfileModel, { softDelete: true, versioned: true }),
+    chickArrivals: createMongoFarmRepo(ChickArrivalModel, { softDelete: true, versioned: true }),
+    brooderChecks: createMongoFarmRepo(BrooderCheckModel, { softDelete: true, versioned: true }),
+    counters: {
+      async next(name, farmId, tx) {
+        const at = new Date();
+        const doc = await CounterModel.findOneAndUpdate({ _id: `${name}:${farmId}` }, { $inc: { value: 1 }, $set: { updatedAt: at }, $setOnInsert: { createdAt: at } }, { new: true, upsert: true, ...s(tx) }).lean();
+        return (doc as unknown as { value: number }).value;
+      },
+    },
     articles: {
       async findPublished(q) {
         const docs = await ArticleModel.find({ status: "published", locale: q.locale, regionCode: { $in: q.regionCodes }, ...(q.kind ? { kind: q.kind } : {}), ...(q.tag ? { tags: q.tag } : {}) }).sort({ publishedAt: -1 }).lean();

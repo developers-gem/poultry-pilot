@@ -339,7 +339,7 @@ export interface EggInventoryRecord extends FarmOwned {
   grade?: import("@poultrypilot/types").EggGrade;
   quantityDelta: number;
   flockId?: string;
-  sourceType: "egg_record" | "order" | "manual";
+  sourceType: "egg_record" | "order" | "manual" | "hatchery_batch";
   sourceId?: string;
   reversalOf?: string;
   note?: string;
@@ -661,4 +661,138 @@ export interface ArticleRecord {
   createdAt: Date;
   updatedAt: Date;
   version: number;
+}
+
+// ---- hatchery and ChickStart --------------------------------------------------------
+
+export interface HatchCountsValue {
+  infertile?: number;
+  cracked?: number;
+  deadEmbryo?: number;
+  hatched?: number;
+  deadInShell?: number;
+  saleable?: number;
+  culled?: number;
+}
+
+export interface HatcheryBatchRecord extends Editable {
+  code: string;
+  species: import("@poultrypilot/types").Species;
+  breed?: string;
+  eggSource: "own_flock" | "purchased";
+  sourceFlockId?: string;
+  eggGrade?: import("@poultrypilot/types").EggGrade;
+  supplier?: string;
+  eggsReceived: number;
+  rejects?: Partial<Record<(typeof import("@poultrypilot/constants").EGG_REJECT_REASONS)[number], number>>;
+  eggsSet: number;
+  incubatorId?: string;
+  hatcherId?: string;
+  setDate: string;
+  incubationDays: number;
+  expectedTransferDate: string;
+  expectedHatchDate: string;
+  status: "incubating" | "in_hatcher" | "hatched" | "cancelled";
+  results?: {
+    infertile: number; cracked: number; deadEmbryo: number; transferred?: number; hatched: number; deadInShell: number; culled: number; saleable: number; inIncubation: number;
+    fertilityPercent?: number; hatchabilityPercent?: number; saleableChickPercent?: number; lossPercent?: number;
+  };
+  eggCost?: MoneyValue;
+  otherCost?: MoneyValue;
+  chickLotId?: string;
+  cancelledReason?: string;
+  notes?: string;
+}
+
+export interface HatcheryEventRecord extends FarmOwned {
+  batchId: string;
+  type: import("../domain/hatchery.js").HatchEvent["type"];
+  date: string;
+  counts?: HatchCountsValue;
+  machine?: "setter" | "hatcher";
+  temperatureC?: number;
+  humidityPercent?: number;
+  chickLotId?: string;
+  reversalOf?: string;
+  note?: string;
+}
+
+export interface BuyerRecord extends Editable {
+  name: string;
+  type: "trader" | "retailer" | "restaurant" | "processor" | "individual" | "farm" | "other";
+  phone?: string;
+  email?: string;
+  locationLabel?: string;
+  notes?: string;
+}
+
+export interface OrderLineRecord {
+  category: (typeof import("@poultrypilot/constants").LISTING_CATEGORIES)[number];
+  description: string;
+  chickLotId?: string;
+  quantity: number;
+  unit: string;
+  unitPrice: MoneyValue;
+  total: MoneyValue;
+}
+
+export interface OrderRecord extends Editable {
+  orderNumber: number;
+  channel: "direct" | "marketplace";
+  buyerId?: string;
+  hatcheryBatchId?: string;
+  lines: OrderLineRecord[];
+  subtotal: MoneyValue;
+  total: MoneyValue;
+  status: import("@poultrypilot/types").OrderStatus;
+  statusHistory: { status: import("@poultrypilot/types").OrderStatus; at: Date; by?: string }[];
+  paymentStatus: "unpaid" | "partially_paid" | "paid" | "refunded";
+  requestedDeliveryDate?: string;
+  deliveredDate?: string;
+  deliveryAddress?: string;
+  notes?: string;
+}
+
+export interface BroodingProfileRecord extends Editable {
+  name: string;
+  flockTypes?: import("@poultrypilot/types").FlockType[];
+  bands: import("../domain/hatchery.js").BroodingBand[];
+  source?: string;
+  isDefault: boolean;
+}
+
+export interface ChickArrivalRecord extends Editable {
+  houseId: string;
+  expectedDate: string;
+  expectedCount: number;
+  source: "own_hatchery" | "chick_lot" | "supplier";
+  hatcheryBatchId?: string;
+  chickLotId?: string;
+  supplier?: string;
+  flockType: import("@poultrypilot/types").FlockType;
+  breed?: string;
+  broodingProfileId?: string;
+  status: "planned" | "arrived" | "cancelled";
+  preparation?: { checklist: ChecklistResult; completedAt: Date; completedBy?: string };
+  arrival?: { arrivedAt: Date; received: number; deadOnArrival: number; averageWeightG?: number; sampleSize?: number; qualityNotes?: string; checklist?: ChecklistResult };
+  flockId?: string;
+  cancelledReason?: string;
+  notes?: string;
+}
+
+export interface BrooderCheckRecord extends Editable {
+  flockId: string;
+  houseId?: string;
+  checkedAt: Date;
+  date: string;
+  dayOfAge: number;
+  temperatureC?: number;
+  humidityPercent?: number;
+  behaviour?: (typeof import("@poultrypilot/constants").BROODER_BEHAVIOURS)[number];
+  feedAvailable?: boolean;
+  waterAvailable?: boolean;
+  cropFill?: { sampled: number; full: number };
+  checklist?: ChecklistResult;
+  flags?: import("../domain/hatchery.js").BroodingFlag[];
+  notes?: string;
 }

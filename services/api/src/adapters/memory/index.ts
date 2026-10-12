@@ -11,7 +11,7 @@ import type {
   UserRecord,
 } from "../../ports/records.js";
 import type { Repositories, Tx, TxRunner } from "../../ports/repositories.js";
-import type { ArticleRecord, MedicineRecord, VaccinationProgrammeRecord, VaccinationRecord, ChecklistTemplateRecord, VisitorRecord, BiosecurityLogRecord, CleaningTaskRecord, EquipmentRecord, EquipmentMovementRecord, TaskRecord, AlertRecord, ChickLotRecord, InventoryItemRecord, InventoryLotRecord, InventoryTransactionRecord, BirdWeightRecord, DailyRecordRecord, EggInventoryRecord, EggRecordRecord, FeedConsumptionRecord, FlockEventRecord, FlockRecord, HealthRecordRecord, HouseRecord, MediaAssetRecord, WaterRecordRecord } from "../../ports/records.js";
+import type { HatcheryBatchRecord, HatcheryEventRecord, BuyerRecord, OrderRecord, BroodingProfileRecord, ChickArrivalRecord, BrooderCheckRecord, ArticleRecord, MedicineRecord, VaccinationProgrammeRecord, VaccinationRecord, ChecklistTemplateRecord, VisitorRecord, BiosecurityLogRecord, CleaningTaskRecord, EquipmentRecord, EquipmentMovementRecord, TaskRecord, AlertRecord, ChickLotRecord, InventoryItemRecord, InventoryLotRecord, InventoryTransactionRecord, BirdWeightRecord, DailyRecordRecord, EggInventoryRecord, EggRecordRecord, FeedConsumptionRecord, FlockEventRecord, FlockRecord, HealthRecordRecord, HouseRecord, MediaAssetRecord, WaterRecordRecord } from "../../ports/records.js";
 import { createMemFarmRepo } from "./farm-repo.js";
 
 /**
@@ -82,6 +82,14 @@ export interface MemoryStore {
   equipmentMovements: Table<EquipmentMovementRecord>;
   tasks: Table<TaskRecord>;
   articles: Table<ArticleRecord>;
+  hatcheryBatches: Table<HatcheryBatchRecord>;
+  hatcheryEvents: Table<HatcheryEventRecord>;
+  buyers: Table<BuyerRecord>;
+  orders: Table<OrderRecord>;
+  broodingProfiles: Table<BroodingProfileRecord>;
+  chickArrivals: Table<ChickArrivalRecord>;
+  brooderChecks: Table<BrooderCheckRecord>;
+  counters: Map<string, number>;
 }
 
 export function createMemoryRepositories(): { repos: Repositories; store: MemoryStore } {
@@ -124,6 +132,14 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
     equipmentMovements: new Table(),
     tasks: new Table(),
     articles: new Table(),
+    hatcheryBatches: new Table(),
+    hatcheryEvents: new Table(),
+    buyers: new Table(),
+    orders: new Table(),
+    broodingProfiles: new Table(),
+    chickArrivals: new Table(),
+    brooderChecks: new Table(),
+    counters: new Map(),
   };
   const transactional = [
     store.users,
@@ -163,6 +179,13 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
     store.equipmentMovements,
     store.tasks,
     store.articles,
+    store.hatcheryBatches,
+    store.hatcheryEvents,
+    store.buyers,
+    store.orders,
+    store.broodingProfiles,
+    store.chickArrivals,
+    store.brooderChecks,
   ] as Table<unknown>[];
 
   let depth = 0;
@@ -403,6 +426,21 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
     equipment: createMemFarmRepo(store.equipment, { softDelete: true, versioned: true }),
     equipmentMovements: createMemFarmRepo(store.equipmentMovements, { softDelete: false, versioned: false }),
     tasks: createMemFarmRepo(store.tasks, { softDelete: true, versioned: true }),
+    hatcheryBatches: createMemFarmRepo(store.hatcheryBatches, { softDelete: true, versioned: true, unique: [["farmId", "code"]] }),
+    hatcheryEvents: createMemFarmRepo(store.hatcheryEvents, { softDelete: false, versioned: false }),
+    buyers: createMemFarmRepo(store.buyers, { softDelete: true, versioned: true }),
+    orders: createMemFarmRepo(store.orders, { softDelete: true, versioned: true, unique: [["farmId", "orderNumber"]] }),
+    broodingProfiles: createMemFarmRepo(store.broodingProfiles, { softDelete: true, versioned: true, unique: [["farmId", "name"]] }),
+    chickArrivals: createMemFarmRepo(store.chickArrivals, { softDelete: true, versioned: true }),
+    brooderChecks: createMemFarmRepo(store.brooderChecks, { softDelete: true, versioned: true }),
+    counters: {
+      async next(name, farmId) {
+        const key = `${name}:${farmId}`;
+        const n = (store.counters.get(key) ?? 0) + 1;
+        store.counters.set(key, n);
+        return n;
+      },
+    },
     articles: {
       async findPublished(q) {
         return store.articles

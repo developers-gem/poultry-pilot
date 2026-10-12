@@ -249,6 +249,28 @@ function contract(name: string, setup: () => Promise<{ repos: Repositories; rese
       expect((await repos.articles.findPublished({ tag: "health", regionCodes: ["GLOBAL"], locale: "en" })).some((a) => a.slug === article.slug)).toBe(true);
     });
 
+    it("hatchery, order and ChickStart records round-trip through their schemas", async () => {
+      const farmId = newId();
+      const base = { farmId, createdBy: "u1", createdAt: now, updatedAt: now, version: 0 };
+      const batch = { ...base, id: newId(), code: "H-1", species: "chicken" as const, eggSource: "own_flock" as const, sourceFlockId: "f1", eggsReceived: 1050, rejects: { cracked: 30, dirty: 20 }, eggsSet: 1000, setDate: "2026-10-01", incubationDays: 21, expectedTransferDate: "2026-10-19", expectedHatchDate: "2026-10-22", status: "incubating" as const, results: { infertile: 0, cracked: 0, deadEmbryo: 0, hatched: 0, deadInShell: 0, culled: 0, saleable: 0, inIncubation: 1000 } };
+      await repos.hatcheryBatches.insert(batch);
+      expect((await repos.hatcheryBatches.findById(farmId, batch.id))?.rejects).toEqual({ cracked: 30, dirty: 20 });
+      await repos.hatcheryEvents.insert({ farmId, id: newId(), createdBy: "u1", createdAt: now, updatedAt: now, batchId: batch.id, type: "candling", date: "2026-10-08", counts: { infertile: 80, deadEmbryo: 20, cracked: 5 }, machine: "setter" });
+      expect((await repos.hatcheryBatches.update(farmId, batch.id, { status: "hatched", results: { ...batch.results, hatched: 830, fertilityPercent: 91.9 } }, { expectedVersion: 0 }))?.results?.fertilityPercent).toBe(91.9);
+      const buyer = { ...base, id: newId(), name: "Sharma", type: "farm" as const };
+      await repos.buyers.insert(buyer);
+      const total = { amountMinor: 1_900_000, currency: "INR" };
+      await repos.orders.insert({ ...base, id: newId(), orderNumber: await repos.counters.next("order", farmId), channel: "direct", buyerId: buyer.id, hatcheryBatchId: batch.id, lines: [{ category: "day_old_chicks", description: "Chicks", quantity: 500, unit: "chick", unitPrice: { amountMinor: 3800, currency: "INR" }, total }], subtotal: total, total, status: "pending", statusHistory: [{ status: "pending", at: now, by: "u1" }], paymentStatus: "unpaid", requestedDeliveryDate: "2026-10-23" });
+      expect(await repos.counters.next("order", farmId)).toBe(2);
+      expect(await repos.orders.find(farmId, { where: { status: ["pending", "confirmed"] } as never })).toHaveLength(1);
+      const profile = { ...base, id: newId(), name: "P", flockTypes: ["broiler" as const], bands: [{ fromDay: 0, toDay: 3, tempMinC: 31, tempMaxC: 33, targetWeightG: 60 }], source: "Breed guide", isDefault: true };
+      await repos.broodingProfiles.insert(profile);
+      const result = { templateId: newId(), templateVersion: 0, answers: [{ itemId: "q", text: "Q?", answer: false, passed: false }], failedCount: 1 };
+      await repos.chickArrivals.insert({ ...base, id: newId(), houseId: "h1", expectedDate: "2026-10-22", expectedCount: 800, source: "own_hatchery", hatcheryBatchId: batch.id, flockType: "broiler", broodingProfileId: profile.id, status: "arrived", preparation: { checklist: result, completedAt: now, completedBy: "u1" }, arrival: { arrivedAt: now, received: 800, deadOnArrival: 4, averageWeightG: 42, sampleSize: 50 }, flockId: "f2" });
+      await repos.brooderChecks.insert({ ...base, id: newId(), flockId: "f2", checkedAt: now, date: "2026-10-23", dayOfAge: 1, temperatureC: 29.5, humidityPercent: 50, behaviour: "huddling", feedAvailable: true, waterAvailable: true, cropFill: { sampled: 20, full: 15 }, flags: ["temperature_low", "behaviour"] });
+      expect((await repos.brooderChecks.find(farmId, { where: { flockId: "f2" } }))[0]?.cropFill).toEqual({ sampled: 20, full: 15 });
+    });
+
     it("sync: per-farm sequences are independent and changes list in order", async () => {
       const [a, b] = [newId(), newId()];
       expect([await repos.sync.nextSeq(a), await repos.sync.nextSeq(a), await repos.sync.nextSeq(b)]).toEqual([1, 2, 1]);

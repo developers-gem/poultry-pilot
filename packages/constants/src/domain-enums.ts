@@ -47,7 +47,12 @@ export const VACCINATION_STATUSES = ["scheduled", "done", "skipped", "cancelled"
 
 // hatchery
 export const HATCHERY_BATCH_STATUSES = ["incubating", "in_hatcher", "hatched", "cancelled"] as const;
-export const HATCHERY_EVENT_TYPES = ["set", "candling", "transfer_to_hatcher", "hatch", "chick_grading", "environment_reading", "note", "cancelled"] as const;
+/** The hatchery ledger: counts move only through these events (reversal cancels the latest one). */
+export const HATCHERY_EVENT_TYPES = ["set", "candling", "transfer_to_hatcher", "hatch", "chick_grading", "environment_reading", "note", "cancelled", "reversal"] as const;
+/** Why eggs were not set at selection. */
+export const EGG_REJECT_REASONS = ["cracked", "dirty", "misshapen", "undersized", "oversized", "thin_shell", "other"] as const;
+export const BROODER_BEHAVIOURS = ["comfortable", "huddling", "spread_out", "panting", "avoiding_area"] as const;
+export const ARRIVAL_STATUSES = ["planned", "arrived", "cancelled"] as const;
 export const CHICK_SOURCES = ["own_hatchery", "purchased"] as const;
 export const CHICK_LOT_STATUSES = ["available", "depleted", "closed"] as const;
 
@@ -57,7 +62,7 @@ export const ASSESSMENT_SOURCES = ["veterinarian", "laboratory", "farm_staff"] a
 export const WITHDRAWAL_SOURCES = ["medicine_label", "veterinarian", "other"] as const;
 
 // biosecurity & equipment
-export const CHECKLIST_KINDS = ["visitor_declaration", "ppe", "footbath", "cleaning", "disinfection", "vehicle", "pest_control", "audit", "general"] as const;
+export const CHECKLIST_KINDS = ["visitor_declaration", "ppe", "footbath", "cleaning", "disinfection", "vehicle", "pest_control", "audit", "general", "arrival_preparation", "brooder_check"] as const;
 export const CHECKLIST_RESPONSE_TYPES = ["yes_no", "text", "number", "choice"] as const;
 export const PEST_TYPES = ["rodents", "insects", "wild_birds", "other"] as const;
 export const TASK_KINDS = ["general", "corrective_action", "follow_up"] as const;
@@ -115,6 +120,8 @@ export const ALERT_RULE_TYPES = [
   "biosecurity_breach",
   "wild_bird_contact",
   "checklist_failed",
+  "brooding_conditions",
+  "hatch_due",
 ] as const;
 export const NOTIFICATION_CHANNELS = ["in_app", "push", "email", "sms", "whatsapp"] as const;
 export const NOTIFICATION_STATUSES = ["queued", "sent", "delivered", "failed", "read"] as const;

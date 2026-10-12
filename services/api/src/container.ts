@@ -13,6 +13,9 @@ import { createInventoryService } from "./services/inventory.service.js";
 import { createHealthService } from "./services/health.service.js";
 import { createBiosecurityService } from "./services/biosecurity.service.js";
 import { createContentService } from "./services/content.service.js";
+import { createHatcheryService } from "./services/hatchery.service.js";
+import { createChickStartService } from "./services/chickstart.service.js";
+import { createCalendarService } from "./services/calendar.service.js";
 import { FeedConsumptionRequest } from "@poultrypilot/validation";
 import type { HealthChecks } from "./ports/health.js";
 import type { Repositories } from "./ports/repositories.js";
@@ -100,6 +103,9 @@ export function buildContainer(d: ContainerDeps) {
   flocks.hooks.extraCostMinor.push(flockHealth.flockHealthCostMinor);
   const biosecurity = createBiosecurityService({ repos: d.repos, clock, audit, sync, inventory, alerts });
   const content = createContentService({ repos: d.repos, clock });
+  const hatchery = createHatcheryService({ repos: d.repos, clock, audit, sync, inventory, alerts });
+  const chickStart = createChickStartService({ repos: d.repos, clock, audit, flocks, biosecurity, alerts });
+  const calendar = createCalendarService({ repos: d.repos, clock });
   const dailyRecords = createDailyRecordService({ repos: d.repos, clock, audit, sync, flocks, feed, alerts, afterEggsWritten: flockHealth.refreshWithheldEggs });
   const media = createMediaService({ repos: d.repos, clock, audit, storage: d.media ?? memoryMediaStorage() });
 
@@ -150,7 +156,7 @@ export function buildContainer(d: ContainerDeps) {
     },
   });
 
-  return { ...d, clock, startedAt: clock.now(), accessTokens, audit, sync, auth, farms, houses, flocks, dailyRecords, media, inventory, feed, alerts, flockHealth, biosecurity, content };
+  return { ...d, clock, startedAt: clock.now(), accessTokens, audit, sync, auth, farms, houses, flocks, dailyRecords, media, inventory, feed, alerts, flockHealth, biosecurity, content, hatchery, chickStart, calendar };
 }
 
 export type Container = ReturnType<typeof buildContainer>;

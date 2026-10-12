@@ -270,7 +270,7 @@ export const EggInventoryModel = defineCollection({
     grade: enumOf(EGG_GRADES),
     quantityDelta: int({ required: true, min: -10_000_000 }),
     flockId: ref("Flock"),
-    sourceType: enumOf(["egg_record", "order", "manual"], { required: true }),
+    sourceType: enumOf(["egg_record", "order", "manual", "hatchery_batch"], { required: true }),
     sourceId: { type: String },
     reversalOf: ref("EggInventory"),
     note: text(500),

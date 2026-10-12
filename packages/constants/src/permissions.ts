@@ -38,6 +38,10 @@ export const ACTIONS = [
   "market.read",
   "market.manage",
   "payment.record",
+  // hatchery
+  "hatchery.read",
+  "hatchery.record", // candling, readings, transfer, hatch, grading
+  "hatchery.manage", // set and cancel batches
   // inventory (feed, medicine, supplies)
   "inventory.read",
   "inventory.issue", // record use and wastage
@@ -54,6 +58,8 @@ const except = (...remove: Action[]) => new Set(ALL.filter((a) => !remove.includ
 
 const WORKER: Action[] = [
   "farm.read",
+  "hatchery.read",
+  "hatchery.record",
   "inventory.read",
   "inventory.issue",
   "production.read",
@@ -103,6 +109,9 @@ export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Action>> = {
     "inventory.issue",
     "inventory.manage",
     "alert.manage",
+    "hatchery.read",
+    "hatchery.record",
+    "hatchery.manage",
     "content.read",
   ]),
   supervisor: new Set<Action>([...WORKER, "member.read", "production.edit_any", "biosecurity.manage", "alert.manage", "health.vaccinate"]),
@@ -117,6 +126,7 @@ export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Action>> = {
     "payment.record",
     "inventory.read",
     "inventory.manage",
+    "hatchery.read",
     "content.read",
   ]),
   vet: new Set<Action>([
@@ -129,6 +139,7 @@ export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Action>> = {
     "biosecurity.read",
     "inventory.read",
     "inventory.issue",
+    "hatchery.read",
     "content.read",
   ]),
 };
