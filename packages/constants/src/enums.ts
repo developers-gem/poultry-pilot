@@ -47,7 +47,8 @@ export const LEDGER_CATEGORIES = [
   "other_expense",
 ] as const;
 export const RECURRING_FREQUENCIES = ["daily", "weekly", "monthly", "quarterly", "yearly"] as const;
-export const ORDER_STATUSES = ["pending", "confirmed", "delivered", "closed", "cancelled"] as const;
+/** Order lifecycle. Allowed moves are defined once in services/api/src/domain/orders.ts. */
+export const ORDER_STATUSES = ["pending", "accepted", "preparing", "dispatched", "delivered", "completed", "cancelled"] as const;
 export const PAYMENT_METHODS = ["cash", "bank_transfer", "mobile_money", "upi", "card", "cheque", "other"] as const;
 export const LISTING_CATEGORIES = [
   "live_birds",

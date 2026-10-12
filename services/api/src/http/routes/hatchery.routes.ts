@@ -10,7 +10,6 @@ import {
   CandlingRequest,
   ChickOrderRequest,
   CreateHatcheryBatchRequest,
-  DeliverOrderRequest,
   GradingRequest,
   HatchRequest,
   HatcherySummaryQuery,
@@ -62,9 +61,6 @@ export function chickOrderRoutes(h: HatcheryService, farms: FarmService): { buye
   const orders = Router({ mergeParams: true });
   orders.get("/", ...g("market.read"), validate("query", OrderListQuery), async (req, res) => res.json({ items: await h.listOrders(req.farmCtx!, q(req)) }));
   orders.post("/", ...g("market.manage"), validate("body", ChickOrderRequest), async (req, res) => res.status(201).json(await h.createChickOrder(req.farmCtx!, req.body)));
-  orders.post("/:id/confirm", ...g("market.manage", { id: Id }), async (req, res) => res.json(await h.confirmOrder(req.farmCtx!, p(req, "id"))));
-  orders.post("/:id/cancel", ...g("market.manage", { id: Id }), validate("body", ReasonRequest), async (req, res) => res.json(await h.cancelOrder(req.farmCtx!, p(req, "id"), req.body.reason)));
-  orders.post("/:id/deliver", ...g("market.manage", { id: Id }), validate("body", DeliverOrderRequest), async (req, res) => res.json(await h.deliverOrder(req.farmCtx!, p(req, "id"), req.body)));
   return { buyers, orders };
 }
 

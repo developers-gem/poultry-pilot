@@ -73,15 +73,22 @@ export const EQUIPMENT_STATUSES = ["in_service", "maintenance", "retired"] as co
 
 // money & market
 export const EXPENSE_STATUSES = ["unpaid", "partially_paid", "paid", "cancelled"] as const;
-export const TRANSACTION_SOURCES = [
-  "manual",
-  "expense",
-  "order_payment",
-  "feed_purchase",
-  "recurring_expense",
-  "opening_balance",
-  "reversal",
+/** What a cash ledger entry is. Transfers move money between the farm's own accounts and never touch profit. */
+export const TRANSACTION_KINDS = ["payment", "refund", "transfer", "opening_balance", "adjustment"] as const;
+export const CASH_DIRECTIONS = ["in", "out"] as const;
+export const MONEY_ACCOUNT_TYPES = ["cash", "bank", "mobile_money", "other"] as const;
+export const EXPENSE_KINDS = ["expense", "purchase"] as const;
+export const INCOME_KINDS = ["sale", "income"] as const;
+export const INCOME_CATEGORIES = ["bird_sales", "egg_sales", "chick_sales", "manure_sales", "other_income"] as const;
+export const EXPENSE_CATEGORIES = [
+  "stock_purchase", "feed", "medicine_vaccine", "vet_services", "labour", "electricity", "water", "fuel_transport",
+  "litter_bedding", "rent", "maintenance", "licences_fees", "equipment", "other_expense",
 ] as const;
+/** Where a finance document came from. Automatic ones are created by other modules and kept in step with them. */
+export const DOCUMENT_SOURCES = ["manual", "inventory_purchase", "health_record", "recurring_expense", "flock_sale", "chick_order", "market_order"] as const;
+/** pickup orders skip dispatch. */
+export const FULFILMENT_METHODS = ["pickup", "seller_delivery", "courier"] as const;
+export const TRANSACTION_SOURCES = TRANSACTION_KINDS;
 export const ORDER_PAYMENT_STATUSES = ["unpaid", "partially_paid", "paid", "refunded"] as const;
 export const ORDER_CHANNELS = ["direct", "marketplace"] as const;
 export const LISTING_STATUSES = ["draft", "active", "paused", "sold_out", "closed"] as const;

@@ -23,7 +23,7 @@ import type { InventoryService } from "./inventory.service.js";
 import type { SyncService } from "./sync.service.js";
 
 const LAYING_FLOCKS = new Set(["layer", "breeder", "custom"]);
-const OPEN_ORDER = new Set(["pending", "confirmed"]);
+const OPEN_ORDER = new Set(["pending", "accepted", "preparing", "dispatched"]);
 
 export interface CreateBatchInput {
   code: string;
@@ -88,7 +88,7 @@ export function createHatcheryService(d: { repos: Repositories; clock: Clock; au
   /** Chicks still free in a lot: remaining minus open orders that will draw from it. */
   async function lotAvailability(ctx: FarmContext, lot: ChickLotRecord, excludeOrderId: string | undefined, tx?: Tx) {
     const batchIds = lot.hatcheryBatchId ? [lot.hatcheryBatchId] : [];
-    const orders = await repos.orders.find(ctx.farmId, { where: { status: ["pending", "confirmed"] } as never }, tx);
+    const orders = await repos.orders.find(ctx.farmId, { where: { status: [...OPEN_ORDER] } as never }, tx);
     const reserved = orders
       .filter((o) => o.id !== excludeOrderId)
       .flatMap((o) => o.lines.filter((l) => l.chickLotId === lot.id || (!l.chickLotId && o.hatcheryBatchId && batchIds.includes(o.hatcheryBatchId))))
@@ -117,14 +117,6 @@ export function createHatcheryService(d: { repos: Repositories; clock: Clock; au
   }
 
   const orderView = (o: OrderRecord, buyer?: BuyerRecord) => ({ ...strip(o), quantity: o.lines.reduce((t, l) => t + l.quantity, 0), ...(buyer ? { buyerName: buyer.name } : {}) });
-
-  async function setStatus(ctx: FarmContext, o: OrderRecord, status: OrderRecord["status"], patch: Partial<OrderRecord>, tx: Tx) {
-    const now = clock.now();
-    const next = await repos.orders.update(ctx.farmId, o.id, { status, statusHistory: [...o.statusHistory, { status, at: now, by: ctx.userId }], ...patch, updatedBy: ctx.userId, updatedAt: now }, { expectedVersion: o.version }, tx);
-    if (!next) throw new AppError("VERSION_CONFLICT", "This order was changed by someone else");
-    await d.audit.record(ctx, { action: `order.${status}`, entity: "order", entityId: o.id, before: { status: o.status }, after: { status } }, tx);
-    return next;
-  }
 
   return {
     // ---- batches
@@ -387,7 +379,8 @@ export function createHatcheryService(d: { repos: Repositories; clock: Clock; au
      * A chick order: from a chick lot (checked against chicks not already booked) or booked against a batch still
      * incubating (drawn from that batch's lot at delivery). Prices come from the farm, in the farm currency.
      */
-    async createChickOrder(ctx: FarmContext, r: { buyerId: string; quantity: number; unitPrice: MoneyValue; requestedDeliveryDate?: string; chickLotId?: string; hatcheryBatchId?: string; deliveryAddress?: string; notes?: string }) {
+    /** Status changes (accept, dispatch, deliver, cancel, complete) go through the marketplace order state machine. */
+    async createChickOrder(ctx: FarmContext, r: { buyerId: string; quantity: number; unitPrice: MoneyValue; requestedDeliveryDate?: string; chickLotId?: string; hatcheryBatchId?: string; deliveryAddress?: string; fulfilment?: "pickup" | "seller_delivery" | "courier"; notes?: string }) {
       assertCan(ctx, "market.manage");
       return repos.tx.run(async (tx) => {
         const farm = await E.farmOf(ctx, tx);
@@ -422,6 +415,7 @@ export function createHatcheryService(d: { repos: Repositories; clock: Clock; au
           status: "pending",
           statusHistory: [{ status: "pending", at: now, by: ctx.userId }],
           paymentStatus: "unpaid",
+          fulfilment: r.fulfilment ?? "pickup",
           ...defined({ requestedDeliveryDate: r.requestedDeliveryDate, deliveryAddress: r.deliveryAddress, notes: r.notes }),
           createdBy: ctx.userId,
           createdAt: now,
@@ -431,51 +425,6 @@ export function createHatcheryService(d: { repos: Repositories; clock: Clock; au
         await repos.orders.insert(order, tx);
         await d.audit.record(ctx, { action: "order.created", entity: "order", entityId: order.id, after: { orderNumber: order.orderNumber, quantity: r.quantity, total } }, tx);
         return orderView(order, buyer);
-      });
-    },
-
-    async confirmOrder(ctx: FarmContext, id: string) {
-      assertCan(ctx, "market.manage");
-      return repos.tx.run(async (tx) => {
-        const o = await repos.orders.findById(ctx.farmId, id, tx);
-        if (!o) throw notFound("Order");
-        if (o.status !== "pending") throw new AppError("INVALID_STATE_TRANSITION", `A ${o.status} order cannot be confirmed`);
-        return orderView(await setStatus(ctx, o, "confirmed", {}, tx));
-      });
-    },
-
-    async cancelOrder(ctx: FarmContext, id: string, reason: string) {
-      assertCan(ctx, "market.manage");
-      return repos.tx.run(async (tx) => {
-        const o = await repos.orders.findById(ctx.farmId, id, tx);
-        if (!o) throw notFound("Order");
-        if (!OPEN_ORDER.has(o.status)) throw new AppError("INVALID_STATE_TRANSITION", `A ${o.status} order cannot be cancelled`);
-        return orderView(await setStatus(ctx, o, "cancelled", { notes: [o.notes, `Cancelled: ${reason}`].filter(Boolean).join("\n") }, tx));
-      });
-    },
-
-    /** Delivery draws the chicks from the lot (the order's lot, or the lot of the batch it was booked on). */
-    async deliverOrder(ctx: FarmContext, id: string, r: { date: string; chickLotId?: string }) {
-      assertCan(ctx, "market.manage");
-      return repos.tx.run(async (tx) => {
-        const farm = await E.farmOf(ctx, tx);
-        if (r.date > E.todayOf(farm)) throw new AppError("VALIDATION_FAILED", `${r.date} is in the future for this farm`);
-        const o = await repos.orders.findById(ctx.farmId, id, tx);
-        if (!o) throw notFound("Order");
-        if (o.status !== "confirmed") throw new AppError("INVALID_STATE_TRANSITION", o.status === "pending" ? "Confirm the order before delivering it" : `A ${o.status} order cannot be delivered`);
-        const line = o.lines[0]!;
-        let lotId = r.chickLotId ?? line.chickLotId;
-        if (!lotId && o.hatcheryBatchId) lotId = (await loadBatch(ctx, o.hatcheryBatchId, tx)).chickLotId;
-        if (!lotId) throw new AppError("VALIDATION_FAILED", "The batch for this order has not been graded yet; there are no chicks to deliver");
-        const lot = await repos.chickLots.findById(ctx.farmId, lotId, tx);
-        if (!lot) throw notFound("Chick lot");
-        const a = await lotAvailability(ctx, lot, o.id, tx);
-        if (line.quantity > a.available) throw new AppError("INSUFFICIENT_STOCK", `Only ${Math.max(0, a.available)} chicks are free in the lot (${lot.remaining} remaining, ${a.reserved} booked by other orders)`, a);
-        const remaining = lot.remaining - line.quantity;
-        const updatedLot = await repos.chickLots.update(ctx.farmId, lot.id, { remaining, status: remaining === 0 ? "depleted" : "available", updatedBy: ctx.userId, updatedAt: clock.now() }, { expectedVersion: lot.version }, tx);
-        if (!updatedLot) throw new AppError("VERSION_CONFLICT", "That chick lot changed at the same time elsewhere. Try again.");
-        const next = await setStatus(ctx, o, "delivered", { deliveredDate: r.date, lines: [{ ...line, chickLotId: lot.id }] }, tx);
-        return { order: orderView(next), chickLot: strip(updatedLot) };
       });
     },
 

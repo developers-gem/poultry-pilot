@@ -260,7 +260,7 @@ function contract(name: string, setup: () => Promise<{ repos: Repositories; rese
       const buyer = { ...base, id: newId(), name: "Sharma", type: "farm" as const };
       await repos.buyers.insert(buyer);
       const total = { amountMinor: 1_900_000, currency: "INR" };
-      await repos.orders.insert({ ...base, id: newId(), orderNumber: await repos.counters.next("order", farmId), channel: "direct", buyerId: buyer.id, hatcheryBatchId: batch.id, lines: [{ category: "day_old_chicks", description: "Chicks", quantity: 500, unit: "chick", unitPrice: { amountMinor: 3800, currency: "INR" }, total }], subtotal: total, total, status: "pending", statusHistory: [{ status: "pending", at: now, by: "u1" }], paymentStatus: "unpaid", requestedDeliveryDate: "2026-10-23" });
+      await repos.orders.insert({ ...base, id: newId(), orderNumber: await repos.counters.next("order", farmId), channel: "direct", buyerId: buyer.id, hatcheryBatchId: batch.id, lines: [{ category: "day_old_chicks", description: "Chicks", quantity: 500, unit: "chick", unitPrice: { amountMinor: 3800, currency: "INR" }, total }], subtotal: total, total, status: "pending", statusHistory: [{ status: "pending", at: now, by: "u1" }], paymentStatus: "unpaid", fulfilment: "pickup", requestedDeliveryDate: "2026-10-23" });
       expect(await repos.counters.next("order", farmId)).toBe(2);
       expect(await repos.orders.find(farmId, { where: { status: ["pending", "confirmed"] } as never })).toHaveLength(1);
       const profile = { ...base, id: newId(), name: "P", flockTypes: ["broiler" as const], bands: [{ fromDay: 0, toDay: 3, tempMinC: 31, tempMaxC: 33, targetWeightG: 60 }], source: "Breed guide", isDefault: true };
@@ -269,6 +269,37 @@ function contract(name: string, setup: () => Promise<{ repos: Repositories; rese
       await repos.chickArrivals.insert({ ...base, id: newId(), houseId: "h1", expectedDate: "2026-10-22", expectedCount: 800, source: "own_hatchery", hatcheryBatchId: batch.id, flockType: "broiler", broodingProfileId: profile.id, status: "arrived", preparation: { checklist: result, completedAt: now, completedBy: "u1" }, arrival: { arrivedAt: now, received: 800, deadOnArrival: 4, averageWeightG: 42, sampleSize: 50 }, flockId: "f2" });
       await repos.brooderChecks.insert({ ...base, id: newId(), flockId: "f2", checkedAt: now, date: "2026-10-23", dayOfAge: 1, temperatureC: 29.5, humidityPercent: 50, behaviour: "huddling", feedAvailable: true, waterAvailable: true, cropFill: { sampled: 20, full: 15 }, flags: ["temperature_low", "behaviour"] });
       expect((await repos.brooderChecks.find(farmId, { where: { flockId: "f2" } }))[0]?.cropFill).toEqual({ sampled: 20, full: 15 });
+    });
+
+    it("finance and marketplace records round-trip; cross-farm market reads", async () => {
+      const farmId = newId();
+      const base = { farmId, createdBy: "u1", createdAt: now, updatedAt: now, version: 0 };
+      const inr = (n: number) => ({ amountMinor: n, currency: "INR" });
+      const sup = { ...base, id: newId(), name: "Godrej", taxId: "09ABC" };
+      await repos.suppliers.insert(sup);
+      const acct = { ...base, id: newId(), name: "Cash", type: "cash" as const, openingBalance: inr(1000), openingDate: "2026-09-01", active: true };
+      await repos.moneyAccounts.insert(acct);
+      const bill = { ...base, id: newId(), kind: "purchase" as const, date: "2026-10-01", category: "feed" as const, description: "Feed", supplierId: sup.id, amount: inr(11800), net: inr(10000), tax: { label: "GST", ratePercent: 18, inclusive: false, amountMinor: 1800 }, amountPaid: inr(0), status: "unpaid" as const, sourceType: "inventory_purchase" as const, sourceId: newId(), attachments: [{ assetId: newId(), name: "b.png" }] };
+      await repos.expenses.insert(bill);
+      expect((await repos.expenses.update(farmId, bill.id, { amountPaid: inr(5000), status: "partially_paid" }, { expectedVersion: 0 }))?.status).toBe("partially_paid");
+      await repos.incomes.insert({ ...base, id: newId(), kind: "sale", date: "2026-10-02", category: "egg_sales", description: "Eggs", customerName: "Hotel", amount: inr(5000), net: inr(5000), amountPaid: inr(0), status: "unpaid", sourceType: "market_order", sourceId: newId() });
+      await repos.recurringExpenses.insert({ ...base, id: newId(), name: "Wages", category: "labour", amount: inr(1200000), frequency: "monthly", startDate: "2026-08-01", pauses: [{ from: "2026-10-01" }], nextDueDate: "2026-11-01", active: true });
+      const g = newId();
+      await repos.transactions.insertMany([
+        { farmId, id: newId(), createdBy: "u1", createdAt: now, updatedAt: now, date: "2026-10-03", kind: "transfer", direction: "out", accountId: acct.id, amount: inr(100), transferGroupId: g, counterpartAccountId: newId() },
+        { farmId, id: newId(), createdBy: "u1", createdAt: now, updatedAt: now, date: "2026-10-03", kind: "payment", direction: "out", accountId: acct.id, amount: inr(5000), category: "feed", documentType: "expense", documentId: bill.id, supplierId: sup.id, paymentMethod: "upi", reference: "R1" },
+      ]);
+      expect(await repos.transactions.find(farmId, { where: { documentId: bill.id } })).toHaveLength(1);
+      const listing = { ...base, id: newId(), title: "Eggs", category: "eggs" as const, quantityAvailable: 40, unit: "tray", price: inr(18000), priceUnit: "per_tray" as const, regionCode: "IN-UP", fulfilmentOptions: ["pickup" as const, "seller_delivery" as const], status: "active" as const, source: { kind: "eggs" as const, eggGrade: "large" as const } };
+      await repos.listings.insert(listing);
+      const order = { ...base, id: newId(), orderNumber: 1, channel: "marketplace" as const, listingId: listing.id, buyerUserId: "buyer-1", buyerName: "Ravi", fulfilment: "seller_delivery" as const, delivery: { address: "Shop 4", vehicle: "UP14", dispatchedAt: now }, lines: [{ category: "eggs" as const, description: "Eggs", quantity: 10, unit: "tray", unitPrice: inr(18000), total: inr(180000) }], subtotal: inr(180000), total: inr(180000), status: "dispatched" as const, statusHistory: [{ status: "pending" as const, at: now }], paymentStatus: "unpaid" as const, amountPaid: inr(0) };
+      await repos.orders.insert(order);
+      await repos.orderPayments.insert({ farmId, id: newId(), createdBy: "u1", createdAt: now, updatedAt: now, orderId: order.id, kind: "payment", date: "2026-10-04", amount: inr(180000), method: "upi", accountId: acct.id });
+      expect((await repos.market.activeListings({ category: "eggs", regionCode: "IN", limit: 10 })).some((l) => l.id === listing.id)).toBe(true);
+      expect((await repos.market.activeListings({ text: "egg", limit: 10 })).some((l) => l.id === listing.id)).toBe(true);
+      expect((await repos.market.listingById(listing.id))?.farmId).toBe(farmId);
+      expect((await repos.market.orderById(order.id))?.delivery?.vehicle).toBe("UP14");
+      expect((await repos.market.ordersForBuyer("buyer-1")).map((o) => o.id)).toContain(order.id);
     });
 
     it("sync: per-farm sequences are independent and changes list in order", async () => {

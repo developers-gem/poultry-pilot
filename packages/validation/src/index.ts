@@ -10,3 +10,4 @@ export * from "./schemas/inventory.js";
 export * from "./schemas/health.js";
 export * from "./schemas/biosecurity.js";
 export * from "./schemas/hatchery.js";
+export * from "./schemas/finance.js";

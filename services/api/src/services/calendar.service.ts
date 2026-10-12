@@ -38,7 +38,7 @@ export function createCalendarService(d: { repos: Repositories; clock: Clock }) 
 
     const [batches, orders, arrivals, vaccinations, schedules, health, flocks, buyers] = await Promise.all([
       repos.hatcheryBatches.find(ctx.farmId, { where: { status: ["incubating", "in_hatcher"] } as never }),
-      repos.orders.find(ctx.farmId, { where: { status: ["pending", "confirmed"] } as never }),
+      repos.orders.find(ctx.farmId, { where: { status: ["pending", "accepted", "preparing", "dispatched"] } as never }),
       repos.chickArrivals.find(ctx.farmId, { where: { status: "planned" } }),
       repos.vaccinations.find(ctx.farmId, { where: { status: "scheduled" }, range: { field: "dueDate", to: q.to } }),
       repos.cleaningTasks.find(ctx.farmId, { where: { active: true } }),

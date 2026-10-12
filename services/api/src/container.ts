@@ -16,6 +16,8 @@ import { createContentService } from "./services/content.service.js";
 import { createHatcheryService } from "./services/hatchery.service.js";
 import { createChickStartService } from "./services/chickstart.service.js";
 import { createCalendarService } from "./services/calendar.service.js";
+import { createFinanceService } from "./services/finance.service.js";
+import { createMarketService } from "./services/market.service.js";
 import { FeedConsumptionRequest } from "@poultrypilot/validation";
 import type { HealthChecks } from "./ports/health.js";
 import type { Repositories } from "./ports/repositories.js";
@@ -94,18 +96,27 @@ export function buildContainer(d: ContainerDeps) {
 
   const houses = createHouseService({ repos: d.repos, clock, audit, sync });
   const flocks = createFlockService({ repos: d.repos, clock, audit, sync });
+  const finance = createFinanceService({ repos: d.repos, clock, audit, sync, flocks });
+  // Finance plugs into the flock engine: sales become receivables; allocated bills and income reach flock profit.
+  flocks.hooks.afterSale.push(finance.onFlockSale);
+  flocks.hooks.onSaleReversed.push(finance.onFlockSaleReversed);
+  flocks.hooks.extraCostMinor.push(finance.flockExtraCostMinor);
+  flocks.hooks.extraIncomeMinor.push(finance.flockExtraIncomeMinor);
   const alerts = createAlertService({ repos: d.repos, clock });
   const inventory = createInventoryService({ repos: d.repos, clock, audit, sync, onStockChanged: (ctx, tx) => alerts.evaluateInventory(ctx, tx) });
+  inventory.hooks.afterPurchase.push(finance.onInventoryPurchase);
   const feed = createFeedService({ repos: d.repos, clock, audit, sync, inventory, flocks });
   const flockHealth = createHealthService({ repos: d.repos, clock, audit, sync, flocks, inventory, alerts });
   // FlockHealth plugs into the flock engine: no sale or move during a meat withdrawal; health costs in flock profit.
   flocks.hooks.beforeBirdsLeave.push(flockHealth.assertBirdsMayLeave);
   flocks.hooks.extraCostMinor.push(flockHealth.flockHealthCostMinor);
+  flockHealth.hooks.onCost.push(finance.onHealthCost);
   const biosecurity = createBiosecurityService({ repos: d.repos, clock, audit, sync, inventory, alerts });
   const content = createContentService({ repos: d.repos, clock });
   const hatchery = createHatcheryService({ repos: d.repos, clock, audit, sync, inventory, alerts });
   const chickStart = createChickStartService({ repos: d.repos, clock, audit, flocks, biosecurity, alerts });
   const calendar = createCalendarService({ repos: d.repos, clock });
+  const market = createMarketService({ repos: d.repos, clock, audit, sync, finance, flocks, inventory, hatchery });
   const dailyRecords = createDailyRecordService({ repos: d.repos, clock, audit, sync, flocks, feed, alerts, afterEggsWritten: flockHealth.refreshWithheldEggs });
   const media = createMediaService({ repos: d.repos, clock, audit, storage: d.media ?? memoryMediaStorage() });
 
@@ -156,7 +167,7 @@ export function buildContainer(d: ContainerDeps) {
     },
   });
 
-  return { ...d, clock, startedAt: clock.now(), accessTokens, audit, sync, auth, farms, houses, flocks, dailyRecords, media, inventory, feed, alerts, flockHealth, biosecurity, content, hatchery, chickStart, calendar };
+  return { ...d, clock, startedAt: clock.now(), accessTokens, audit, sync, auth, farms, houses, flocks, dailyRecords, media, inventory, feed, alerts, flockHealth, biosecurity, content, hatchery, chickStart, calendar, finance, market };
 }
 
 export type Container = ReturnType<typeof buildContainer>;

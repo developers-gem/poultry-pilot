@@ -43,6 +43,14 @@ import type {
   BroodingProfileRecord,
   ChickArrivalRecord,
   BrooderCheckRecord,
+  SupplierRecord,
+  MoneyAccountRecord,
+  ExpenseRecord,
+  IncomeRecord,
+  RecurringExpenseRecord,
+  TransactionRecord,
+  MarketListingRecord,
+  OrderPaymentRecord,
 } from "./records.js";
 
 /**
@@ -223,6 +231,26 @@ export interface Repositories {
   broodingProfiles: FarmRepo<BroodingProfileRecord>;
   chickArrivals: FarmRepo<ChickArrivalRecord>;
   brooderChecks: FarmRepo<BrooderCheckRecord>;
+  suppliers: FarmRepo<SupplierRecord>;
+  moneyAccounts: FarmRepo<MoneyAccountRecord>;
+  expenses: FarmRepo<ExpenseRecord>;
+  incomes: FarmRepo<IncomeRecord>;
+  recurringExpenses: FarmRepo<RecurringExpenseRecord>;
+  /** Append-only. */
+  transactions: FarmRepo<TransactionRecord>;
+  listings: FarmRepo<MarketListingRecord>;
+  /** Append-only. */
+  orderPayments: FarmRepo<OrderPaymentRecord>;
+  /**
+   * The marketplace's only cross-farm reads: active listings for browsing, one listing or order by id (the caller then
+   * checks it may see it), and a buyer's own orders across sellers.
+   */
+  market: {
+    activeListings(q: { category?: string; regionCode?: string; text?: string; limit: number }): Promise<MarketListingRecord[]>;
+    listingById(id: string): Promise<MarketListingRecord | null>;
+    orderById(id: string): Promise<OrderRecord | null>;
+    ordersForBuyer(userId: string): Promise<OrderRecord[]>;
+  };
   /** Atomic per-farm sequences (order numbers). */
   counters: { next(name: string, farmId: string, tx?: Tx): Promise<number> };
   /** Global educational content (not farm-owned). */

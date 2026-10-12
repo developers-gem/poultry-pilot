@@ -3,7 +3,7 @@
 > Generated from the Mongoose schemas in `services/api/src/adapters/mongo/models`. Do not edit by hand:
 > run `pnpm --filter @poultrypilot/api docs:data-dictionary`. A test fails if this file is out of date.
 
-57 collections, 92 secondary indexes (plus the default `_id` index on each). Design rules and relationships: `docs/data-model.md`.
+60 collections, 98 secondary indexes (plus the default `_id` index on each). Design rules and relationships: `docs/data-model.md`.
 
 | Collection | Domain | Ownership | Indexes | Purpose |
 | --- | --- | --- | --- | --- |
@@ -41,9 +41,12 @@
 | [`brooding_profiles`](#brooding_profiles) | ChickStart | farm | 1 | The farm's brooding targets by day of age (temperature at chick level, humidity, target weight), taken from its breed guide or veterinarian |
 | [`chick_arrivals`](#chick_arrivals) | ChickStart | farm | 1 | A planned delivery of chicks into a house: preparation checklist, then the arrival itself (count, dead on arrival, chick weight and quality) |
 | [`brooder_checks`](#brooder_checks) | ChickStart | farm | 1 | A check of young chicks: temperature at chick level, humidity, behaviour, feed and water, crop fill, with optional checklist answers |
-| [`expenses`](#expenses) | Money | farm | 3 | A bill or cost owed (accrual document) |
+| [`suppliers`](#suppliers) | Money | farm | 1 | The farm's suppliers (feed mills, hatcheries, vets, utilities) |
+| [`money_accounts`](#money_accounts) | Money | farm | 1 | Where the farm keeps money: cash box, bank account, mobile money wallet |
+| [`expenses`](#expenses) | Money | farm | 4 | A bill: an expense or a purchase the farm owes |
+| [`incomes`](#incomes) | Money | farm | 3 | A sale or other income the farm is owed |
 | [`recurring_expenses`](#recurring_expenses) | Money | farm | 1 | A repeating bill (electricity, wages, rent) |
-| [`transactions`](#transactions) | Money | farm, append-only | 3 | The cash ledger: money actually received or paid |
+| [`transactions`](#transactions) | Money | farm, append-only | 3 | The cash ledger: money in or out of one of the farm's accounts |
 | [`buyers`](#buyers) | Market | farm | 1 | The farm's own customer book |
 | [`market_listings`](#market_listings) | Market | farm | 3 | Something a farm offers on the marketplace |
 | [`orders`](#orders) | Market | farm | 4 | A sale by the farm (farmId = seller), recorded directly or placed by a marketplace buyer |
@@ -1262,9 +1265,53 @@ A check of young chicks: temperature at chick level, humidity, behaviour, feed a
 
 ## Money
 
+### suppliers
+
+The farm's suppliers (feed mills, hatcheries, vets, utilities). Linked from bills, purchases and payments.
+
+- **Model:** `Supplier`
+- **Ownership:** Farm — every query must include farmId
+- **Standard fields:** `_id` (UUIDv7 string), `farmId` (required), `createdBy` (required), `updatedBy`, `createdAt`, `updatedAt` (UTC, required), `version` (optimistic concurrency), `deletedAt`, `deletedBy` (soft delete)
+
+| Field | Type | Required | Constraints | References |
+| --- | --- | --- | --- | --- |
+| `name` | String | yes | ≤ 120 chars |  |
+| `phone` | String |  | ≤ 30 chars |  |
+| `email` | String |  | ≤ 254 chars; lowercased |  |
+| `taxId` | String |  | ≤ 40 chars |  |
+| `address` | String |  | ≤ 300 chars |  |
+| `notes` | String |  | ≤ 1000 chars |  |
+
+| Index | Options | Serves |
+| --- | --- | --- |
+| farmId, name |  | Supplier list by name and name search |
+
+### money_accounts
+
+Where the farm keeps money: cash box, bank account, mobile money wallet. Balance = opening balance + its ledger entries.
+
+- **Model:** `MoneyAccount`
+- **Ownership:** Farm — every query must include farmId
+- **Standard fields:** `_id` (UUIDv7 string), `farmId` (required), `createdBy` (required), `updatedBy`, `createdAt`, `updatedAt` (UTC, required), `version` (optimistic concurrency), `deletedAt`, `deletedBy` (soft delete)
+
+| Field | Type | Required | Constraints | References |
+| --- | --- | --- | --- | --- |
+| `name` | String | yes | ≤ 80 chars |  |
+| `type` | String | yes | one of: `cash`, `bank`, `mobile_money`, `other` |  |
+| `openingBalance` | object | yes |  |  |
+| `openingBalance.amountMinor` | Number | yes | integer |  |
+| `openingBalance.currency` | String | yes | pattern `/^[A-Z]{3}$/` |  |
+| `openingDate` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
+| `active` | Boolean |  | default `true` |  |
+| `notes` | String |  | ≤ 500 chars |  |
+
+| Index | Options | Serves |
+| --- | --- | --- |
+| farmId, name | unique, live records only | Account list (prefix); names unique within a farm |
+
 ### expenses
 
-A bill or cost owed (accrual document). It can be unpaid; paying it posts transactions. Feed purchases, treatments and recurring bills create expenses.
+A bill: an expense or a purchase the farm owes. Unpaid bills are payables; payments are ledger entries in `transactions`. Purchases of stock and vet fees are created automatically by FeedWise and FlockHealth.
 
 - **Model:** `Expense`
 - **Ownership:** Farm — every query must include farmId
@@ -1272,36 +1319,97 @@ A bill or cost owed (accrual document). It can be unpaid; paying it posts transa
 
 | Field | Type | Required | Constraints | References |
 | --- | --- | --- | --- | --- |
+| `kind` | String | yes | one of: `expense`, `purchase`; default `"expense"` |  |
 | `date` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
 | `dueDate` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
-| `category` | String | yes | one of: `bird_sales`, `egg_sales`, `chick_sales`, `manure_sales`, `other_income`, `stock_purchase`, `feed`, `medicine_vaccine`, `vet_services`, `labour`, `electricity`, `water`, `fuel_transport`, `litter_bedding`, `rent`, `maintenance`, `licences_fees`, `equipment`, `other_expense` |  |
+| `category` | String | yes | one of: `stock_purchase`, `feed`, `medicine_vaccine`, `vet_services`, `labour`, `electricity`, `water`, `fuel_transport`, `litter_bedding`, `rent`, `maintenance`, `licences_fees`, `equipment`, `other_expense` |  |
 | `description` | String | yes | ≤ 300 chars |  |
+| `supplierId` | String |  |  | `Supplier` |
 | `vendor` | String |  | ≤ 120 chars |  |
 | `amount` | object | yes |  |  |
 | `amount.amountMinor` | Number | yes | integer |  |
 | `amount.currency` | String | yes | pattern `/^[A-Z]{3}$/` |  |
-| `amountPaid` | object |  |  |  |
+| `net` | object | yes |  |  |
+| `net.amountMinor` | Number | yes | integer |  |
+| `net.currency` | String | yes | pattern `/^[A-Z]{3}$/` |  |
+| `tax` | object |  |  |  |
+| `tax.label` | String |  | ≤ 30 chars |  |
+| `tax.ratePercent` | Number | yes | max 100 |  |
+| `tax.inclusive` | Boolean | yes |  |  |
+| `tax.amountMinor` | Number | yes | integer |  |
+| `amountPaid` | object | yes |  |  |
 | `amountPaid.amountMinor` | Number | yes | integer |  |
 | `amountPaid.currency` | String | yes | pattern `/^[A-Z]{3}$/` |  |
 | `status` | String | yes | one of: `unpaid`, `partially_paid`, `paid`, `cancelled`; default `"unpaid"` |  |
 | `flockId` | String |  |  | `Flock` |
 | `houseId` | String |  |  | `House` |
 | `recurringExpenseId` | String |  |  | `RecurringExpense` |
-| `sourceType` | String | yes | one of: `manual`, `feed_purchase`, `health_record`, `inventory_transaction`, `recurring_expense`; default `"manual"` |  |
+| `sourceType` | String | yes | one of: `manual`, `inventory_purchase`, `health_record`, `recurring_expense`, `flock_sale`, `chick_order`, `market_order`; default `"manual"` |  |
 | `sourceId` | String |  |  |  |
 | `invoiceNumber` | String |  | ≤ 60 chars |  |
 | `attachments` | array of objects |  |  |  |
+| `attachments[].assetId` | String | yes |  | `MediaAsset` |
 | `attachments[].name` | String |  | ≤ 200 chars |  |
-| `attachments[].assetUrl` | String | yes | ≤ 1000 chars |  |
 | `notes` | String |  | ≤ 1000 chars |  |
 
 | Index | Options | Serves |
 | --- | --- | --- |
-| farmId, date ↓ |  | Expense list and spend by period |
-| farmId, status, dueDate |  | Unpaid and overdue bills |
-| farmId, recurringExpenseId, dueDate | unique, partial: {"recurringExpenseId":{"$exists":true}} | Bill generation is idempotent: one expense per recurring bill per due date |
+| farmId, date ↓ |  | Expense list, P&L and breakdowns by period |
+| farmId, status, dueDate |  | Payables: unpaid and overdue bills |
+| farmId, recurringExpenseId, dueDate | unique, partial: {"recurringExpenseId":{"$exists":true}} | Bill generation is idempotent: one bill per recurring expense per due date |
+| farmId, sourceId | partial: {"sourceId":{"$exists":true}} | The bill created from a purchase lot or health record |
 
-- **Relationship:** `sourceId` → FeedPurchase | HealthRecord | InventoryTransaction (one-to-one) — Polymorphic by sourceType
+- **Relationship:** `sourceId` → InventoryLot | HealthRecord (one-to-one) — Polymorphic by sourceType
+
+### incomes
+
+A sale or other income the farm is owed. Unpaid incomes are receivables. Bird sales, chick orders and marketplace orders create them automatically.
+
+- **Model:** `Income`
+- **Ownership:** Farm — every query must include farmId
+- **Standard fields:** `_id` (UUIDv7 string), `farmId` (required), `createdBy` (required), `updatedBy`, `createdAt`, `updatedAt` (UTC, required), `version` (optimistic concurrency), `deletedAt`, `deletedBy` (soft delete)
+
+| Field | Type | Required | Constraints | References |
+| --- | --- | --- | --- | --- |
+| `kind` | String | yes | one of: `sale`, `income`; default `"sale"` |  |
+| `date` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
+| `dueDate` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
+| `category` | String | yes | one of: `bird_sales`, `egg_sales`, `chick_sales`, `manure_sales`, `other_income` |  |
+| `description` | String | yes | ≤ 300 chars |  |
+| `buyerId` | String |  |  | `Buyer` |
+| `customerName` | String |  | ≤ 120 chars |  |
+| `amount` | object | yes |  |  |
+| `amount.amountMinor` | Number | yes | integer |  |
+| `amount.currency` | String | yes | pattern `/^[A-Z]{3}$/` |  |
+| `net` | object | yes |  |  |
+| `net.amountMinor` | Number | yes | integer |  |
+| `net.currency` | String | yes | pattern `/^[A-Z]{3}$/` |  |
+| `tax` | object |  |  |  |
+| `tax.label` | String |  | ≤ 30 chars |  |
+| `tax.ratePercent` | Number | yes | max 100 |  |
+| `tax.inclusive` | Boolean | yes |  |  |
+| `tax.amountMinor` | Number | yes | integer |  |
+| `amountPaid` | object | yes |  |  |
+| `amountPaid.amountMinor` | Number | yes | integer |  |
+| `amountPaid.currency` | String | yes | pattern `/^[A-Z]{3}$/` |  |
+| `status` | String | yes | one of: `unpaid`, `partially_paid`, `paid`, `cancelled`; default `"unpaid"` |  |
+| `flockId` | String |  |  | `Flock` |
+| `houseId` | String |  |  | `House` |
+| `sourceType` | String | yes | one of: `manual`, `inventory_purchase`, `health_record`, `recurring_expense`, `flock_sale`, `chick_order`, `market_order`; default `"manual"` |  |
+| `sourceId` | String |  |  |  |
+| `invoiceNumber` | String |  | ≤ 60 chars |  |
+| `attachments` | array of objects |  |  |  |
+| `attachments[].assetId` | String | yes |  | `MediaAsset` |
+| `attachments[].name` | String |  | ≤ 200 chars |  |
+| `notes` | String |  | ≤ 1000 chars |  |
+
+| Index | Options | Serves |
+| --- | --- | --- |
+| farmId, date ↓ |  | Income list, P&L and breakdowns by period |
+| farmId, status, dueDate |  | Receivables: unpaid and overdue incomes |
+| farmId, sourceId | partial: {"sourceId":{"$exists":true}} | The income created from a sale event or order |
+
+- **Relationship:** `sourceId` → FlockEvent | Order (one-to-one) — Polymorphic by sourceType
 
 ### recurring_expenses
 
@@ -1314,11 +1422,17 @@ A repeating bill (electricity, wages, rent). The scheduler creates an expense on
 | Field | Type | Required | Constraints | References |
 | --- | --- | --- | --- | --- |
 | `name` | String | yes | ≤ 120 chars |  |
-| `category` | String | yes | one of: `bird_sales`, `egg_sales`, `chick_sales`, `manure_sales`, `other_income`, `stock_purchase`, `feed`, `medicine_vaccine`, `vet_services`, `labour`, `electricity`, `water`, `fuel_transport`, `litter_bedding`, `rent`, `maintenance`, `licences_fees`, `equipment`, `other_expense` |  |
+| `category` | String | yes | one of: `stock_purchase`, `feed`, `medicine_vaccine`, `vet_services`, `labour`, `electricity`, `water`, `fuel_transport`, `litter_bedding`, `rent`, `maintenance`, `licences_fees`, `equipment`, `other_expense` |  |
+| `supplierId` | String |  |  | `Supplier` |
 | `vendor` | String |  | ≤ 120 chars |  |
 | `amount` | object | yes |  |  |
 | `amount.amountMinor` | Number | yes | integer |  |
 | `amount.currency` | String | yes | pattern `/^[A-Z]{3}$/` |  |
+| `tax` | object |  |  |  |
+| `tax.label` | String |  | ≤ 30 chars |  |
+| `tax.ratePercent` | Number | yes | max 100 |  |
+| `tax.inclusive` | Boolean | yes |  |  |
+| `tax.amountMinor` | Number | yes | integer |  |
 | `frequency` | String | yes | one of: `daily`, `weekly`, `monthly`, `quarterly`, `yearly` |  |
 | `startDate` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
 | `endDate` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
@@ -1328,6 +1442,7 @@ A repeating bill (electricity, wages, rent). The scheduler creates an expense on
 | `nextDueDate` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
 | `active` | Boolean |  | default `true` |  |
 | `flockId` | String |  |  | `Flock` |
+| `houseId` | String |  |  | `House` |
 | `notes` | String |  | ≤ 1000 chars |  |
 
 | Index | Options | Serves |
@@ -1336,7 +1451,7 @@ A repeating bill (electricity, wages, rent). The scheduler creates an expense on
 
 ### transactions
 
-The cash ledger: money actually received or paid. Farm profit for a period = income − expense here. Corrections are reversal entries.
+The cash ledger: money in or out of one of the farm's accounts. Payments and refunds against bills and incomes, transfers between accounts (a pair sharing transferGroupId) and opening balances. Cash flow is built from it. Corrections are reversal entries.
 
 - **Model:** `Transaction`
 - **Ownership:** Farm — every query must include farmId
@@ -1346,28 +1461,37 @@ The cash ledger: money actually received or paid. Farm profit for a period = inc
 | Field | Type | Required | Constraints | References |
 | --- | --- | --- | --- | --- |
 | `date` | String | yes | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
-| `direction` | String | yes | one of: `income`, `expense` |  |
-| `category` | String | yes | one of: `bird_sales`, `egg_sales`, `chick_sales`, `manure_sales`, `other_income`, `stock_purchase`, `feed`, `medicine_vaccine`, `vet_services`, `labour`, `electricity`, `water`, `fuel_transport`, `litter_bedding`, `rent`, `maintenance`, `licences_fees`, `equipment`, `other_expense` |  |
+| `kind` | String | yes | one of: `payment`, `refund`, `transfer`, `opening_balance`, `adjustment` |  |
+| `direction` | String | yes | one of: `in`, `out` |  |
+| `accountId` | String | yes |  | `MoneyAccount` |
 | `amount` | object | yes |  |  |
 | `amount.amountMinor` | Number | yes | integer |  |
 | `amount.currency` | String | yes | pattern `/^[A-Z]{3}$/` |  |
-| `description` | String |  | ≤ 300 chars |  |
-| `source` | String | yes | one of: `manual`, `expense`, `order_payment`, `feed_purchase`, `recurring_expense`, `opening_balance`, `reversal` |  |
-| `sourceId` | String |  |  |  |
+| `category` | String |  | one of: `bird_sales`, `egg_sales`, `chick_sales`, `manure_sales`, `other_income`, `stock_purchase`, `feed`, `medicine_vaccine`, `vet_services`, `labour`, `electricity`, `water`, `fuel_transport`, `litter_bedding`, `rent`, `maintenance`, `licences_fees`, `equipment`, `other_expense` |  |
+| `documentType` | String |  | one of: `expense`, `income` |  |
+| `documentId` | String |  |  |  |
+| `orderId` | String |  |  | `Order` |
+| `transferGroupId` | String |  |  |  |
+| `counterpartAccountId` | String |  |  | `MoneyAccount` |
+| `supplierId` | String |  |  | `Supplier` |
+| `buyerId` | String |  |  | `Buyer` |
 | `flockId` | String |  |  | `Flock` |
 | `houseId` | String |  |  | `House` |
 | `paymentMethod` | String |  | one of: `cash`, `bank_transfer`, `mobile_money`, `upi`, `card`, `cheque`, `other` |  |
 | `reference` | String |  | ≤ 80 chars |  |
-| `counterparty` | String |  | ≤ 120 chars |  |
+| `description` | String |  | ≤ 300 chars |  |
+| `attachments` | array of objects |  |  |  |
+| `attachments[].assetId` | String | yes |  | `MediaAsset` |
+| `attachments[].name` | String |  | ≤ 200 chars |  |
 | `reversalOf` | String |  |  | `Transaction` |
 
 | Index | Options | Serves |
 | --- | --- | --- |
-| farmId, date |  | Profit and category totals for a period (Money, Dashboard) |
-| farmId, flockId, date |  | Batch economics: income and direct costs of one flock |
-| farmId, sourceId |  | Find the postings of an expense or payment to reverse or reconcile them |
+| farmId, date |  | Cash flow for a period |
+| farmId, accountId, date |  | Account balances and statements |
+| farmId, documentId | partial: {"documentId":{"$exists":true}} | Payments and refunds of one bill or income |
 
-- **Relationship:** `sourceId` → Expense | OrderPayment | FeedPurchase | RecurringExpense (many-to-one) — Polymorphic by source
+- **Relationship:** `documentId` → Expense | Income (many-to-one) — Polymorphic by documentType
 
 ## Market
 
@@ -1395,7 +1519,7 @@ The farm's own customer book. A buyer may also be another PoultryPilot farm (lin
 
 ### market_listings
 
-Something a farm offers on the marketplace. Seller contact details are not stored here; they are shared only with a buyer who places an order.
+Something a farm offers on the marketplace. quantityAvailable is what is not yet reserved by accepted orders. Seller contact details are never in a listing; a buyer sees them once the seller accepts the order. An optional stock source makes delivery move stock automatically.
 
 - **Model:** `MarketListing`
 - **Ownership:** Farm — every query must include farmId
@@ -1408,6 +1532,7 @@ Something a farm offers on the marketplace. Seller contact details are not store
 | `product` | String |  | one of: `live_broiler`, `dressed_broiler`, `table_eggs`, `day_old_chick_broiler`, `day_old_chick_layer`, `spent_hen`, `maize`, `soybean_meal`, `broiler_feed`, `layer_feed` |  |
 | `description` | String |  | ≤ 2000 chars |  |
 | `quantityAvailable` | Number | yes |  |  |
+| `minOrderQuantity` | Number |  |  |  |
 | `unit` | String | yes | ≤ 20 chars |  |
 | `price` | object | yes |  |  |
 | `price.amountMinor` | Number | yes | integer |  |
@@ -1420,8 +1545,14 @@ Something a farm offers on the marketplace. Seller contact details are not store
 | `location.coordinates` | array of Number | yes |  |  |
 | `availableFrom` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
 | `availableUntil` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
+| `fulfilmentOptions` | array of String | yes | custom validation; one of: `pickup`, `seller_delivery`, `courier` |  |
 | `status` | String | yes | one of: `draft`, `active`, `paused`, `sold_out`, `closed`; default `"draft"` |  |
-| `photos` | array of String |  | ≤ 1000 chars |  |
+| `photos` | array of String |  |  | `MediaAsset` |
+| `source` | object |  |  |  |
+| `source.kind` | String | yes | one of: `eggs`, `chick_lot`, `flock` |  |
+| `source.eggGrade` | String |  | one of: `large`, `medium`, `small`, `cracked`, `dirty`, `double_yolk` |  |
+| `source.chickLotId` | String |  |  | `ChickLot` |
+| `source.flockId` | String |  |  | `Flock` |
 
 | Index | Options | Serves |
 | --- | --- | --- |
@@ -1448,6 +1579,22 @@ A sale by the farm (farmId = seller), recorded directly or placed by a marketpla
 | `buyerFarmId` | String |  |  | `Farm` |
 | `listingId` | String |  |  | `MarketListing` |
 | `hatcheryBatchId` | String |  |  | `HatcheryBatch` |
+| `buyerName` | String |  | ≤ 120 chars |  |
+| `buyerPhone` | String |  | ≤ 30 chars |  |
+| `fulfilment` | String | yes | one of: `pickup`, `seller_delivery`, `courier`; default `"pickup"` |  |
+| `delivery` | object |  |  |  |
+| `delivery.address` | String |  | ≤ 300 chars |  |
+| `delivery.expectedDate` | String |  | pattern `/^\d{4}-\d{2}-\d{2}$/` |  |
+| `delivery.vehicle` | String |  | ≤ 60 chars |  |
+| `delivery.driver` | String |  | ≤ 120 chars |  |
+| `delivery.trackingReference` | String |  | ≤ 80 chars |  |
+| `delivery.dispatchedAt` | Date |  |  |  |
+| `delivery.deliveredAt` | Date |  |  |  |
+| `delivery.receivedBy` | String |  | ≤ 120 chars |  |
+| `delivery.proofAssetId` | String |  |  | `MediaAsset` |
+| `incomeId` | String |  |  | `Income` |
+| `cancelReason` | String |  | ≤ 300 chars |  |
+| `cancelledBy` | String |  | one of: `seller`, `buyer` |  |
 | `lines` | array of objects | yes | custom validation |  |
 | `lines[].category` | String | yes | one of: `live_birds`, `dressed_birds`, `eggs`, `day_old_chicks`, `hatching_eggs`, `manure`, `other` |  |
 | `lines[].description` | String | yes | ≤ 200 chars |  |
@@ -1471,9 +1618,9 @@ A sale by the farm (farmId = seller), recorded directly or placed by a marketpla
 | `total` | object | yes |  |  |
 | `total.amountMinor` | Number | yes | integer |  |
 | `total.currency` | String | yes | pattern `/^[A-Z]{3}$/` |  |
-| `status` | String | yes | one of: `pending`, `confirmed`, `delivered`, `closed`, `cancelled`; default `"pending"` |  |
+| `status` | String | yes | one of: `pending`, `accepted`, `preparing`, `dispatched`, `delivered`, `completed`, `cancelled`; default `"pending"` |  |
 | `statusHistory` | array of objects |  |  |  |
-| `statusHistory[].status` | String | yes | one of: `pending`, `confirmed`, `delivered`, `closed`, `cancelled` |  |
+| `statusHistory[].status` | String | yes | one of: `pending`, `accepted`, `preparing`, `dispatched`, `delivered`, `completed`, `cancelled` |  |
 | `statusHistory[].at` | Date | yes |  |  |
 | `statusHistory[].by` | String |  |  | `User` |
 | `paymentStatus` | String | yes | one of: `unpaid`, `partially_paid`, `paid`, `refunded`; default `"unpaid"` |  |
@@ -1515,6 +1662,7 @@ Money received against an order (or refunded). Posts an income transaction; over
 | `reference` | String |  | ≤ 80 chars |  |
 | `transactionId` | String |  |  | `Transaction` |
 | `reversalOf` | String |  |  | `OrderPayment` |
+| `accountId` | String |  |  | `MoneyAccount` |
 | `note` | String |  | ≤ 500 chars |  |
 
 | Index | Options | Serves |
@@ -2049,27 +2197,48 @@ Every reference between collections, derived from the schemas.
 | `brooder_checks` | `flockId` | `flocks` | many-to-one |
 | `brooder_checks` | `houseId` | `houses` | many-to-one |
 | `brooder_checks` | `checklist.templateId` | `checklist_templates` | many-to-one |
+| `expenses` | `supplierId` | `suppliers` | many-to-one |
 | `expenses` | `flockId` | `flocks` | many-to-one |
 | `expenses` | `houseId` | `houses` | many-to-one |
 | `expenses` | `recurringExpenseId` | `recurring_expenses` | many-to-one |
-| `expenses` | `sourceId` | FeedPurchase \| HealthRecord \| InventoryTransaction | one-to-one (Polymorphic by sourceType) |
+| `expenses` | `attachments[].assetId` | `media_assets` | many-to-one |
+| `expenses` | `sourceId` | InventoryLot \| HealthRecord | one-to-one (Polymorphic by sourceType) |
+| `incomes` | `buyerId` | `buyers` | many-to-one |
+| `incomes` | `flockId` | `flocks` | many-to-one |
+| `incomes` | `houseId` | `houses` | many-to-one |
+| `incomes` | `attachments[].assetId` | `media_assets` | many-to-one |
+| `incomes` | `sourceId` | FlockEvent \| Order | one-to-one (Polymorphic by sourceType) |
+| `recurring_expenses` | `supplierId` | `suppliers` | many-to-one |
 | `recurring_expenses` | `flockId` | `flocks` | many-to-one |
+| `recurring_expenses` | `houseId` | `houses` | many-to-one |
+| `transactions` | `accountId` | `money_accounts` | many-to-one |
+| `transactions` | `orderId` | `orders` | many-to-one |
+| `transactions` | `counterpartAccountId` | `money_accounts` | many-to-one |
+| `transactions` | `supplierId` | `suppliers` | many-to-one |
+| `transactions` | `buyerId` | `buyers` | many-to-one |
 | `transactions` | `flockId` | `flocks` | many-to-one |
 | `transactions` | `houseId` | `houses` | many-to-one |
+| `transactions` | `attachments[].assetId` | `media_assets` | many-to-one |
 | `transactions` | `reversalOf` | `transactions` | many-to-one |
-| `transactions` | `sourceId` | Expense \| OrderPayment \| FeedPurchase \| RecurringExpense | many-to-one (Polymorphic by source) |
+| `transactions` | `documentId` | Expense \| Income | many-to-one (Polymorphic by documentType) |
 | `buyers` | `linkedFarmId` | `farms` | many-to-one |
+| `market_listings` | `photos` | `media_assets` | many-to-many |
+| `market_listings` | `source.chickLotId` | `chicks` | many-to-one |
+| `market_listings` | `source.flockId` | `flocks` | many-to-one |
 | `orders` | `buyerId` | `buyers` | many-to-one |
 | `orders` | `buyerUserId` | `users` | many-to-one |
 | `orders` | `buyerFarmId` | `farms` | many-to-one |
 | `orders` | `listingId` | `market_listings` | many-to-one |
 | `orders` | `hatcheryBatchId` | `hatchery_batches` | many-to-one |
+| `orders` | `delivery.proofAssetId` | `media_assets` | many-to-one |
+| `orders` | `incomeId` | `incomes` | many-to-one |
 | `orders` | `lines[].flockId` | `flocks` | many-to-one |
 | `orders` | `lines[].chickLotId` | `chicks` | many-to-one |
 | `orders` | `statusHistory[].by` | `users` | many-to-one |
 | `order_payments` | `orderId` | `orders` | many-to-one |
 | `order_payments` | `transactionId` | `transactions` | many-to-one |
 | `order_payments` | `reversalOf` | `order_payments` | many-to-one |
+| `order_payments` | `accountId` | `money_accounts` | many-to-one |
 | `tasks` | `assigneeUserId` | `users` | many-to-one |
 | `tasks` | `flockId` | `flocks` | many-to-one |
 | `tasks` | `houseId` | `houses` | many-to-one |

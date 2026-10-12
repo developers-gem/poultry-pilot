@@ -2,7 +2,7 @@
 
 How the MongoDB collections fit together and the rules every collection follows. The field-by-field reference is the generated [data dictionary](data-dictionary.md); schemas live in `services/api/src/adapters/mongo/models/`.
 
-57 collections: the 50 product collections, plus 7 for authentication and infrastructure (`sessions`, `refresh_tokens`, `one_time_tokens`, `sync_changes`, `idempotency_keys`, `counters`, `media_assets`). 92 secondary indexes, each tied to a named query.
+60 collections: the 53 product collections, plus 7 for authentication and infrastructure (`sessions`, `refresh_tokens`, `one_time_tokens`, `sync_changes`, `idempotency_keys`, `counters`, `media_assets`). 98 secondary indexes, each tied to a named query.
 
 ## Conventions
 
@@ -21,7 +21,7 @@ How the MongoDB collections fit together and the rules every collection follows.
 
 | Ownership | Collections | Standard fields | Access rule |
 | --- | --- | --- | --- |
-| Farm | 42 collections, e.g. flocks, daily_records, inventory_lots, hatchery_batches, chick_arrivals, sync_operations | `farmId`, `createdBy` (required), `updatedBy`, `version`, soft delete unless append-only | Every query includes `farmId`; the `requireFarmScope` plugin throws if it is missing. Indexes start with `farmId` |
+| Farm | 45 collections, e.g. flocks, daily_records, inventory_lots, hatchery_batches, incomes, money_accounts, sync_operations | `farmId`, `createdBy` (required), `updatedBy`, `version`, soft delete unless append-only | Every query includes `farmId`; the `requireFarmScope` plugin throws if it is missing. Indexes start with `farmId` |
 | Tenant | farms | `createdBy`, `version`, soft delete | Read by `_id` after a membership check |
 | User | users, sessions, refresh/one-time tokens, notifications, training_progress | per collection | Queried by `userId` of the signed-in person |
 | Global | training_courses, articles, glossary_terms, market_prices, weather_cache | `createdBy`/`updatedBy` optional (staff or import job) | Readable by any signed-in user; written by staff tools or jobs |
@@ -60,8 +60,10 @@ Each fact has one home. Some values are also kept as **derived snapshots** for f
 | `health_records.treatments[].endDate`, `withdrawal*Until` | HealthService on save | start + duration; end + withdrawal days (treatment override, else the medicine's catalog entry; none if neither) |
 | `egg_records.withheldUntil` | HealthService when treatments or eggs change | egg withdrawal windows of the flock's treatments |
 | `visitors.downtimeHours`, `flags` | BiosecurityService at check-in | last poultry contact vs check-in, the farm's `visitorDowntimeHours`, declaration checklist |
-| `expenses.amountPaid`, `expenses.status` | LedgerService | `transactions` with `sourceId` = expense |
-| `orders.amountPaid`, `orders.paymentStatus` | OrderService | `order_payments` |
+| `expenses` / `incomes` `.net`, `.tax`, `.amountPaid`, `.status` | FinanceService | the entered amount and tax; `transactions` with `documentId` = the document |
+| Money account balance | FinanceService (computed, not stored) | opening balance + `transactions` for the account |
+| `market_listings.quantityAvailable` | MarketService on accept and cancel | listing quantity − accepted, undelivered orders |
+| `orders.amountPaid`, `orders.paymentStatus`, `orders.incomeId` | MarketService | `order_payments` / the order's income |
 | Vaccination "overdue" | never stored | `status = scheduled` and `dueDate` < farm-local today |
 
 ## What writes what
@@ -81,16 +83,21 @@ When a record changes, the service writes these in **one transaction** (MongoDB 
 | Purchase (any stock item) | `inventory_lots` + `inventory_transactions` (receipt) → `inventory_items.stock`; alerts re-evaluated; `expenses` when the money module exists |
 | Stock count | `inventory_transactions` (adjustment), and an `inventory_lots` row for a surplus |
 | Place a flock from a chick lot | `chicks.remaining`, `placedFlockIds` + the placement event |
-| Pay an expense | `transactions` (expense) → `expenses.amountPaid/status` |
+| Pay or refund a bill or income | `transactions` (payment or refund) → document `amountPaid/status` |
+| Transfer between accounts | two `transactions` (kind transfer) sharing `transferGroupId` |
 | Recurring bill falls due | `expenses` (unique per bill and due date), then `recurring_expenses.nextDueDate` |
+| Inventory purchase | also an `expenses` purchase bill (sourceId = lot) |
+| Bird sale | also an `incomes` receivable (sourceId = sale event), unless the sale came from an order |
 | Give a vaccination | `vaccinations` (done, batches and expiry from lots) + `inventory_transactions` (issue) → `inventory_items.stock`; alert resolved |
 | Record a treatment | `health_records` (treatments with withdrawal dates) + `inventory_transactions` (issue) + `egg_records.withheldUntil`; `withdrawal_active` alert |
 | Check a visitor in | `visitors` + `tasks` (corrective actions for failed declaration items) + alerts (downtime, failed checklist) |
 | Biosecurity log | `biosecurity_logs` + `inventory_transactions` for products + `tasks` / alerts for problems found |
 | Complete a cleaning schedule | `biosecurity_logs` + `cleaning_tasks.lastDoneDate/nextDueDate` |
 | Move equipment | `equipment_movements` + `equipment.houseId`; corrective action if not disinfected |
-| Deliver an order | `orders.status/statusHistory` + stock postings: `egg_inventory` (sold), `flock_events` (sale) or `chicks.remaining` |
-| Receive a payment | `order_payments` + `transactions` (income) → `orders.amountPaid/paymentStatus` |
+| Accept an order | `orders.status` + `market_listings.quantityAvailable` (reserved) + `incomes` receivable |
+| Deliver an order | `orders.status/delivery` + stock: `egg_inventory` (sold), `flock_events` (sale with orderId) or `chicks.remaining` |
+| Cancel an order | `orders.status` + reservation returned + receivable cancelled (refused while payments stand) |
+| Receive an order payment | `order_payments` + `transactions` → income `amountPaid` → `orders.amountPaid/paymentStatus` |
 | Set a hatchery batch | `hatchery_batches` + `hatchery_events` (set) + `egg_inventory` (own-flock hatching eggs leave stock) |
 | Candling, transfer, hatch | `hatchery_events` → `hatchery_batches.results/status` |
 | Grade chicks | `hatchery_events` + a `chicks` lot (costed per saleable chick) |
@@ -218,15 +225,22 @@ erDiagram
 
 ```mermaid
 erDiagram
+  suppliers ||--o{ expenses : bills
   recurring_expenses ||--o{ expenses : generates
   expenses ||--o{ transactions : "paid by"
+  incomes ||--o{ transactions : "received by"
+  money_accounts ||--o{ transactions : holds
+  buyers ||--o{ incomes : owes
   buyers ||--o{ orders : places
   market_listings ||--o{ orders : "ordered from"
+  orders ||--o| incomes : receivable
   orders ||--o{ order_payments : "paid by"
   order_payments ||--|| transactions : posts
   orders ||--o{ egg_inventory : "sold eggs"
   orders ||--o{ flock_events : "sold birds"
-  flocks ||--o{ transactions : "batch income/cost"
+  inventory_lots ||--o| expenses : "purchase bill"
+  flocks ||--o{ expenses : "allocated costs"
+  houses ||--o{ expenses : "allocated costs"
 ```
 
 ### Operations and system

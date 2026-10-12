@@ -340,6 +340,68 @@ post("/farms/invitations/accept", "Accept an emailed farm invitation", bodyOf(S.
   r("get", "/calendar/ics", "Calendar", "The same events as an iCalendar file", farmParams, { query: V.CalendarQuery }, { 200: { description: "text/calendar" } });
 }
 
+// ---- Finance and PoultryMarket --------------------------------------------------
+{
+  const P = `${API_PREFIX}/farms/{farmId}`;
+  const any = z.record(z.unknown());
+  const items = z.object({ items: z.array(any) });
+  const idp = z.object({ farmId: V.Id, id: V.Id });
+  const r = (method: "get" | "post" | "put", path: string, tag: string, summary: string, params: z.AnyZodObject, request: Record<string, unknown>, ok: Record<string, unknown>, prefix = P) =>
+    registry.registerPath({ method, path: `${prefix}${path}`, tags: [tag], summary, security: secured, request: { params, ...request }, responses: { ...ok, ...errors } } as never);
+  const F = "Finance";
+  r("get", "/finance/suppliers", F, "Suppliers", farmParams, {}, { 200: json(items, "Suppliers") });
+  r("post", "/finance/suppliers", F, "Add a supplier", farmParams, bodyOf(V.SupplierRequest), { 201: json(any, "Created") });
+  r("get", "/finance/suppliers/{id}", F, "Supplier statement: bills and what is owed", idp, {}, { 200: json(any, "Statement") });
+  r("get", "/finance/accounts", F, "Money accounts with balances", farmParams, {}, { 200: json(items, "Accounts") });
+  r("post", "/finance/accounts", F, "Add a cash, bank or mobile money account", farmParams, bodyOf(V.MoneyAccountRequest), { 201: json(any, "Created") });
+  r("post", "/finance/transfers", F, "Move money between the farm's accounts", farmParams, bodyOf(V.TransferRequestMoney), { 201: json(any, "Transferred"), 422: json(S.ErrorEnvelope, "Not enough in a cash or mobile money account") });
+  r("get", "/finance/ledger", F, "Cash ledger entries", farmParams, { query: V.LedgerQuery }, { 200: json(items, "Entries") });
+  for (const [path, label, body] of [["expenses", "bill (expense or purchase)", V.ExpenseRequest], ["incomes", "income (sale or other)", V.IncomeRequest]] as const) {
+    r("get", `/finance/${path}`, F, `List ${path}`, farmParams, { query: V.DocumentListQuery }, { 200: json(items, path) });
+    r("post", `/finance/${path}`, F, `Record a ${label}; optionally paid now`, farmParams, bodyOf(body), { 201: json(any, "Created") });
+    r("get", `/finance/${path}/{id}`, F, `One ${label} with its payments`, idp, {}, { 200: json(any, "Document") });
+    r("post", `/finance/${path}/{id}/payments`, F, "Record a payment (no overpayment)", idp, bodyOf(V.PaymentRequest), { 201: json(any, "Paid") });
+    r("post", `/finance/${path}/{id}/refunds`, F, "Record a refund (not more than was paid)", idp, bodyOf(V.RefundRequest), { 201: json(any, "Refunded") });
+    r("post", `/finance/${path}/{id}/cancel`, F, "Cancel an unpaid, hand-entered document", idp, bodyOf(V.ReasonRequest), { 200: json(any, "Cancelled") });
+  }
+  r("get", "/finance/recurring", F, "Recurring expenses", farmParams, {}, { 200: json(items, "Recurring") });
+  r("post", "/finance/recurring", F, "Add a recurring expense", farmParams, bodyOf(V.RecurringExpenseRequest), { 201: json(any, "Created") });
+  r("post", "/finance/recurring/generate", F, "Create bills that have fallen due (idempotent; also hourly)", farmParams, {}, { 200: json(any, "Created") });
+  r("post", "/finance/recurring/{id}/pause", F, "Pause a recurring expense", idp, bodyOf(V.PauseRequest), { 200: json(any, "Paused") });
+  r("get", "/finance/reports/pnl", F, "Profit and loss (accrual, excluding tax)", farmParams, { query: V.PeriodQuery }, { 200: json(any, "P&L") });
+  r("get", "/finance/reports/cash-flow", F, "Cash flow by category and account", farmParams, { query: V.PeriodQuery }, { 200: json(any, "Cash flow") });
+  r("get", "/finance/reports/expenses", F, "Expense breakdown by category, supplier, flock and house", farmParams, { query: V.PeriodQuery }, { 200: json(any, "Breakdown") });
+  r("get", "/finance/reports/revenue", F, "Revenue breakdown by category, customer, flock and source", farmParams, { query: V.PeriodQuery }, { 200: json(any, "Breakdown") });
+  r("get", "/finance/reports/receivables", F, "Receivables, aged", farmParams, {}, { 200: json(any, "Receivables") });
+  r("get", "/finance/reports/payables", F, "Payables, aged", farmParams, {}, { 200: json(any, "Payables") });
+  r("get", "/finance/reports/flock-profitability", F, "Flock profitability with cost per bird, per kg and per egg", farmParams, { query: V.ProfitabilityQuery }, { 200: json(any, "Profitability") });
+  r("get", "/finance/reports/house-costing", F, "Costs and revenue by house", farmParams, { query: V.OptionalPeriodQuery }, { 200: json(any, "Costing") });
+  const M = "PoultryMarket";
+  r("get", "/market/listings", M, "Your listings", farmParams, { query: V.MyListingsQuery }, { 200: json(items, "Listings") });
+  r("post", "/market/listings", M, "Create a listing (draft)", farmParams, bodyOf(V.ListingRequest), { 201: json(any, "Created") });
+  r("put", "/market/listings/{id}", M, "Replace a listing", idp, bodyOf(V.UpdateListingRequest), { 200: json(any, "Updated") });
+  r("post", "/market/listings/{id}/status", M, "Activate, pause or close a listing", idp, bodyOf(V.ListingStatusRequest), { 200: json(any, "Updated") });
+  r("get", "/market/orders", M, "Orders you received", farmParams, { query: V.OrderListQueryMarket }, { 200: json(items, "Orders") });
+  r("get", "/market/orders/{id}", M, "An order with its payments", idp, {}, { 200: json(any, "Order") });
+  for (const [path, summary, body] of [["accept", "PENDING → ACCEPTED (reserves quantity, creates the receivable)", null], ["prepare", "ACCEPTED → PREPARING", null], ["dispatch", "→ DISPATCHED (not for pickup)", V.DispatchRequest], ["deliver", "→ DELIVERED (moves stock)", V.DeliveredRequest], ["complete", "DELIVERED → COMPLETED (fully paid only)", null], ["cancel", "→ CANCELLED before dispatch (restores quantity; refund payments first)", V.ReasonRequest]] as const) {
+    r("post", `/market/orders/{id}/${path}`, M, summary, idp, body ? bodyOf(body) : {}, { 200: json(any, "Order"), 422: json(S.ErrorEnvelope, "Transition not allowed") });
+  }
+  r("post", "/market/orders/{id}/payments", M, "Record a payment received", idp, bodyOf(V.PaymentRequest), { 201: json(any, "Recorded") });
+  r("post", "/market/orders/{id}/refunds", M, "Record a refund", idp, bodyOf(V.RefundRequest), { 201: json(any, "Recorded") });
+  r("get", "/buyers/{id}", "Orders", "A buyer's orders and what they owe", idp, {}, { 200: json(any, "Buyer") });
+  r("put", "/buyers/{id}", "Orders", "Replace a buyer", idp, bodyOf(V.BuyerUpdateRequest), { 200: json(any, "Updated") });
+  const B = `${API_PREFIX}/market`;
+  const oid = z.object({ id: V.Id });
+  r("get", "/listings", M, "Browse active listings (any signed-in user; no seller contact)", z.object({}), { query: V.BrowseQuery }, { 200: json(items, "Listings") }, B);
+  r("get", "/listings/{id}", M, "One active listing", oid, {}, { 200: json(any, "Listing") }, B);
+  r("post", "/orders", M, "Place an order (price from the listing)", z.object({}), bodyOf(V.PlaceOrderRequest), { 201: json(any, "Placed") }, B);
+  r("get", "/orders", M, "Your purchases across sellers", z.object({}), {}, { 200: json(items, "Orders") }, B);
+  r("get", "/orders/{id}", M, "One of your purchases (seller contact once accepted)", oid, {}, { 200: json(any, "Order") }, B);
+  r("post", "/orders/{id}/cancel", M, "Cancel while pending or accepted", oid, bodyOf(V.ReasonRequest), { 200: json(any, "Cancelled") }, B);
+  r("post", "/orders/{id}/received", M, "Confirm a dispatched order arrived", oid, {}, { 200: json(any, "Delivered") }, B);
+  r("post", "/orders/{id}/complete", M, "Complete a delivered, paid order", oid, {}, { 200: json(any, "Completed") }, B);
+}
+
 // ---- sync -----------------------------------------------------------------
 registry.registerPath({
   method: "get",

@@ -9,7 +9,7 @@ export const systemContext = (farmId: string): FarmContext => ({ userId: "system
  * Re-evaluates stock alerts for every farm. Needed because expiry alerts depend on the date passing, not on
  * anyone touching stock. One farm's failure is logged and does not stop the others.
  */
-export async function runAlertJob(c: Pick<Container, "repos" | "alerts" | "flockHealth" | "hatchery">, logger?: Logger): Promise<{ farms: number; failed: number }> {
+export async function runAlertJob(c: Pick<Container, "repos" | "alerts" | "flockHealth" | "hatchery" | "finance">, logger?: Logger): Promise<{ farms: number; failed: number }> {
   const ids = await c.repos.farms.listIds();
   let failed = 0;
   for (const farmId of ids) {
@@ -18,6 +18,7 @@ export async function runAlertJob(c: Pick<Container, "repos" | "alerts" | "flock
         await c.alerts.evaluateInventory(systemContext(farmId), tx);
         await c.flockHealth.evaluateAlerts(systemContext(farmId), tx);
         await c.hatchery.evaluateAlerts(systemContext(farmId), tx);
+        await c.finance.runScheduled(systemContext(farmId), tx);
       });
     } catch (err) {
       failed++;
@@ -28,7 +29,7 @@ export async function runAlertJob(c: Pick<Container, "repos" | "alerts" | "flock
 }
 
 /** Starts the hourly job. Returns a stop function for graceful shutdown. */
-export function scheduleAlertJob(c: Pick<Container, "repos" | "alerts" | "flockHealth" | "hatchery">, logger: Logger, everyMs = 60 * 60 * 1000): () => void {
+export function scheduleAlertJob(c: Pick<Container, "repos" | "alerts" | "flockHealth" | "hatchery" | "finance">, logger: Logger, everyMs = 60 * 60 * 1000): () => void {
   let running = false;
   const tick = async () => {
     if (running) return;

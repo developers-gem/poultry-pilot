@@ -15,6 +15,7 @@ import { dailyRecordRoutes, dashboardRoutes, farmDailyRecordRoutes, mediaRoutes 
 import { alertRoutes, feedRoutes, inventoryRoutes, waterRoutes } from "./http/routes/inventory.routes.js";
 import { biosecurityRoutes, contentRoutes, healthRoutes } from "./http/routes/health.routes.js";
 import { calendarRoutes, chickOrderRoutes, chickStartRoutes, hatcheryRoutes } from "./http/routes/hatchery.routes.js";
+import { buyerMarketRoutes, chickOrderActions, financeRoutes, sellerMarketRoutes } from "./http/routes/finance.routes.js";
 import { syncRoutes } from "./http/routes/sync.routes.js";
 import { systemRoutes } from "./http/routes/system.routes.js";
 
@@ -90,8 +91,12 @@ export function createApp(c: Container): Express {
   v1.use("/farms/:farmId/health", ...secured, healthRoutes(c.flockHealth, c.farms));
   v1.use("/farms/:farmId/hatchery", ...secured, hatcheryRoutes(c.hatchery, c.farms));
   const chickOrders = chickOrderRoutes(c.hatchery, c.farms);
-  v1.use("/farms/:farmId/buyers", ...secured, chickOrders.buyers);
-  v1.use("/farms/:farmId/chick-orders", ...secured, chickOrders.orders);
+  const orderActions = chickOrderActions(c.market, c.farms);
+  v1.use("/farms/:farmId/buyers", ...secured, chickOrders.buyers, orderActions.buyers);
+  v1.use("/farms/:farmId/chick-orders", ...secured, chickOrders.orders, orderActions.orders);
+  v1.use("/farms/:farmId/finance", ...secured, financeRoutes(c.finance, c.farms));
+  v1.use("/farms/:farmId/market", ...secured, sellerMarketRoutes(c.market, c.farms));
+  v1.use("/market", ...secured, buyerMarketRoutes(c.market));
   v1.use("/farms/:farmId/chickstart", ...secured, chickStartRoutes(c.chickStart, c.farms));
   v1.use("/farms/:farmId/calendar", ...secured, calendarRoutes(c.calendar, c.farms));
   v1.use("/farms", ...secured, farmRoutes(c.farms, c.audit));

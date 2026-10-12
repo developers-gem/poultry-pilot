@@ -14,3 +14,5 @@ export * from "./flock-metrics.js";
 export * from "./inventory.js";
 export * from "./health.js";
 export * from "./hatchery.js";
+export * from "./orders.js";
+export * from "./finance.js";

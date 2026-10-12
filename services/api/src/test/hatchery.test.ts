@@ -126,7 +126,8 @@ describe("chick orders and delivery", () => {
     const booked = (await s.call("post", "/chick-orders").send({ buyerId: buyer.id, quantity: 500, unitPrice: INR(38), requestedDeliveryDate: D(1), hatcheryBatchId: b.id })).body;
     expect(booked).toMatchObject({ orderNumber: 1, status: "pending", quantity: 500, total: INR(19_000), buyerName: "Sharma Poultry" });
     expect((await s.call("get", `/hatchery/batches/${b.id}`)).body.chicksBooked).toBe(500);
-    expect((await s.call("post", `/chick-orders/${booked.id}/deliver`).send({ date: D(0) })).body.error.message).toMatch(/Confirm the order/);
+    // The shared order state machine: a pending order must be accepted first.
+    expect((await s.call("post", `/chick-orders/${booked.id}/deliver`).send({ date: D(0) })).body.error.message).toMatch(/pending cannot become delivered/);
     await s.call("post", `/chick-orders/${booked.id}/confirm`);
     expect((await s.call("post", `/chick-orders/${booked.id}/deliver`).send({ date: D(0) })).body.error.message).toMatch(/not been graded/);
     const graded = await runToGrading(s, b.id);
@@ -137,7 +138,7 @@ describe("chick orders and delivery", () => {
     expect(second.orderNumber).toBe(2);
     const delivered = (await s.call("post", `/chick-orders/${booked.id}/deliver`).send({ date: D(0) })).body;
     expect(delivered.order).toMatchObject({ status: "delivered", deliveredDate: D(0) });
-    expect(delivered.chickLot).toMatchObject({ remaining: 310 });
+    expect((await s.call("get", "/inventory/chick-lots")).body.items[0]).toMatchObject({ remaining: 310 });
     expect((await s.call("post", `/chick-orders/${second.id}/cancel`).send({ reason: "Buyer postponed" })).body.status).toBe("cancelled");
     expect((await s.call("post", "/chick-orders").send({ buyerId: buyer.id, quantity: 1, unitPrice: { amountMinor: 100, currency: "USD" }, chickLotId: graded.chickLot.id })).status).toBe(400);
     expect((await s.call("get", "/chick-orders?status=delivered")).body.items).toHaveLength(1);

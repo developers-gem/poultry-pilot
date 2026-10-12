@@ -61,6 +61,7 @@ export const ChickOrderRequest = z
     /** ...or book against a batch still incubating. */
     hatcheryBatchId: Id.optional(),
     deliveryAddress: OptionalText(300),
+    fulfilment: z.enum(C.FULFILMENT_METHODS).default("pickup"),
     notes: OptionalText(1000),
   })
   .strict()

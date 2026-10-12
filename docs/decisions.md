@@ -126,3 +126,19 @@ Each is cheap to change until the phase named.
 | D72 | Arrival = placement | A ChickStart arrival creates the flock and draws the chick lot in the same transaction |
 | D73 | Nested transactions | The MongoDB runner joins an active transaction (AsyncLocalStorage), matching the memory adapter |
 | D74 | Calendar | Built on request from source records (never stored); iCalendar download for phone calendars |
+
+## Added with Finance and PoultryMarket
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| D75 | Profit basis | P&L is accrual (document date, excluding tax); cash flow is reported separately from the ledger. Supersedes D8 |
+| D76 | Documents and ledger | Bills (`expenses`) and incomes are accrual documents; payments, refunds, transfers and opening balances are cash `transactions` against one money account |
+| D77 | Overpayment and refunds | No payment past the document total; no refund beyond what was paid; cash and mobile money accounts cannot go negative |
+| D78 | Tax | Rate and label entered by the farm, inclusive or exclusive; reports show net amounts with tax separately; no country rules |
+| D79 | Single currency | Documents, payments and listings must be in the farm currency |
+| D80 | Costing without double counting | Flock cost = flock engine (chicks, feed eaten, health) + bills allocated to the flock except purchase and vet bills; flock revenue = sale events + hand-entered allocated income |
+| D81 | Automatic postings | Inventory purchases, vet fees, bird sales and accepted orders create documents; those documents change only through their source |
+| D82 | Order state machine | One transition table and function; actor rules for buyer and seller; pickup skips dispatch; completion needs full payment; chick orders use it too |
+| D83 | Listing reservation | Quantity reserved on acceptance (refused beyond what is left), returned on cancellation |
+| D84 | Marketplace privacy and pricing | Listings never carry seller contact; buyers see it after acceptance; prices come only from the listing (fixes B8) |
+| D85 | Delivery moves stock | Eggs, chick lots, or a flock sale through the flock engine (withdrawal periods apply; the order carries the income) |

@@ -44,6 +44,8 @@ export const PurchaseRequest = z
     date: LocalDate,
     quantity: Quantity,
     unitCost: Money,
+    /** A supplier from the farm's list; the purchase becomes a bill owed to them. */
+    supplierId: Id.optional(),
     supplier: OptionalText(120),
     batchNumber: OptionalText(60),
     invoiceNumber: OptionalText(60),

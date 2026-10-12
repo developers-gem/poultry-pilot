@@ -6,6 +6,7 @@ export interface UserRecord {
   id: string;
   email: string;
   fullName: string;
+  phone?: string;
   passwordHash?: string;
   googleSub?: string;
   emailVerified: boolean;
@@ -246,6 +247,8 @@ export interface FlockEventRecord extends FarmOwned {
   dailyRecordId?: string;
   chickLotId?: string;
   buyerId?: string;
+  /** Set when the sale came from a marketplace or chick order (the order carries the income). */
+  orderId?: string;
   fromStatus?: import("@poultrypilot/types").FlockStatus;
   toStatus?: import("@poultrypilot/types").FlockStatus;
   reason?: string;
@@ -751,6 +754,17 @@ export interface OrderRecord extends Editable {
   deliveredDate?: string;
   deliveryAddress?: string;
   notes?: string;
+  listingId?: string;
+  buyerUserId?: string;
+  buyerFarmId?: string;
+  buyerName?: string;
+  buyerPhone?: string;
+  fulfilment: "pickup" | "seller_delivery" | "courier";
+  delivery?: { address?: string; expectedDate?: string; vehicle?: string; driver?: string; trackingReference?: string; dispatchedAt?: Date; deliveredAt?: Date; receivedBy?: string; proofAssetId?: string };
+  amountPaid?: MoneyValue;
+  incomeId?: string;
+  cancelReason?: string;
+  cancelledBy?: "seller" | "buyer";
 }
 
 export interface BroodingProfileRecord extends Editable {
@@ -795,4 +809,140 @@ export interface BrooderCheckRecord extends Editable {
   checklist?: ChecklistResult;
   flags?: import("../domain/hatchery.js").BroodingFlag[];
   notes?: string;
+}
+
+// ---- finance and marketplace ------------------------------------------------------------
+
+export interface TaxValue {
+  label?: string;
+  ratePercent: number;
+  inclusive: boolean;
+  amountMinor: number;
+}
+
+export type DocumentSource = (typeof import("@poultrypilot/constants").DOCUMENT_SOURCES)[number];
+export type DocumentStatusValue = "unpaid" | "partially_paid" | "paid" | "cancelled";
+
+export interface SupplierRecord extends Editable {
+  name: string;
+  phone?: string;
+  email?: string;
+  taxId?: string;
+  address?: string;
+  notes?: string;
+}
+
+export interface MoneyAccountRecord extends Editable {
+  name: string;
+  type: "cash" | "bank" | "mobile_money" | "other";
+  openingBalance: MoneyValue;
+  openingDate: string;
+  active: boolean;
+  notes?: string;
+}
+
+interface FinanceDocument extends Editable {
+  date: string;
+  dueDate?: string;
+  description: string;
+  amount: MoneyValue;
+  net: MoneyValue;
+  tax?: TaxValue;
+  amountPaid: MoneyValue;
+  status: DocumentStatusValue;
+  flockId?: string;
+  houseId?: string;
+  sourceType: DocumentSource;
+  sourceId?: string;
+  invoiceNumber?: string;
+  attachments?: { assetId: string; name?: string }[];
+  notes?: string;
+}
+
+export interface ExpenseRecord extends FinanceDocument {
+  kind: "expense" | "purchase";
+  category: (typeof import("@poultrypilot/constants").EXPENSE_CATEGORIES)[number];
+  supplierId?: string;
+  vendor?: string;
+  recurringExpenseId?: string;
+}
+
+export interface IncomeRecord extends FinanceDocument {
+  kind: "sale" | "income";
+  category: (typeof import("@poultrypilot/constants").INCOME_CATEGORIES)[number];
+  buyerId?: string;
+  customerName?: string;
+}
+
+export interface RecurringExpenseRecord extends Editable {
+  name: string;
+  category: ExpenseRecord["category"];
+  supplierId?: string;
+  vendor?: string;
+  amount: MoneyValue;
+  tax?: Omit<TaxValue, "amountMinor">;
+  frequency: (typeof import("@poultrypilot/constants").RECURRING_FREQUENCIES)[number];
+  startDate: string;
+  endDate?: string;
+  pauses: { from: string; to?: string }[];
+  nextDueDate?: string;
+  active: boolean;
+  flockId?: string;
+  houseId?: string;
+  notes?: string;
+}
+
+export interface TransactionRecord extends FarmOwned {
+  date: string;
+  kind: "payment" | "refund" | "transfer" | "opening_balance" | "adjustment";
+  direction: "in" | "out";
+  accountId: string;
+  amount: MoneyValue;
+  category?: (typeof import("@poultrypilot/constants").LEDGER_CATEGORIES)[number];
+  documentType?: "expense" | "income";
+  documentId?: string;
+  orderId?: string;
+  transferGroupId?: string;
+  counterpartAccountId?: string;
+  supplierId?: string;
+  buyerId?: string;
+  flockId?: string;
+  houseId?: string;
+  paymentMethod?: import("@poultrypilot/types").PaymentMethod;
+  reference?: string;
+  description?: string;
+  attachments?: { assetId: string; name?: string }[];
+  reversalOf?: string;
+}
+
+export interface MarketListingRecord extends Editable {
+  title: string;
+  category: OrderLineRecord["category"];
+  product?: (typeof import("@poultrypilot/constants").MARKET_PRODUCTS)[number];
+  description?: string;
+  quantityAvailable: number;
+  minOrderQuantity?: number;
+  unit: string;
+  price: MoneyValue;
+  priceUnit: (typeof import("@poultrypilot/constants").PRICE_UNITS)[number];
+  regionCode: string;
+  locationLabel?: string;
+  availableFrom?: string;
+  availableUntil?: string;
+  fulfilmentOptions: OrderRecord["fulfilment"][];
+  status: (typeof import("@poultrypilot/constants").LISTING_STATUSES)[number];
+  photos?: string[];
+  source?: { kind: "eggs" | "chick_lot" | "flock"; eggGrade?: import("@poultrypilot/types").EggGrade; chickLotId?: string; flockId?: string };
+}
+
+export interface OrderPaymentRecord extends FarmOwned {
+  orderId: string;
+  kind: "payment" | "refund";
+  date: string;
+  amount: MoneyValue;
+  method: import("@poultrypilot/types").PaymentMethod;
+  reference?: string;
+  transactionId?: string;
+  accountId?: string;
+  note?: string;
 }

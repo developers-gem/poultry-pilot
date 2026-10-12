@@ -50,6 +50,8 @@ const toStockLot = (l: InventoryLotRecord): StockLot => ({
 
 export function createInventoryService(d: InventoryDeps) {
   const { repos, clock } = d;
+  /** Finance: a purchase becomes a bill. */
+  const hooks: { afterPurchase: ((ctx: FarmContext, item: InventoryItemRecord, lot: InventoryLotRecord, supplierId: string | undefined, tx: Tx) => Promise<void>)[] } = { afterPurchase: [] };
 
   // ---- engine (usable inside other services' transactions) -------------------------
 
@@ -249,6 +251,7 @@ export function createInventoryService(d: InventoryDeps) {
 
   return {
     engine: { farmOf, todayOf, loadItem, take, receive, reverseSource, assertCurrency },
+    hooks,
 
     async createItem(ctx: FarmContext, input: Omit<InventoryItemRecord, keyof import("../ports/records.js").Editable | "stock" | "active" | "expiryWarningDays"> & { id?: string; expiryWarningDays?: number }) {
       assertCan(ctx, "inventory.manage");
@@ -319,13 +322,17 @@ export function createInventoryService(d: InventoryDeps) {
     },
 
     /** A purchase: creates a lot (batch, expiry, location, unit cost) and a receipt in the ledger. */
-    async receivePurchase(ctx: FarmContext, itemId: string, r: ReceiveInput) {
+    async receivePurchase(ctx: FarmContext, itemId: string, r: ReceiveInput & { supplierId?: string }) {
       assertCan(ctx, "inventory.manage");
       return repos.tx.run(async (tx) => {
         const farm = await farmOf(ctx, tx);
         const item = await loadItem(ctx, itemId, tx);
         if (!item.active) throw new AppError("VALIDATION_FAILED", `${item.name} is inactive`);
-        const out = await receive(ctx, item, r, "purchase", farm, tx);
+        const supplier = r.supplierId ? await repos.suppliers.findById(ctx.farmId, r.supplierId, tx) : null;
+        if (r.supplierId && !supplier) throw notFound("Supplier");
+        const { supplierId: _s, ...rest } = r;
+        const out = await receive(ctx, item, { ...rest, ...(supplier && !r.supplier ? { supplier: supplier.name } : {}) }, "purchase", farm, tx);
+        for (const h of hooks.afterPurchase) await h(ctx, item, out.lot, r.supplierId, tx);
         return lotView(out.lot, out.item, todayOf(farm));
       });
     },

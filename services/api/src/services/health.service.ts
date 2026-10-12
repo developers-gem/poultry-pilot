@@ -35,6 +35,8 @@ export interface HealthDeps {
  */
 export function createHealthService(d: HealthDeps) {
   const { repos, clock } = d;
+  /** Finance: a fee on a record becomes (or stops being) a vet services bill. */
+  const hooks: { onCost: ((ctx: FarmContext, rec: HealthRecordRecord | null, recordId: string, tx: Tx) => Promise<void>)[] } = { onCost: [] };
   const E = d.inventory.engine;
   const L = d.flocks.ledger;
 
@@ -204,6 +206,7 @@ export function createHealthService(d: HealthDeps) {
   }
 
   return {
+    hooks,
     assertBirdsMayLeave,
     refreshWithheldEggs,
 
@@ -271,6 +274,7 @@ export function createHealthService(d: HealthDeps) {
           version: 0,
         };
         await repos.healthRecords.insert(rec, tx);
+        for (const h of hooks.onCost) await h(ctx, rec, id, tx);
         await d.audit.record(ctx, { action: `health.${input.type}_recorded`, entity: "health_record", entityId: id, after: { flockId: rec.flockId, title: rec.title, treatments: treatments.map((t) => t.medicineName) } }, tx);
         await afterWrite(ctx, rec, farm, tx);
         return strip(rec);
@@ -303,6 +307,7 @@ export function createHealthService(d: HealthDeps) {
           { expectedVersion: input.version }, tx,
         );
         if (!next) throw new AppError("VERSION_CONFLICT", "This record was changed by someone else");
+        for (const h of hooks.onCost) await h(ctx, next, id, tx);
         await d.audit.record(ctx, { action: "health.record_updated", entity: "health_record", entityId: id, before: cur as never, after: next as never }, tx);
         await afterWrite(ctx, next, farm, tx);
         if (cur.flockId && cur.flockId !== next.flockId) await refreshWithheldEggs(ctx, cur.flockId, tx);
@@ -321,6 +326,7 @@ export function createHealthService(d: HealthDeps) {
         await E.reverseSource(ctx, id, "Health record deleted", farm, tx);
         const now = clock.now();
         const gone = await repos.healthRecords.update(ctx.farmId, id, { deletedAt: now, deletedBy: ctx.userId, updatedAt: now }, { expectedVersion: cur.version }, tx);
+        for (const h of hooks.onCost) await h(ctx, null, id, tx);
         await d.audit.record(ctx, { action: "health.record_deleted", entity: "health_record", entityId: id, before: { title: cur.title, flockId: cur.flockId } }, tx);
         if (cur.flockId) await afterWrite(ctx, { ...cur, ...gone! }, farm, tx);
       });

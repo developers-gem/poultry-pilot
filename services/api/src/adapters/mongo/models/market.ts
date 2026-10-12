@@ -1,4 +1,5 @@
 import {
+  FULFILMENT_METHODS,
   EGG_GRADES,
   LISTING_CATEGORIES,
   LISTING_STATUSES,
@@ -38,14 +39,17 @@ export const MarketListingModel = defineCollection({
   domain: D,
   ownership: "farm",
   description:
-    "Something a farm offers on the marketplace. Seller contact details are not stored here; they are shared only with a buyer who places an order.",
+    "Something a farm offers on the marketplace. quantityAvailable is what is not yet reserved by accepted orders. Seller contact details are never in a listing; a buyer sees them once the seller accepts the order. An optional stock source makes delivery move stock automatically.",
   fields: {
     title: str({ required: true, max: 150 }),
     category: enumOf(LISTING_CATEGORIES, { required: true }),
     product: enumOf(MARKET_PRODUCTS),
     description: text(2000),
+    /** Unreserved quantity, in `unit`. Decreases when an order is accepted, increases if it is cancelled. */
     quantityAvailable: num({ required: true }),
+    minOrderQuantity: num(),
     unit: str({ required: true, max: 20 }),
+    /** Price per `unit`, set by the seller. Orders always use this price. */
     price: money({ required: true }),
     priceUnit: enumOf(PRICE_UNITS, { required: true }),
     regionCode: { type: String, required: true, match: /^[A-Z]{2}(-[A-Z0-9]{1,3})?$/ },
@@ -53,8 +57,12 @@ export const MarketListingModel = defineCollection({
     location: { type: GeoJsonPointSchema },
     availableFrom: localDate(),
     availableUntil: localDate(),
+    fulfilmentOptions: { type: [enumOf(FULFILMENT_METHODS)], required: true, validate: { validator: (v: unknown[]) => v.length >= 1, message: "At least one fulfilment option" } },
     status: enumOf(LISTING_STATUSES, { required: true, default: "draft" }),
-    photos: { type: [str({ max: 1000 })], default: undefined },
+    photos: { type: [ref("MediaAsset")], default: undefined },
+    source: {
+      type: new Schema({ kind: enumOf(["eggs", "chick_lot", "flock"], { required: true }), eggGrade: enumOf(EGG_GRADES), chickLotId: ref("ChickLot"), flockId: ref("Flock") }, { _id: false }),
+    },
   },
   indexes: [
     { fields: { farmId: 1, status: 1 }, why: "Seller's own listings" },
@@ -95,6 +103,30 @@ export const OrderModel = defineCollection({
     listingId: ref("MarketListing"),
     /** A booking against a hatch not yet graded; delivery draws from that batch's chick lot. */
     hatcheryBatchId: ref("HatcheryBatch"),
+    /** Marketplace buyer details, shared with the seller when the order is placed. */
+    buyerName: str({ max: 120 }),
+    buyerPhone: str({ max: 30 }),
+    fulfilment: enumOf(FULFILMENT_METHODS, { required: true, default: "pickup" }),
+    delivery: {
+      type: new Schema(
+        {
+          address: str({ max: 300 }),
+          expectedDate: localDate(),
+          vehicle: str({ max: 60 }),
+          driver: str({ max: 120 }),
+          trackingReference: str({ max: 80 }),
+          dispatchedAt: instant(),
+          deliveredAt: instant(),
+          receivedBy: str({ max: 120 }),
+          proofAssetId: ref("MediaAsset"),
+        },
+        { _id: false },
+      ),
+    },
+    /** The receivable created when the order is accepted. */
+    incomeId: ref("Income"),
+    cancelReason: str({ max: 300 }),
+    cancelledBy: enumOf(["seller", "buyer"]),
     lines: {
       type: [OrderLineSchema],
       required: true,
@@ -145,6 +177,7 @@ export const OrderPaymentModel = defineCollection({
     reference: str({ max: 80 }),
     transactionId: ref("Transaction"),
     reversalOf: ref("OrderPayment"),
+    accountId: ref("MoneyAccount"),
     note: text(500),
   },
   indexes: [{ fields: { farmId: 1, orderId: 1, date: 1 }, why: "Payments of one order (balance, receipt)" }],

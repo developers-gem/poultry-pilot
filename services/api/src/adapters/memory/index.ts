@@ -11,7 +11,7 @@ import type {
   UserRecord,
 } from "../../ports/records.js";
 import type { Repositories, Tx, TxRunner } from "../../ports/repositories.js";
-import type { HatcheryBatchRecord, HatcheryEventRecord, BuyerRecord, OrderRecord, BroodingProfileRecord, ChickArrivalRecord, BrooderCheckRecord, ArticleRecord, MedicineRecord, VaccinationProgrammeRecord, VaccinationRecord, ChecklistTemplateRecord, VisitorRecord, BiosecurityLogRecord, CleaningTaskRecord, EquipmentRecord, EquipmentMovementRecord, TaskRecord, AlertRecord, ChickLotRecord, InventoryItemRecord, InventoryLotRecord, InventoryTransactionRecord, BirdWeightRecord, DailyRecordRecord, EggInventoryRecord, EggRecordRecord, FeedConsumptionRecord, FlockEventRecord, FlockRecord, HealthRecordRecord, HouseRecord, MediaAssetRecord, WaterRecordRecord } from "../../ports/records.js";
+import type { SupplierRecord, MoneyAccountRecord, ExpenseRecord, IncomeRecord, RecurringExpenseRecord, TransactionRecord, MarketListingRecord, OrderPaymentRecord, HatcheryBatchRecord, HatcheryEventRecord, BuyerRecord, OrderRecord, BroodingProfileRecord, ChickArrivalRecord, BrooderCheckRecord, ArticleRecord, MedicineRecord, VaccinationProgrammeRecord, VaccinationRecord, ChecklistTemplateRecord, VisitorRecord, BiosecurityLogRecord, CleaningTaskRecord, EquipmentRecord, EquipmentMovementRecord, TaskRecord, AlertRecord, ChickLotRecord, InventoryItemRecord, InventoryLotRecord, InventoryTransactionRecord, BirdWeightRecord, DailyRecordRecord, EggInventoryRecord, EggRecordRecord, FeedConsumptionRecord, FlockEventRecord, FlockRecord, HealthRecordRecord, HouseRecord, MediaAssetRecord, WaterRecordRecord } from "../../ports/records.js";
 import { createMemFarmRepo } from "./farm-repo.js";
 
 /**
@@ -89,6 +89,14 @@ export interface MemoryStore {
   broodingProfiles: Table<BroodingProfileRecord>;
   chickArrivals: Table<ChickArrivalRecord>;
   brooderChecks: Table<BrooderCheckRecord>;
+  suppliers: Table<SupplierRecord>;
+  moneyAccounts: Table<MoneyAccountRecord>;
+  expenses: Table<ExpenseRecord>;
+  incomes: Table<IncomeRecord>;
+  recurringExpenses: Table<RecurringExpenseRecord>;
+  transactions: Table<TransactionRecord>;
+  listings: Table<MarketListingRecord>;
+  orderPayments: Table<OrderPaymentRecord>;
   counters: Map<string, number>;
 }
 
@@ -139,6 +147,14 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
     broodingProfiles: new Table(),
     chickArrivals: new Table(),
     brooderChecks: new Table(),
+    suppliers: new Table(),
+    moneyAccounts: new Table(),
+    expenses: new Table(),
+    incomes: new Table(),
+    recurringExpenses: new Table(),
+    transactions: new Table(),
+    listings: new Table(),
+    orderPayments: new Table(),
     counters: new Map(),
   };
   const transactional = [
@@ -186,6 +202,14 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
     store.broodingProfiles,
     store.chickArrivals,
     store.brooderChecks,
+    store.suppliers,
+    store.moneyAccounts,
+    store.expenses,
+    store.incomes,
+    store.recurringExpenses,
+    store.transactions,
+    store.listings,
+    store.orderPayments,
   ] as Table<unknown>[];
 
   let depth = 0;
@@ -433,6 +457,36 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
     broodingProfiles: createMemFarmRepo(store.broodingProfiles, { softDelete: true, versioned: true, unique: [["farmId", "name"]] }),
     chickArrivals: createMemFarmRepo(store.chickArrivals, { softDelete: true, versioned: true }),
     brooderChecks: createMemFarmRepo(store.brooderChecks, { softDelete: true, versioned: true }),
+    suppliers: createMemFarmRepo(store.suppliers, { softDelete: true, versioned: true }),
+    moneyAccounts: createMemFarmRepo(store.moneyAccounts, { softDelete: true, versioned: true, unique: [["farmId", "name"]] }),
+    expenses: createMemFarmRepo(store.expenses, { softDelete: true, versioned: true }),
+    incomes: createMemFarmRepo(store.incomes, { softDelete: true, versioned: true }),
+    recurringExpenses: createMemFarmRepo(store.recurringExpenses, { softDelete: true, versioned: true }),
+    transactions: createMemFarmRepo(store.transactions, { softDelete: false, versioned: false }),
+    listings: createMemFarmRepo(store.listings, { softDelete: true, versioned: true }),
+    orderPayments: createMemFarmRepo(store.orderPayments, { softDelete: false, versioned: false }),
+    market: {
+      async activeListings(q) {
+        const t = q.text?.toLowerCase();
+        return store.listings
+          .all()
+          .filter((l) => !l.deletedAt && l.status === "active" && (!q.category || l.category === q.category) && (!q.regionCode || l.regionCode === q.regionCode || l.regionCode.startsWith(`${q.regionCode}-`)) && (!t || l.title.toLowerCase().includes(t)))
+          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+          .slice(0, q.limit)
+          .map((l) => structuredClone(l));
+      },
+      async listingById(id) {
+        const l = store.listings.get(id);
+        return l && !l.deletedAt ? structuredClone(l) : null;
+      },
+      async orderById(id) {
+        const o = store.orders.get(id);
+        return o && !o.deletedAt ? structuredClone(o) : null;
+      },
+      async ordersForBuyer(userId) {
+        return store.orders.all().filter((o) => o.buyerUserId === userId && !o.deletedAt).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).map((o) => structuredClone(o));
+      },
+    },
     counters: {
       async next(name, farmId) {
         const key = `${name}:${farmId}`;

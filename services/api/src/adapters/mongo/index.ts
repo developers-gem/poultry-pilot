@@ -11,6 +11,8 @@ import type {
   SessionRecord,
   SyncChangeRecord,
   ArticleRecord,
+  MarketListingRecord,
+  OrderRecord,
   UserRecord,
 } from "../../ports/records.js";
 import type { Repositories, Tx } from "../../ports/repositories.js";
@@ -60,6 +62,14 @@ import {
   BroodingProfileModel,
   ChickArrivalModel,
   BrooderCheckModel,
+  SupplierModel,
+  MoneyAccountModel,
+  ExpenseModel,
+  IncomeModel,
+  RecurringExpenseModel,
+  TransactionModel,
+  MarketListingModel,
+  OrderPaymentModel,
 } from "./models/index.js";
 import { createMongoFarmRepo } from "./farm-repo.js";
 
@@ -313,6 +323,37 @@ export function createMongoRepositories(connection = mongoose.connection): Repos
     broodingProfiles: createMongoFarmRepo(BroodingProfileModel, { softDelete: true, versioned: true }),
     chickArrivals: createMongoFarmRepo(ChickArrivalModel, { softDelete: true, versioned: true }),
     brooderChecks: createMongoFarmRepo(BrooderCheckModel, { softDelete: true, versioned: true }),
+    suppliers: createMongoFarmRepo(SupplierModel, { softDelete: true, versioned: true }),
+    moneyAccounts: createMongoFarmRepo(MoneyAccountModel, { softDelete: true, versioned: true }),
+    expenses: createMongoFarmRepo(ExpenseModel, { softDelete: true, versioned: true }),
+    incomes: createMongoFarmRepo(IncomeModel, { softDelete: true, versioned: true }),
+    recurringExpenses: createMongoFarmRepo(RecurringExpenseModel, { softDelete: true, versioned: true }),
+    transactions: createMongoFarmRepo(TransactionModel, { softDelete: false, versioned: false }),
+    listings: createMongoFarmRepo(MarketListingModel, { softDelete: true, versioned: true }),
+    orderPayments: createMongoFarmRepo(OrderPaymentModel, { softDelete: false, versioned: false }),
+    // Cross-farm by design (marketplace browse and buyer views); callers check what each user may see.
+    market: {
+      async activeListings(q) {
+        const filter: Record<string, unknown> = { status: "active", deletedAt: null };
+        if (q.category) filter["category"] = q.category;
+        if (q.regionCode) filter["regionCode"] = { $in: [q.regionCode, new RegExp(`^${q.regionCode.replace(/[^A-Z0-9-]/g, "")}-`)] };
+        if (q.text) filter["title"] = { $regex: q.text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" };
+        const docs = await MarketListingModel.find(filter).setOptions({ crossFarm: true } as never).sort({ createdAt: -1 }).limit(q.limit).lean();
+        return docs.map((d) => fromDoc<MarketListingRecord>(d));
+      },
+      async listingById(id) {
+        const d = await MarketListingModel.findOne({ _id: id, deletedAt: null }).setOptions({ crossFarm: true } as never).lean();
+        return d ? fromDoc<MarketListingRecord>(d) : null;
+      },
+      async orderById(id) {
+        const d = await OrderModel.findOne({ _id: id, deletedAt: null }).setOptions({ crossFarm: true } as never).lean();
+        return d ? fromDoc<OrderRecord>(d) : null;
+      },
+      async ordersForBuyer(userId) {
+        const docs = await OrderModel.find({ buyerUserId: userId, deletedAt: null }).setOptions({ crossFarm: true } as never).sort({ createdAt: -1 }).limit(500).lean();
+        return docs.map((d) => fromDoc<OrderRecord>(d));
+      },
+    },
     counters: {
       async next(name, farmId, tx) {
         const at = new Date();

@@ -82,11 +82,16 @@ export function toLedger(e: FlockEventRecord): LedgerEvent {
 export interface FlockHooks {
   beforeBirdsLeave: ((ctx: FarmContext, flock: FlockRecord, date: string, purpose: "sale" | "move", tx: Tx) => Promise<void>)[];
   extraCostMinor: ((ctx: FarmContext, flockId: string, asOf: string) => Promise<number>)[];
+  extraIncomeMinor: ((ctx: FarmContext, flockId: string, asOf: string) => Promise<number>)[];
+  /** Finance: a sale becomes a receivable (unless an order carries it). */
+  afterSale: ((ctx: FarmContext, flock: FlockRecord, event: FlockEventRecord, tx: Tx) => Promise<void>)[];
+  /** Finance: reversing a sale cancels its receivable, or refuses if it was already paid. */
+  onSaleReversed: ((ctx: FarmContext, saleEventId: string, tx: Tx) => Promise<void>)[];
 }
 
 export function createFlockService(d: FlockDeps) {
   const { repos, clock } = d;
-  const hooks: FlockHooks = { beforeBirdsLeave: [], extraCostMinor: [] };
+  const hooks: FlockHooks = { beforeBirdsLeave: [], extraCostMinor: [], extraIncomeMinor: [], afterSale: [], onSaleReversed: [] };
   const birdsLeave = async (ctx: FarmContext, flock: FlockRecord, date: string, purpose: "sale" | "move", tx: Tx) => {
     for (const h of hooks.beforeBirdsLeave) await h(ctx, flock, date, purpose, tx);
   };
@@ -254,6 +259,8 @@ export function createFlockService(d: FlockDeps) {
     const eggs = await repos.eggRecords.aggregate(ctx.farmId, { where: { flockId: flock.id }, range: { field: "date", to: date } }, ["flockId"], ["collected"]);
     let otherCostMinor = 0;
     for (const h of hooks.extraCostMinor) otherCostMinor += await h(ctx, flock.id, date);
+    let otherIncomeMinor = 0;
+    for (const h of hooks.extraIncomeMinor) otherIncomeMinor += await h(ctx, flock.id, date);
     const m = computeFlockMetrics({
       ...(flock.placementDate ? { placementDate: flock.placementDate } : {}),
       ...(flock.hatchDate ? { hatchDate: flock.hatchDate } : {}),
@@ -263,6 +270,7 @@ export function createFlockService(d: FlockDeps) {
       feed: feed.map((f) => ({ date: f.date, quantityKg: f.quantityKg, kind: f.kind ?? "consumption", ...(f.cost ? { costMinor: f.cost.amountMinor } : {}) })),
       eggsCollected: eggs[0]?.sums["collected"] ?? 0,
       otherCostMinor,
+      otherIncomeMinor,
       asOf: date,
       includeMortalityWeight: farm.settings.fcrIncludesMortalityWeight,
       referencePricePerKgMinor: referencePricePerKgMinor ?? null,
@@ -597,7 +605,8 @@ export function createFlockService(d: FlockDeps) {
       });
     },
 
-    async sell(ctx: FarmContext, flockId: string, r: SaleRequest) {
+    /** `opts.orderId` links the sale to an order that carries the income, so no separate receivable is made. */
+    async sell(ctx: FarmContext, flockId: string, r: SaleRequest, opts: { orderId?: string } = {}) {
       assertCan(ctx, "flock.sell");
       return onFlock(ctx, flockId, async ({ farm, flock, events, tx }) => {
         assertStatus(flock, ["active"], "sell birds");
@@ -612,9 +621,10 @@ export function createFlockService(d: FlockDeps) {
         const totalMinor = r.total ? r.total.amountMinor : r.pricePerKg ? r.pricePerKg.amountMinor * r.totalLiveWeightKg! : r.pricePerBird!.amountMinor * r.birds;
         const out = await appendEvents(
           ctx, flock, events,
-          [{ type: "sale", date: r.date, birds: r.birds, total: money(totalMinor, farm.settings.currency), ...(weight !== undefined ? { totalLiveWeightKg: weight } : {}), ...(r.notes ? { note: r.notes } : {}) }],
+          [{ type: "sale", date: r.date, birds: r.birds, total: money(totalMinor, farm.settings.currency), ...(weight !== undefined ? { totalLiveWeightKg: weight } : {}), ...(opts.orderId ? { orderId: opts.orderId } : {}), ...(r.notes ? { note: r.notes } : {}) }],
           {}, farm, tx, "flock.sold",
         );
+        for (const h of hooks.afterSale) await h(ctx, out.flock, out.events[0]!, tx);
         return toEventView(out.events[0]!, new Set());
       });
     },
@@ -683,6 +693,8 @@ export function createFlockService(d: FlockDeps) {
           throw new DomainError("INVALID_STATE_TRANSITION", `A ${target.type.replace("_", " ")} cannot be reversed here; record the opposite movement instead`);
         }
         if (target.dailyRecordId) throw new DomainError("INVALID_STATE_TRANSITION", "This entry belongs to a daily record; edit the daily record instead");
+        if (target.type === "sale" && target.orderId) throw new DomainError("INVALID_STATE_TRANSITION", "This sale belongs to an order; cancel or refund the order instead");
+        if (target.type === "sale") for (const h of hooks.onSaleReversed) await h(ctx, target.id, tx);
         const out = await appendEvents(
           ctx, flock, events,
           [{ type: target.type, date: target.date, reversalOf: target.id, reason, ...(target.birds !== undefined ? { birds: target.birds } : {}) }],
