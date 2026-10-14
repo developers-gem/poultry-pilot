@@ -168,3 +168,15 @@ Each is cheap to change until the phase named.
 | D99 | Reports | One format-neutral document per report, rendered to PDF, CSV or Excel from live data; each report needs its permission (route and service), money and stock sections omitted with a note for people without that access; every export audited |
 | D100 | Spreadsheet safety | Text cells starting with = + - @ tab or CR are prefixed with an apostrophe in CSV and Excel |
 | D101 | Seed content | Seed articles' reviewed wording and sources are carried forward verbatim across model changes |
+
+## Added with the web migration
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| D102 | Prototype identity | Palette, fonts, radius, prism glass and edge, layouts and navigation kept; darker same-hue shades for text only (contrast) |
+| D103 | No browser-side data logic | Every figure from the API; every write through it; no Supabase, no third-party calls from the browser (tested) |
+| D104 | No hard-coded content | Learn pages show editor-published content only; News prices are live listing medians, labelled as asking prices |
+| D105 | Partial day updates | `PATCH` of a day's record changes only the sections sent (server rebuilds the rest), so per-screen entry never erases other data |
+| D106 | Session in the browser | Access token in memory; refresh token in localStorage with rotation and reuse detection; cross-tab refresh lock (Web Locks) |
+| D107 | Overlays | Menus and dialogs are near-opaque and portalled to the page root (glass overlays were unreadable; backdrop-filter traps fixed layers) |
+| D108 | Routes load on demand | One chunk per screen, prefetched on hover |

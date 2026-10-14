@@ -1,4 +1,4 @@
-import { Id } from "@poultrypilot/validation";
+import { Id, UpdateProfileRequest } from "@poultrypilot/validation";
 import { Router } from "express";
 import { z } from "zod";
 import type { AuthService } from "../../services/auth.service.js";
@@ -10,6 +10,9 @@ export function meRoutes(auth: AuthService): Router {
   const r = Router();
   r.get("/", async (req, res) => {
     res.json(await auth.me(req.auth!));
+  });
+  r.put("/", validate("body", UpdateProfileRequest), async (req, res) => {
+    res.json(await auth.updateProfile(req.auth!, req.body));
   });
   r.get("/sessions", async (req, res) => {
     res.json({ items: await auth.listSessions(req.auth!) });

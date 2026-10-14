@@ -103,6 +103,9 @@ export const CreateDailyRecordRequest = DailyRecordFields.extend({ id: Id.option
 export const UpdateDailyRecordRequest = DailyRecordFields.extend({ version: z.number().int().nonnegative() }).strict().refine(tempOrder, tempMsg).refine(waterNeedsLitres, waterMsg);
 
 /** PUT /farms/:farmId/flocks/:flockId/daily-records/:date — create or replace by flock and date (offline-friendly). */
+/** PATCH by flock and date: only the sections given are changed. `version` is required when a record exists. */
+export const PatchDailyRecordRequest = DailyRecordFields.partial().extend({ version: z.number().int().nonnegative().optional() }).strict();
+
 export const UpsertDailyRecordRequest = DailyRecordFields.extend({ version: z.number().int().nonnegative().optional() }).strict().refine(tempOrder, tempMsg).refine(waterNeedsLitres, waterMsg);
 
 export const DailyRecordListQuery = z.object({

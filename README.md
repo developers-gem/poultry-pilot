@@ -176,3 +176,12 @@ Fourteen configurable alert rules (mortality, egg production, feed, water, weigh
 ## Knowledge and reports
 
 Training courses with lessons and personal progress, facts, news, a glossary, disease information and management guides, filtered by region. Externally sourced articles carry source, link, date, region, category and author, and pass an editorial review before readers see them; news is imported from feeds for review and reaches the apps only through the API. Nine farm reports (farm, flock, egg, feed, health, hatchery, biosecurity, financial, marketplace) are generated on the server from live data as PDF, CSV or Excel, each behind its own permission. Details: `docs/knowledge-reports.md`.
+
+## Web app
+
+The Lovable prototype rebuilt on the REST API (`apps/web`): all 21 signed-in screens at the same paths with the prototype's look (glass panels, rainbow edge, palette, Space Grotesk and Inter, layouts, navigation), no Supabase, no hard-coded data, every figure and every write through the API. Loading, empty, error and offline states throughout; responsive from phone to desktop; each screen loads on demand. Verified in Chromium at three widths against the real API (`apps/web/e2e`). Details: `docs/web-migration.md`.
+
+```bash
+pnpm dev:api                 # API on :4000
+pnpm dev:web                 # web on :5173 (proxies /api)
+```

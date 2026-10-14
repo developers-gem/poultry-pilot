@@ -667,6 +667,30 @@ export function createFlockService(d: FlockDeps) {
       });
     },
 
+    /** Weigh-ins, newest first: average and sample size, plus min, max, CV and uniformity when birds were weighed one by one. */
+    async weighings(ctx: FarmContext, flockId: string) {
+      assertCan(ctx, "production.read");
+      const flock = await loadFlock(ctx, flockId);
+      const events = await loadEvents(ctx, flock.id);
+      const live = new Set(effectiveEvents(events.map(toLedger)).map((e) => e.id));
+      const sessions = await repos.birdWeights.find(ctx.farmId, { where: { flockId: flock.id } });
+      const byId = new Map(sessions.map((s) => [s.id, s]));
+      return events
+        .filter((e) => e.type === "weighing" && live.has(e.id))
+        .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.createdAt.getTime() - a.createdAt.getTime()))
+        .map((e) => {
+          const s = e.birdWeightId ? byId.get(e.birdWeightId) : undefined;
+          return {
+            eventId: e.id,
+            date: e.date,
+            averageWeightG: e.averageWeightG ?? null,
+            sampleSize: e.sampleSize ?? null,
+            ...(s?.stats ? { stats: { minG: s.stats.minG, maxG: s.stats.maxG, sdG: Math.round(s.stats.sdG * 10) / 10, cvPercent: Math.round(s.stats.cvPercent * 10) / 10, uniformityPercent: Math.round(s.stats.uniformityPercent * 10) / 10 } } : {}),
+            note: e.note ?? null,
+          };
+        });
+    },
+
     async close(ctx: FarmContext, flockId: string, r: CloseFlockRequest) {
       assertCan(ctx, "flock.manage");
       return onFlock(ctx, flockId, async ({ farm, flock, events, tx }) => {

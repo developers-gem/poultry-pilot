@@ -466,6 +466,16 @@ post("/farms/invitations/accept", "Accept an emailed farm invitation", bodyOf(S.
   });
 }
 
+// ---- Added for the web app -----------------------------------------------------------
+{
+  const any = z.record(z.unknown());
+  const r = (method: "get" | "put" | "patch", path: string, tag: string, summary: string, params: z.AnyZodObject, request: Record<string, unknown>, ok: Record<string, unknown>) =>
+    registry.registerPath({ method, path: `${API_PREFIX}${path}`, tags: [tag], summary, security: secured, request: { params, ...request }, responses: { ...ok, ...errors } } as never);
+  r("patch", "/farms/{farmId}/flocks/{flockId}/daily-records/{date}", "Daily records", "Change only the sections sent (e.g. eggs) and keep the rest of the day as recorded; version required once the record exists", z.object({ farmId: V.Id, flockId: V.Id, date: V.LocalDate }), bodyOf(V.PatchDailyRecordRequest), { 200: json(any, "The day's record"), 409: json(S.ErrorEnvelope, "Changed by someone else") });
+  r("get", "/farms/{farmId}/flocks/{flockId}/weighings", "Flocks", "Weigh-ins, newest first, with min, max, CV and uniformity when birds were weighed one by one", z.object({ farmId: V.Id, flockId: V.Id }), {}, { 200: json(z.object({ items: z.array(any) }), "Weigh-ins") });
+  r("put", "/me", "Account", "Update your own name and phone", z.object({}), bodyOf(V.UpdateProfileRequest), { 200: json(any, "Your account") });
+}
+
 // ---- sync -----------------------------------------------------------------
 registry.registerPath({
   method: "get",

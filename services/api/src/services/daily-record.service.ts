@@ -373,6 +373,42 @@ export function createDailyRecordService(d: DailyRecordDeps) {
     updatedAt: r.updatedAt.toISOString(),
   });
 
+  /** What this record itself wrote, in request form (entries linked to it by dailyRecordId). */
+  async function ownFields(ctx: FarmContext, record: DailyRecordRecord | null, tx: Tx): Promise<Fields> {
+    const none: Fields = { mortality: [], culls: 0, feed: [], healthObservations: [], photos: [] };
+    if (!record) return none;
+    const [events, feed, water, eggs, obs] = await Promise.all([
+      L.loadEvents(ctx, record.flockId, tx),
+      repos.feedConsumption.find(ctx.farmId, { where: { dailyRecordId: record.id } }, tx),
+      repos.waterRecords.find(ctx.farmId, { where: { dailyRecordId: record.id }, limit: 1 }, tx),
+      repos.eggRecords.find(ctx.farmId, { where: { dailyRecordId: record.id }, limit: 1 }, tx),
+      repos.healthRecords.find(ctx.farmId, { where: { dailyRecordId: record.id } }, tx),
+    ]);
+    const live = new Set(effectiveEvents(events.map(toLedger)).map((e) => e.id));
+    const mine = events.filter((e) => e.dailyRecordId === record.id && live.has(e.id));
+    const weighing = mine.find((e) => e.type === "weighing");
+    const w = water[0];
+    const egg = eggs[0];
+    const defined = <T extends object>(o: T) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T;
+    return {
+      ...defined({ observedBirdCount: record.observedBirdCount, temperatureMinC: record.temperatureMinC, temperatureMaxC: record.temperatureMaxC, humidityPercent: record.humidityPercent, lightingHours: record.lightingHours, notes: record.notes }),
+      mortality: mine.filter((e) => e.type === "mortality").map((e) => ({ cause: e.cause ?? "unknown", count: e.birds ?? 0 })),
+      culls: mine.filter((e) => e.type === "cull").reduce((t, e) => t + (e.birds ?? 0), 0),
+      feed: feed.map((x) => ({
+        quantityKg: x.quantityKg,
+        kind: x.kind ?? "consumption",
+        ...(x.feedItemId ? { feedItemId: x.feedItemId } : {}),
+        // Untracked feed keeps its price (per kg), so the line compares equal and is not rewritten.
+        ...(!x.feedItemId && x.cost ? { unitCostPerKg: { amountMinor: x.cost.amountMinor / x.quantityKg, currency: x.cost.currency } } : {}),
+      })),
+      ...(w ? { waterLitres: w.litres, ...(w.source || w.ph !== undefined || w.tdsPpm !== undefined || w.chlorinePpm !== undefined || w.qualityRating || w.treatment ? { waterQuality: defined({ source: w.source, ph: w.ph, tdsPpm: w.tdsPpm, chlorinePpm: w.chlorinePpm, qualityRating: w.qualityRating, treatment: w.treatment, treatmentNotes: w.treatmentNotes }) } : {}) } : {}),
+      ...(egg ? { eggs: defined({ collected: egg.collected, broken: egg.broken, byGrade: egg.byGrade as Record<string, number> | undefined, averageEggWeightG: egg.averageEggWeightG, qualityNotes: egg.qualityNotes }) } : {}),
+      ...(weighing?.averageWeightG ? { averageWeight: defined({ averageWeightG: weighing.averageWeightG, sampleSize: weighing.sampleSize }) } : {}),
+      healthObservations: obs.map((o) => defined({ signs: o.observedSigns ?? o.title, affectedBirds: o.affectedBirds })),
+      photos: record.photos ?? [],
+    } as Fields;
+  }
+
   async function fullView(ctx: FarmContext, flock: FlockRecord, date: string, record: DailyRecordRecord | null, tx?: Tx): Promise<DailyRecordView> {
     const [events, feed, waterList, eggList, obs] = await Promise.all([
       L.loadEvents(ctx, flock.id, tx),
@@ -517,6 +553,29 @@ export function createDailyRecordService(d: DailyRecordDeps) {
         const { version: _v, ...fields } = body;
         const record = await writeDay(ctx, farm, flock, existing.date, fields, existing, undefined, tx);
         return opts.minimal ? minimal(record) : fullView(ctx, flock, existing.date, record, tx);
+      });
+    },
+
+    /**
+     * Changes only the sections given and keeps the rest of the day as recorded: e.g. eggs entered on the egg screen
+     * do not erase the feed and deaths entered earlier. The record's own entries are rebuilt from their sources
+     * (linked by dailyRecordId), so entries made outside the record are never copied into it.
+     */
+    async patchByFlockDate(ctx: FarmContext, flockId: string, date: string, body: Partial<Fields> & { version?: number }) {
+      assertCan(ctx, "production.record");
+      return repos.tx.run(async (tx) => {
+        const farm = await L.farmOf(ctx, tx);
+        const flock = await L.loadFlock(ctx, flockId, tx);
+        const existing = (await repos.dailyRecords.find(ctx.farmId, { where: { flockId, date }, limit: 1 }, tx))[0] ?? null;
+        assertMayWrite(ctx, farm, date, existing, existing ? "edit" : "record");
+        if (existing && (body.version === undefined || body.version !== existing.version)) {
+          throw new AppError("VERSION_CONFLICT", "This day's record was changed by someone else. Reload it first.", { serverVersion: existing.version });
+        }
+        const { version: _v, ...partial } = body;
+        const current = await ownFields(ctx, existing, tx);
+        const merged = { ...current, ...Object.fromEntries(Object.entries(partial).filter(([, v]) => v !== undefined)) } as Fields;
+        const record = await writeDay(ctx, farm, flock, date, merged, existing, undefined, tx);
+        return fullView(ctx, flock, date, record, tx);
       });
     },
 

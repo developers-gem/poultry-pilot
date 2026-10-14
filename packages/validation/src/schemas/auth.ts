@@ -44,6 +44,9 @@ export const LogoutRequest = z.object({ refreshToken: Token.optional() });
 export const VerifyEmailRequest = z.object({ token: Token });
 export const ForgotPasswordRequest = z.object({ email: Email });
 export const ResetPasswordRequest = z.object({ token: Token, newPassword: Password });
+/** PUT /me: the signed-in person's own name and phone. */
+export const UpdateProfileRequest = z.object({ fullName: NonEmptyText(120), phone: z.string().trim().max(30).optional() }).strict();
+
 export const ChangePasswordRequest = z.object({ currentPassword: z.string().min(1).max(200), newPassword: Password });
 
 export const TokenPair = z.object({
@@ -58,6 +61,9 @@ export const UserView = z.object({
   id: z.string(),
   email: z.string(),
   fullName: z.string(),
+  phone: z.string().optional(),
+  /** PoultryPilot staff roles (content editing); empty for everyone else. */
+  platformRoles: z.array(z.string()),
   emailVerified: z.boolean(),
   hasPassword: z.boolean(),
   googleLinked: z.boolean(),

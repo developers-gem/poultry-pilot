@@ -1,3 +1,4 @@
+import { getAccessToken, getRefreshToken, setTokens } from "./session";
 import { API_PREFIX } from "@poultrypilot/constants";
 import type { ErrorEnvelope } from "@poultrypilot/types";
 
@@ -60,4 +61,90 @@ export async function apiRequest<T>(
     envelope?.requestId ?? res.headers.get("x-request-id") ?? undefined,
     envelope?.details,
   );
+}
+
+// ---- signed-in requests -------------------------------------------------------------------
+
+
+let refreshing: Promise<boolean> | null = null;
+let onSignedOut: (() => void) | null = null;
+
+/** Called once by the auth provider: what to do when the session can no longer be refreshed. */
+export function setSignedOutHandler(fn: () => void): void {
+  onSignedOut = fn;
+}
+
+/** Runs `fn` while holding a lock shared by every tab of this site, where the browser supports Web Locks. */
+async function withTabLock<T>(fn: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator !== "undefined" ? (navigator as Navigator & { locks?: { request(name: string, cb: () => Promise<T>): Promise<T> } }).locks : undefined;
+  return locks ? locks.request("poultrypilot-refresh", fn) : fn();
+}
+
+/**
+ * Exchanges the refresh token for new tokens. Concurrent callers in this tab share one refresh, and tabs take turns
+ * (Web Locks), each reading the latest token inside the lock: two tabs opened together must never spend the same
+ * refresh token, which the API treats as theft and answers by revoking the session.
+ */
+export function refreshSession(fetchImpl: typeof fetch = fetch): Promise<boolean> {
+  if (refreshing) return refreshing;
+  if (!getRefreshToken()) return Promise.resolve(false);
+  refreshing = withTabLock(async () => {
+    const token = getRefreshToken();
+    if (!token) throw new ApiError("UNAUTHENTICATED", "Signed out", 401);
+    return apiRequest<{ accessToken: string; refreshToken: string }>("/auth/refresh", { method: "POST", body: JSON.stringify({ refreshToken: token }) }, fetchImpl);
+  })
+    .then((r) => {
+      setTokens(r.data);
+      return true;
+    })
+    .catch((e: unknown) => {
+      // A network failure is not a sign-out: keep the refresh token for when the connection returns.
+      if (e instanceof ApiError && e.status !== 0) setTokens(null);
+      return false;
+    })
+    .finally(() => {
+      refreshing = null;
+    });
+  return refreshing;
+}
+
+/**
+ * An API call as the signed-in person: adds the bearer token, refreshes once on an expired token and retries.
+ * If the session cannot be refreshed, the person is signed out.
+ */
+export async function authedRequest<T>(path: string, init: Parameters<typeof apiRequest>[1] = {}, fetchImpl: typeof fetch = fetch): Promise<T> {
+  const withToken = () => {
+    const token = getAccessToken();
+    return { ...init, headers: { ...(init.headers as Record<string, string> | undefined), ...(token ? { Authorization: `Bearer ${token}` } : {}) } };
+  };
+  try {
+    if (!getAccessToken() && getRefreshToken()) await refreshSession(fetchImpl);
+    return (await apiRequest<T>(path, withToken(), fetchImpl)).data;
+  } catch (e) {
+    if (!(e instanceof ApiError) || e.status !== 401) throw e;
+    if (await refreshSession(fetchImpl)) return (await apiRequest<T>(path, withToken(), fetchImpl)).data;
+    setTokens(null);
+    onSignedOut?.();
+    throw e;
+  }
+}
+
+/** Downloads a file the API generates (reports, calendar), as the signed-in person. */
+export async function downloadFile(path: string, fallbackName: string, fetchImpl: typeof fetch = fetch): Promise<void> {
+  const go = async () => fetchImpl(`${apiBaseUrl()}${API_PREFIX}${path}`, { headers: getAccessToken() ? { Authorization: `Bearer ${getAccessToken()}` } : {} });
+  let res = await go();
+  if (res.status === 401 && (await refreshSession(fetchImpl))) res = await go();
+  if (!res.ok) {
+    const body = (await res.json().catch(() => undefined)) as Partial<ErrorEnvelope> | undefined;
+    throw new ApiError(body?.error?.code ?? "HTTP_ERROR", body?.error?.message ?? `Download failed (${res.status})`, res.status);
+  }
+  const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") ?? "")?.[1] ?? fallbackName;
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }

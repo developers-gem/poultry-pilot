@@ -429,6 +429,12 @@ export function createAuthService(d: AuthDeps) {
       return { otherSessionsSignedOut: count };
     },
 
+    async updateProfile(principal: AuthenticatedPrincipal, r: { fullName: string; phone?: string }) {
+      await activeUser(principal.userId);
+      await repos.users.update(principal.userId, { fullName: r.fullName, phone: r.phone || undefined, updatedAt: clock.now() });
+      return this.me(principal);
+    },
+
     async me(principal: AuthenticatedPrincipal): Promise<MeResponse> {
       const user = await activeUser(principal.userId);
       const memberships = await repos.memberships.findActiveForUser(user.id);

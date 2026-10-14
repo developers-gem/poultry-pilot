@@ -8,6 +8,8 @@ export const toUserView = (u: UserRecord): UserView => ({
   id: u.id,
   email: u.email,
   fullName: u.fullName,
+  ...(u.phone ? { phone: u.phone } : {}),
+  platformRoles: u.platformRoles ?? [],
   emailVerified: u.emailVerified,
   hasPassword: !!u.passwordHash,
   googleLinked: !!u.googleSub,

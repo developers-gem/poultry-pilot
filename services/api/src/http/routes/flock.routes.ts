@@ -17,6 +17,7 @@ import {
   SplitRequest,
   TransferRequest,
   UpsertDailyRecordRequest,
+  PatchDailyRecordRequest,
   WeighingRequest,
 } from "@poultrypilot/validation";
 import type { Action } from "@poultrypilot/constants";
@@ -92,6 +93,7 @@ export function flockRoutes(flocks: FlockService, farms: FarmService, repos: Rep
   r.post("/:flockId/adjustments", ...flock("production.edit_any"), validate("body", AdjustmentRequest), async (req, res) => {
     res.status(201).json(await flocks.adjust(req.farmCtx!, fid(req), req.body));
   });
+  r.get("/:flockId/weighings", ...flock("production.read"), async (req, res) => res.json({ items: await flocks.weighings(req.farmCtx!, req.params["flockId"] as string) }));
   r.post("/:flockId/weighings", ...flock("production.record"), validate("body", WeighingRequest), async (req, res) => {
     res.status(201).json(await flocks.weigh(req.farmCtx!, fid(req), req.body));
   });
@@ -110,6 +112,10 @@ export function flockRoutes(flocks: FlockService, farms: FarmService, repos: Rep
   r.get("/:flockId/daily-records/:date", ...flock("production.read", { date: LocalDate }), async (req, res) => {
     res.json(await daily.getByFlockDate(req.farmCtx!, fid(req), req.params["date"] as string));
   });
+  // Only the sections sent are changed; the rest of the day stays as recorded.
+  r.patch("/:flockId/daily-records/:date", ...flock("production.record", { date: LocalDate }), validate("body", PatchDailyRecordRequest), async (req, res) =>
+    res.json(await daily.patchByFlockDate(req.farmCtx!, req.params["flockId"] as string, req.params["date"] as string, req.body)),
+  );
   r.put("/:flockId/daily-records/:date", ...flock("production.record", { date: LocalDate }), validate("body", UpsertDailyRecordRequest), async (req, res) => {
     const minimal = /\breturn=minimal\b/i.test(req.header("prefer") ?? "");
     res.json(await daily.upsertByFlockDate(req.farmCtx!, fid(req), req.params["date"] as string, req.body, { minimal }));
