@@ -1,0 +1,6 @@
+{
+  "pushEnabled": true,
+  "emailEnabled": true,
+  "pushMinSeverity": "warning",
+  "emailMinSeverity": "warning"
+}

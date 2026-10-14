@@ -1,0 +1,19 @@
+{
+  "user": {
+    "id": "01a139e3-6e6d-7545-8bd0-a940f4ffe2ec",
+    "email": "asha@example.com",
+    "fullName": "Asha Verma",
+    "platformRoles": [],
+    "emailVerified": false,
+    "hasPassword": true,
+    "googleLinked": false,
+    "createdAt": "2026-10-14T10:09:28.685Z"
+  },
+  "tokens": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzaWQiOiIwMWExMzllMy02ZTdkLTc3OTgtOWRmMy03ZDkwZDViOTVhYWMiLCJzdWIiOiIwMWExMzllMy02ZTZkLTc1NDUtOGJkMC1hOTQwZjRmZmUyZWMiLCJqdGkiOiIwMWExMzllMy02ZTdkLTc3OTgtOWRmMy04NmEzNmI4NGUwMjciLCJpc3MiOiJwb3VsdHJ5cGlsb3QtdGVzdCIsImF1ZCI6InBvdWx0cnlwaWxvdCIsImlhdCI6MTc5MTk3MjU2OCwiZXhwIjoxNzkxOTczNDY4fQ.u7NfxP2yL-pz8U1_1ZqWEm5vUAhnOdDt3PaQZhkwtOw",
+    "accessTokenExpiresAt": "2026-10-14T10:24:28.000Z",
+    "refreshToken": "EM-sN7bIbxk5och38WZm67o-XfGhJEPgKx9_JEQASfI",
+    "refreshTokenExpiresAt": "2026-11-13T10:09:28.701Z",
+    "sessionId": "01a139e3-6e7d-7798-9df3-7d90d5b95aac"
+  }
+}

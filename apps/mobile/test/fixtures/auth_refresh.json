@@ -1,0 +1,7 @@
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzaWQiOiIwMWExMzllMy02ZTdkLTc3OTgtOWRmMy03ZDkwZDViOTVhYWMiLCJzdWIiOiIwMWExMzllMy02ZTZkLTc1NDUtOGJkMC1hOTQwZjRmZmUyZWMiLCJqdGkiOiIwMWExMzllMy02ZTgyLTc3NWMtOTgzNS1jMzZhOTNjOWQ0YTEiLCJpc3MiOiJwb3VsdHJ5cGlsb3QtdGVzdCIsImF1ZCI6InBvdWx0cnlwaWxvdCIsImlhdCI6MTc5MTk3MjU2OCwiZXhwIjoxNzkxOTczNDY4fQ.x5ftm61A7PNqggCuStMMZOBo6AM9TRKQrIC_QKqX42k",
+  "accessTokenExpiresAt": "2026-10-14T10:24:28.000Z",
+  "refreshToken": "ZcabCcZhRndgg6ejo4itDjsF5HkYa1Zv4wkIkcQ03fc",
+  "refreshTokenExpiresAt": "2026-11-13T10:09:28.707Z",
+  "sessionId": "01a139e3-6e7d-7798-9df3-7d90d5b95aac"
+}

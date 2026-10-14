@@ -1,0 +1,72 @@
+{
+  "user": {
+    "id": "01a139e3-6e6d-7545-8bd0-a940f4ffe2ec",
+    "email": "asha@example.com",
+    "fullName": "Asha Verma",
+    "platformRoles": [],
+    "emailVerified": false,
+    "hasPassword": true,
+    "googleLinked": false,
+    "createdAt": "2026-10-14T10:09:28.685Z"
+  },
+  "farm": {
+    "id": "01a139e3-6e6e-7611-becc-e9ab7af39fbc",
+    "name": "Green Valley Poultry",
+    "settings": {
+      "timezone": "Asia/Kolkata",
+      "currency": "INR",
+      "unitSystem": "metric",
+      "fcrIncludesMortalityWeight": false,
+      "workerEditWindowDays": 1
+    },
+    "version": 0,
+    "createdAt": "2026-10-14T10:09:28.686Z",
+    "updatedAt": "2026-10-14T10:09:28.686Z",
+    "myRole": "owner",
+    "myPermissions": [
+      "farm.read",
+      "farm.update_settings",
+      "farm.delete",
+      "member.read",
+      "member.invite",
+      "member.change_role",
+      "member.remove",
+      "audit.read",
+      "production.read",
+      "production.record",
+      "production.edit_own_recent",
+      "production.edit_any",
+      "production.delete",
+      "flock.manage",
+      "flock.sell",
+      "health.read",
+      "health.record_observation",
+      "health.manage",
+      "health.vaccinate",
+      "biosecurity.read",
+      "biosecurity.record",
+      "biosecurity.manage",
+      "money.read",
+      "money.record",
+      "money.delete",
+      "market.read",
+      "market.manage",
+      "payment.record",
+      "hatchery.read",
+      "hatchery.record",
+      "hatchery.manage",
+      "inventory.read",
+      "inventory.issue",
+      "inventory.manage",
+      "alert.manage",
+      "content.read"
+    ]
+  },
+  "tokens": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzaWQiOiIwMWExMzllMy02ZTZmLTcxZmUtYjQ5My1iN2Q2ZTBjOTg5NWMiLCJzdWIiOiIwMWExMzllMy02ZTZkLTc1NDUtOGJkMC1hOTQwZjRmZmUyZWMiLCJqdGkiOiIwMWExMzllMy02ZTZmLTcxZmUtYjQ5My1iZjkzNzBhZjI4OGIiLCJpc3MiOiJwb3VsdHJ5cGlsb3QtdGVzdCIsImF1ZCI6InBvdWx0cnlwaWxvdCIsImlhdCI6MTc5MTk3MjU2OCwiZXhwIjoxNzkxOTczNDY4fQ.kDSgU6hQS733_kEHyyHnzd--YWc_cQTsLhxO--ycyvo",
+    "accessTokenExpiresAt": "2026-10-14T10:24:28.000Z",
+    "refreshToken": "XKdHuyGsuC9vSg5kuhw9mOm9DHxj5PbsKP7PJ74hyfQ",
+    "refreshTokenExpiresAt": "2026-11-13T10:09:28.689Z",
+    "sessionId": "01a139e3-6e6f-71fe-b493-b7d6e0c9895c"
+  }
+}

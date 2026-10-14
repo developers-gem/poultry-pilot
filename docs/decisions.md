@@ -180,3 +180,14 @@ Each is cheap to change until the phase named.
 | D106 | Session in the browser | Access token in memory; refresh token in localStorage with rotation and reuse detection; cross-tab refresh lock (Web Locks) |
 | D107 | Overlays | Menus and dialogs are near-opaque and portalled to the page root (glass overlays were unreadable; backdrop-filter traps fixed layers) |
 | D108 | Routes load on demand | One chunk per screen, prefetched on hover |
+
+## Added with the mobile app
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| D109 | Mobile backend | None: the app calls the same /api/v1 as the web app |
+| D110 | Layers | core, domain (Freezed entities, repository interfaces), data (JSON models, Dio and Drift sources, repositories), presentation (MVVM: Riverpod view model per screen) |
+| D111 | Mobile session | Refresh token in platform secure storage; access token in memory; one shared refresh for concurrent 401s; only a server refusal signs out (offline keeps the session); random per-install device id names the session |
+| D112 | Offline (mobile) | Dashboard and account cached in Drift; served when offline and marked with the time saved |
+| D113 | API/app contract | Mobile models tested against fixtures captured from the real API; an API test fails when those responses change shape |
+| D114 | Generated code | Freezed, json_serializable and Drift output is generated (setup script and CI), not committed |

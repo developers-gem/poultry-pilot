@@ -1,30 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'src/api/api_client.dart';
-import 'src/api/health.dart';
-import 'src/config/app_config.dart';
-import 'src/features/health/health_screen.dart';
+import 'core/router/app_router.dart';
+import 'core/theme/app_theme.dart';
 
 void main() {
-  final config = AppConfig.fromEnvironment();
-  runApp(PoultryPilotApp(config: config, client: ApiClient(config)));
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const ProviderScope(child: PoultryPilotApp()));
 }
 
-class PoultryPilotApp extends StatelessWidget {
-  const PoultryPilotApp({super.key, required this.config, required this.client});
-
-  final AppConfig config;
-  final ApiClient client;
+class PoultryPilotApp extends ConsumerWidget {
+  const PoultryPilotApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // Brand colour from the web design tokens (--color-brand in apps/web/src/styles.css).
-    const brand = Color(0xFF6D5CF0);
-    return MaterialApp(
+  Widget build(BuildContext context, WidgetRef ref) {
+    return MaterialApp.router(
       title: 'PoultryPilot',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(colorSchemeSeed: brand, useMaterial3: true),
-      home: HealthScreen(api: HealthApi(client), apiBaseUrl: config.apiBaseUrl),
+      theme: AppTheme.light(),
+      routerConfig: ref.watch(routerProvider),
     );
   }
 }

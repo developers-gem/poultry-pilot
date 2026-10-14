@@ -1,0 +1,60 @@
+{
+  "date": "2026-10-14",
+  "farm": {
+    "id": "01a139e3-6f19-70bf-be88-603b313bf322",
+    "name": "Second Farm",
+    "currency": "INR"
+  },
+  "alerts": {
+    "open": 0,
+    "bySeverity": {
+      "critical": 0,
+      "warning": 0,
+      "info": 0
+    },
+    "latest": []
+  },
+  "production": {
+    "totals": {
+      "birdsAlive": 0,
+      "mortality": 0,
+      "culls": 0,
+      "feedKg": 0,
+      "waterLitres": 0,
+      "eggsCollected": 0,
+      "eggsBroken": 0,
+      "henDayPercent": null,
+      "mortalityRatePercent": null
+    },
+    "flocksTotal": 0,
+    "flocksRecorded": 0,
+    "flocks": []
+  },
+  "weather": {
+    "unavailable": "Set the farm's location to see weather"
+  },
+  "upcoming": [],
+  "inventory": {
+    "totalValueMinor": 0,
+    "lowStockItems": 0,
+    "lotsExpiringSoon": 0,
+    "feedDaysRemaining": null,
+    "eggsInStock": 0,
+    "chicksAvailable": 0
+  },
+  "hatchery": {
+    "incubating": 0,
+    "eggsIncubating": 0,
+    "nextHatch": null
+  },
+  "finance": {
+    "cashMinor": 0,
+    "receivablesMinor": 0,
+    "payablesMinor": 0,
+    "monthToDate": {
+      "revenueMinor": 0,
+      "expensesMinor": 0,
+      "profitMinor": 0
+    }
+  }
+}

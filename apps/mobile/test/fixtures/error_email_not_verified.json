@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "EMAIL_NOT_VERIFIED",
+    "message": "Confirm your email address before inviting people to the farm",
+    "requestId": "01a139e3-6f22-7440-a3f6-f17a5ef2aab7"
+  }
+}

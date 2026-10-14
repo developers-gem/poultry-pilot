@@ -1,0 +1,29 @@
+{
+  "error": {
+    "code": "VALIDATION_FAILED",
+    "message": "Some fields are invalid",
+    "details": [
+      {
+        "path": "email",
+        "message": "Invalid email"
+      },
+      {
+        "path": "password",
+        "message": "Use at least 10 characters"
+      },
+      {
+        "path": "password",
+        "message": "Use letters and at least one number"
+      },
+      {
+        "path": "fullName",
+        "message": "String must contain at least 1 character(s)"
+      },
+      {
+        "path": "farm.name",
+        "message": "String must contain at least 1 character(s)"
+      }
+    ],
+    "requestId": "01a139e3-6e8b-748d-a460-e7a21d0587a0"
+  }
+}

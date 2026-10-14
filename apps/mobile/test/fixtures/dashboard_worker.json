@@ -1,0 +1,120 @@
+{
+  "date": "2026-10-14",
+  "farm": {
+    "id": "01a139e3-6e6e-7611-becc-e9ab7af39fbc",
+    "name": "Green Valley Poultry",
+    "currency": "INR"
+  },
+  "alerts": {
+    "open": 1,
+    "bySeverity": {
+      "critical": 0,
+      "warning": 1,
+      "info": 0
+    },
+    "latest": [
+      {
+        "id": "01a139e3-6efe-754d-99e1-d8cb874e5330",
+        "ruleType": "weather_risk",
+        "severity": "warning",
+        "status": "open",
+        "title": "Weather: heat on 2026-10-14",
+        "flockId": null,
+        "date": "2026-10-14"
+      }
+    ]
+  },
+  "production": {
+    "totals": {
+      "birdsAlive": 996,
+      "mortality": 1,
+      "culls": 0,
+      "feedKg": 0,
+      "waterLitres": 0,
+      "eggsCollected": 900,
+      "eggsBroken": 8,
+      "henDayPercent": 90.27081243731193,
+      "mortalityRatePercent": 0.10030090270812438
+    },
+    "flocksTotal": 1,
+    "flocksRecorded": 1,
+    "flocks": [
+      {
+        "flockId": "01a139e3-6eac-713e-b3ab-cd8760075918",
+        "flockCode": "L1",
+        "type": "layer",
+        "birdsAlive": 996,
+        "mortality": 1,
+        "eggsCollected": 900,
+        "recorded": true
+      }
+    ]
+  },
+  "weather": {
+    "current": {
+      "observedAt": "2026-10-14T06:00:00Z",
+      "temperatureC": 31.5,
+      "humidityPercent": 58,
+      "rainMm": 0,
+      "windKph": 12
+    },
+    "today": {
+      "date": "2026-10-14",
+      "tempMaxC": 37,
+      "tempMinC": 23,
+      "rainMm": 0,
+      "windMaxKph": 15
+    },
+    "next": [
+      {
+        "date": "2026-10-15",
+        "tempMaxC": 32,
+        "tempMinC": 23,
+        "rainMm": 0,
+        "windMaxKph": 15
+      },
+      {
+        "date": "2026-10-16",
+        "tempMaxC": 31,
+        "tempMinC": 23,
+        "rainMm": 0,
+        "windMaxKph": 15
+      }
+    ],
+    "risks": [
+      {
+        "date": "2026-10-14",
+        "kind": "heat",
+        "value": 37,
+        "reason": "high of 37 °C, 6 °C above this farm's recent average high (31 °C)"
+      }
+    ],
+    "stale": false,
+    "fetchedAt": "2026-10-14T10:09:28.829Z"
+  },
+  "upcoming": [
+    {
+      "type": "vaccination_due",
+      "date": "2026-10-16",
+      "title": "ND booster for L1",
+      "refType": "vaccination",
+      "refId": "01a139e3-6eea-753c-b580-c97f4a1e1c86",
+      "flockId": "01a139e3-6eac-713e-b3ab-cd8760075918",
+      "id": "vaccination_due:01a139e3-6eea-753c-b580-c97f4a1e1c86",
+      "overdue": false
+    }
+  ],
+  "inventory": {
+    "totalValueMinor": 2800000,
+    "lowStockItems": 0,
+    "lotsExpiringSoon": 0,
+    "feedDaysRemaining": null,
+    "eggsInStock": 3538,
+    "chicksAvailable": 0
+  },
+  "hatchery": {
+    "incubating": 0,
+    "eggsIncubating": 0,
+    "nextHatch": null
+  }
+}
