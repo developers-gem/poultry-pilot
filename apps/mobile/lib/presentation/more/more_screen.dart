@@ -6,7 +6,7 @@ import '../../core/router/app_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/glass.dart';
-import '../entry/daily_entry_view_model.dart';
+import '../sync/sync_controller.dart';
 import '../session/session_controller.dart';
 
 /// More: account, settings, switching farm, and anything waiting to be sent.
@@ -16,7 +16,8 @@ class MoreScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
-    final pending = ref.watch(dailyEntryProvider.select((s) => s.pending.length));
+    final sync = ref.watch(syncControllerProvider);
+    final pending = sync.unsent;
     final user = session is SessionSignedIn ? session.account.user : null;
     Widget item(IconData icon, String title, {String? subtitle, VoidCallback? onTap, Color? color}) => ListTile(
           minTileHeight: 64,
@@ -34,7 +35,7 @@ class MoreScreen extends ConsumerWidget {
       GlassCard(
         padding: EdgeInsets.zero,
         child: Column(children: [
-          if (pending > 0) item(Icons.cloud_upload_outlined, '$pending waiting to send', subtitle: 'Saved on this phone while offline', color: AppColors.amberInk, onTap: () => context.go(Routes.entry)),
+          item(Icons.sync, 'Sync', subtitle: pending > 0 ? '$pending change${pending == 1 ? '' : 's'} not yet on the server' : 'Everything is on the server', color: pending > 0 ? AppColors.amberInk : null, onTap: () => context.go(Routes.sync)),
           item(Icons.person_outline, 'Profile', subtitle: 'Your details, password and devices', onTap: () => context.go(Routes.profile)),
           item(Icons.settings_outlined, 'Settings', subtitle: 'Notifications and data on this phone', onTap: () => context.go(Routes.settings)),
           item(Icons.swap_horiz, 'Switch farm', onTap: () => ref.read(sessionProvider.notifier).clearFarm()),
@@ -43,7 +44,7 @@ class MoreScreen extends ConsumerWidget {
               context: context,
               builder: (c) => AlertDialog(
                 title: const Text('Sign out?'),
-                content: Text(pending > 0 ? '$pending entr${pending == 1 ? 'y has' : 'ies have'} not been sent yet and will be lost.' : 'Saved data on this phone is cleared.'),
+                content: Text(pending > 0 ? '$pending change${pending == 1 ? '' : 's'} not yet sent will stay on this phone and be sent when you sign in again.' : 'Saved data on this phone is cleared.'),
                 actions: [TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Sign out'))],
               ),
             );

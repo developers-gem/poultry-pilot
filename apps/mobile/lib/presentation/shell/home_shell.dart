@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/widgets/glass.dart';
-import '../../core/widgets/states.dart';
-import '../entry/daily_entry_view_model.dart';
 import '../entry/outbox_sync.dart';
+import '../sync/sync_controller.dart';
+import '../sync/sync_widgets.dart';
 
 /// Signed-in frame: backdrop, offline banner, and the seven primary tabs. Each tab is at least 48 dp wide on a
 /// 360 dp phone; only the selected one shows its label so the icons stay large.
@@ -16,13 +16,13 @@ class HomeShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final pending = ref.watch(dailyEntryProvider.select((s) => s.pending.length));
-    return OutboxSync(
+    final pending = ref.watch(syncControllerProvider.select((s) => s.unsent));
+    return SyncTrigger(
       child: Scaffold(
         body: Backdrop(
           child: SafeArea(
             bottom: false,
-            child: Column(children: [const OfflineBanner(), Expanded(child: shell)]),
+            child: Column(children: [const SyncStatusBar(), Expanded(child: shell)]),
           ),
         ),
         bottomNavigationBar: NavigationBar(

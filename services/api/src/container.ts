@@ -26,7 +26,8 @@ import { createIntelligenceService } from "./services/intelligence.service.js";
 import { createDashboardService } from "./services/dashboard.service.js";
 import { createReportService } from "./services/report.service.js";
 import type { NotificationProvider, WeatherProvider } from "./ports/external.js";
-import { FeedConsumptionRequest } from "@poultrypilot/validation";
+import { AdministerVaccinationRequest, CompleteTaskRequest, CreateHealthRecordRequest, FeedConsumptionRequest, PatchDailyRecordRequest } from "@poultrypilot/validation";
+import { VersionConflict } from "./services/sync.service.js";
 import type { HealthChecks } from "./ports/health.js";
 import type { Repositories } from "./ports/repositories.js";
 import { createAuditService } from "./services/audit.service.js";
@@ -151,8 +152,9 @@ export function buildContainer(d: ContainerDeps) {
   // Offline field-recording commands (Flutter outbox). Same service methods, same rules, as REST.
   // Handlers receive the parsed (output) value, with defaults applied.
   const DailyRecordCommand = z.object({ flockId: Id, date: LocalDate, record: UpsertDailyRecordRequest });
-  const MortalityCommand = z.object({ flockId: Id }).and(MortalityRequest);
-  const CullCommand = z.object({ flockId: Id }).and(CullRequest);
+  // .extend (not .and): the request schemas are strict, so an intersection would reject flockId as unknown.
+  const MortalityCommand = MortalityRequest.extend({ flockId: Id });
+  const CullCommand = CullRequest.extend({ flockId: Id });
   sync.register("daily_record.put", {
     action: "production.record",
     schema: DailyRecordCommand,
@@ -189,6 +191,83 @@ export function buildContainer(d: ContainerDeps) {
   const intelligence = createIntelligenceService({ repos: d.repos, clock, alerts, rules, flocks, weather });
   const reports = createReportService({ repos: d.repos, clock, audit, flocks, finance, hatchery, inventory, feed });
   const tasks = createTaskService({ repos: d.repos, clock, audit, calendar, dailyRecords });
+
+  // ---- Offline-first commands used by the mobile sync queue ----------------------------------------
+  /** Part of a day (the sections touched offline). A stale version is a conflict carrying the server's day. */
+  const DayPatchCommand = z.object({ flockId: Id, date: LocalDate, patch: PatchDailyRecordRequest.omit({ version: true }) });
+  sync.register("daily_record.patch", {
+    action: "production.record",
+    schema: DayPatchCommand,
+    async run(ctx, raw, meta) {
+      const p = raw as z.output<typeof DayPatchCommand>;
+      try {
+        const out = await dailyRecords.patchByFlockDate(ctx, p.flockId, p.date, { ...p.patch, ...(meta.baseVersion !== undefined ? { version: meta.baseVersion } : {}) });
+        return { entityId: out.id!, version: out.version! };
+      } catch (e) {
+        if (e instanceof AppError && e.code === "VERSION_CONFLICT") {
+          const server = await dailyRecords.getByFlockDate(ctx, p.flockId, p.date);
+          throw new VersionConflict(server.version ?? 0, server);
+        }
+        throw e;
+      }
+    },
+  });
+  /** Finishing a task that is already finished is a success: the work the farmer recorded is done. */
+  const TaskCommand = CompleteTaskRequest.extend({ taskId: Id });
+  sync.register("task.complete", {
+    action: "task.complete",
+    schema: TaskCommand,
+    async run(ctx, raw) {
+      const { taskId, notes } = raw as z.output<typeof TaskCommand>;
+      try {
+        const t = await tasks.complete(ctx, taskId, { ...(notes ? { notes } : {}) });
+        return { entityId: t.id, version: t.version };
+      } catch (e) {
+        const t = e instanceof AppError && e.code === "INVALID_STATE_TRANSITION" ? await tasks.get(ctx, taskId) : null;
+        if (t?.status === "done") return { entityId: t.id, version: t.version };
+        throw e;
+      }
+    },
+  });
+  sync.register("task.start", {
+    action: "task.complete",
+    schema: z.object({ taskId: Id }),
+    async run(ctx, p) {
+      try {
+        const t = await tasks.start(ctx, p.taskId);
+        return { entityId: t.id, version: t.version };
+      } catch (e) {
+        const t = e instanceof AppError && e.code === "INVALID_STATE_TRANSITION" ? await tasks.get(ctx, p.taskId) : null;
+        if (t && (t.status === "in_progress" || t.status === "done")) return { entityId: t.id, version: t.version };
+        throw e;
+      }
+    },
+  });
+  /** Health events; the client sends the record id, so the record is created once whatever happens. */
+  sync.register("health.record", {
+    action: "health.record_observation",
+    schema: CreateHealthRecordRequest,
+    async run(ctx, raw) {
+      const input = raw as z.output<typeof CreateHealthRecordRequest>;
+      if (input.id && (await d.repos.healthRecords.findById(ctx.farmId, input.id))) return { entityId: input.id };
+      const r = await flockHealth.createRecord(ctx, input as never);
+      return { entityId: (r as { id: string }).id };
+    },
+  });
+  // The request schema has refinements (no .extend): take the id, then validate the rest with the full schema.
+  const VaccinationCommand = z.object({ vaccinationId: Id }).passthrough();
+  sync.register("vaccination.administer", {
+    action: "health.vaccinate",
+    schema: VaccinationCommand,
+    async run(ctx, raw) {
+      const { vaccinationId, ...rest } = raw as z.output<typeof VaccinationCommand>;
+      const r = AdministerVaccinationRequest.parse(rest);
+      const v = await d.repos.vaccinations.findById(ctx.farmId, vaccinationId);
+      if (v?.status === "done") return { entityId: v.id, version: v.version };
+      const out = await flockHealth.administer(ctx, vaccinationId, r as never);
+      return { entityId: vaccinationId, version: (out as { version?: number }).version };
+    },
+  });
   const dashboard = createDashboardService({ repos: d.repos, clock, dailyRecords, weather, calendar, inventory, feed, hatchery, finance, flocks, intelligence, rules, tasks });
 
   const FeedCommand = FeedConsumptionRequest;

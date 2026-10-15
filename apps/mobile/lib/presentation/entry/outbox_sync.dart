@@ -1,28 +1,24 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/connectivity/connectivity.dart';
-import '../../core/providers.dart';
-import 'daily_entry_view_model.dart';
+import '../sync/sync_controller.dart';
 
-/// Sends entries saved offline: when the connection comes back and when the app returns to the foreground.
-class OutboxSync extends ConsumerStatefulWidget {
-  const OutboxSync({super.key, required this.child});
+/// Starts the sync controller and syncs when the app returns to the foreground. (Reconnecting, saving a change
+/// and the one-minute timer are handled by the controller itself.)
+class SyncTrigger extends ConsumerStatefulWidget {
+  const SyncTrigger({super.key, required this.child});
 
   final Widget child;
 
   @override
-  ConsumerState<OutboxSync> createState() => _OutboxSyncState();
+  ConsumerState<SyncTrigger> createState() => _SyncTriggerState();
 }
 
-class _OutboxSyncState extends ConsumerState<OutboxSync> with WidgetsBindingObserver {
-  bool _running = false;
-
+class _SyncTriggerState extends ConsumerState<SyncTrigger> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _sync());
   }
 
   @override
@@ -33,27 +29,12 @@ class _OutboxSyncState extends ConsumerState<OutboxSync> with WidgetsBindingObse
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _sync();
-  }
-
-  Future<void> _sync() async {
-    if (_running) return;
-    _running = true;
-    try {
-      await ref.read(dailyEntryRepositoryProvider).sync();
-      await ref.read(dailyEntryProvider.notifier).refreshPending();
-    } catch (_) {
-      // Still offline or the server is busy: try again on the next reconnect or resume.
-    } finally {
-      _running = false;
-    }
+    if (state == AppLifecycleState.resumed) ref.read(syncControllerProvider.notifier).syncNow();
   }
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<AsyncValue<bool>>(isOnlineProvider, (prev, next) {
-      if (next.valueOrNull == true && prev?.valueOrNull != true) _sync();
-    });
+    ref.watch(syncControllerProvider); // keeps the controller (and its listeners) alive while signed in
     return widget.child;
   }
 }

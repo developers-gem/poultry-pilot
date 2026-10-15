@@ -1,8 +1,8 @@
 {
-  "id": "01a13e06-a925-70e7-96b9-3263bb9d6850",
-  "flockId": "01a13e06-a8ef-7089-bce0-dca1f48c15aa",
+  "id": "01a14069-8ab2-729b-ac42-460387437dd3",
+  "flockId": "01a14069-8a88-7687-9dcb-2aa9957bf62d",
   "flockCode": "L1",
-  "houseId": "01a13e06-a8e7-7044-8f44-e772371261d9",
+  "houseId": "01a14069-8a7f-7509-8028-be8f1575e295",
   "flockType": "layer",
   "date": "2026-10-15",
   "birdsAliveEndOfDay": 996,
@@ -10,7 +10,7 @@
     {
       "cause": "unknown",
       "count": 1,
-      "eventId": "01a13e06-a9ab-723e-ab50-bcdde7d214bb",
+      "eventId": "01a14069-8b43-71bd-8c4f-0ecb1cd7cdf7",
       "fromDailyRecord": true
     }
   ],
@@ -34,24 +34,24 @@
   "averageWeight": {
     "averageWeightG": 1780,
     "sampleSize": 10,
-    "eventId": "01a13e06-a9ab-723e-ab50-c1fde4c4391d"
+    "eventId": "01a14069-8b43-71bd-8c4f-13e342d89198"
   },
   "healthObservations": [
     {
-      "id": "01a13e06-a9ad-750c-9200-9e658de0c903",
+      "id": "01a14069-8b45-74c3-8646-037d3c563bae",
       "signs": "Two birds coughing",
       "affectedBirds": 2
     }
   ],
   "photos": [
     {
-      "assetId": "01a13e06-a99e-71ca-ad27-f70738369687",
+      "assetId": "01a14069-8b39-744b-a191-07d2ca3a1266",
       "caption": "Drinker line",
-      "url": "/api/v1/farms/01a13e06-a89d-71b6-8437-be15d9cd8125/media/01a13e06-a99e-71ca-ad27-f70738369687"
+      "url": "/api/v1/farms/01a14069-8a3f-748c-b741-846baab587fd/media/01a14069-8b39-744b-a191-07d2ca3a1266"
     }
   ],
   "version": 1,
-  "createdBy": "01a13e06-a89d-71b6-8437-b78aa2287571",
-  "createdAt": "2026-10-15T05:26:26.341Z",
-  "updatedAt": "2026-10-15T05:26:26.475Z"
+  "createdBy": "01a14069-8a3f-748c-b741-7e3826ea51d5",
+  "createdAt": "2026-10-15T16:33:41.042Z",
+  "updatedAt": "2026-10-15T16:33:41.187Z"
 }

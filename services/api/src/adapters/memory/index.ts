@@ -1,3 +1,4 @@
+import { AppError } from "../../lib/errors.js";
 import type {
   AuditEventRecord,
   FarmRecord,
@@ -443,6 +444,8 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
         return store.processed.get(id);
       },
       async saveProcessed(rec) {
+        // Unique, like the Mongo _id: a second save of the same mutation fails.
+        if (store.processed.get(rec.id)) throw new AppError("DUPLICATE", "Mutation already processed");
         store.processed.put(rec.id, rec);
       },
     },

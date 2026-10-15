@@ -23,6 +23,7 @@ class TaskItem with _$TaskItem {
     String? completedByName,
     String? resolutionNotes,
     required int version,
+    @Default(false) bool pendingSync,
   }) = _TaskItem;
 
   bool get isActive => status == 'open' || status == 'in_progress';
@@ -83,12 +84,12 @@ class TrendDay with _$TrendDay {
 
 @freezed
 class HealthRecordItem with _$HealthRecordItem {
-  const factory HealthRecordItem({required String id, required String type, required String date, required String title, String? flockId, int? affectedBirds, String? signs, String? vetName}) = _HealthRecordItem;
+  const factory HealthRecordItem({required String id, required String type, required String date, required String title, String? flockId, int? affectedBirds, String? signs, String? vetName, @Default(false) bool pendingSync}) = _HealthRecordItem;
 }
 
 @freezed
 class VaccinationItem with _$VaccinationItem {
-  const factory VaccinationItem({required String id, required String flockId, required String vaccineName, required String dueDate, required String state}) = _VaccinationItem;
+  const factory VaccinationItem({required String id, required String flockId, required String vaccineName, required String dueDate, required String state, @Default(false) bool pendingSync}) = _VaccinationItem;
 }
 
 @freezed

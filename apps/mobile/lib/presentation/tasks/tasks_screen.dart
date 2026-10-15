@@ -12,15 +12,23 @@ import '../../domain/entities/farm_work.dart';
 import '../dashboard/dashboard_view_model.dart';
 import '../entry/entry_sheets.dart';
 import '../session/session_controller.dart';
+import '../sync/sync_controller.dart';
+
+String _userOf(Ref ref) {
+  final s = ref.watch(sessionProvider);
+  return s is SessionSignedIn ? s.account.user.id : '';
+}
 
 final _todayProvider = FutureProvider.autoDispose<TodayWork>((ref) async {
+  ref.watch(syncControllerProvider.select((s) => s.unsent)); // refresh as changes are sent
   final farmId = ref.watch(sessionProvider.select((s) => s.farm?.farmId))!;
-  return ref.watch(farmWorkRepositoryProvider).today(farmId);
+  return ref.watch(farmWorkRepositoryProvider).today(farmId, userId: _userOf(ref));
 });
 
 final _allTasksProvider = FutureProvider.autoDispose<List<TaskItem>>((ref) async {
+  ref.watch(syncControllerProvider.select((s) => s.unsent));
   final farmId = ref.watch(sessionProvider.select((s) => s.farm?.farmId))!;
-  return ref.watch(farmWorkRepositoryProvider).tasks(farmId);
+  return ref.watch(farmWorkRepositoryProvider).tasks(farmId, userId: _userOf(ref));
 });
 
 /// Tasks: today's work (entries still to do, my tasks, scheduled work) and all open tasks.
@@ -49,8 +57,11 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
       if (notes == null) return;
     }
     try {
-      await ref.read(farmWorkRepositoryProvider).completeTask(ref.read(sessionProvider).farm!.farmId, t.id, notes: notes);
+      final s = ref.read(sessionProvider);
+      // Saved on the phone first (works offline); the sync queue sends it.
+      await ref.read(farmWorkRepositoryProvider).completeTask(s.farm!.farmId, t.id, userId: s is SessionSignedIn ? s.account.user.id : '', notes: notes);
       _refresh();
+      ref.read(syncControllerProvider.notifier).changed();
       if (mounted) showMessage(context, 'Done: ${t.title}');
     } catch (e) {
       if (mounted) showError(context, e);
@@ -103,6 +114,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                     if (t.houseName != null) t.houseName!,
                     if (t.assigneeName != null) t.assigneeName!,
                     if (t.kind == 'corrective_action') 'Corrective action',
+                    if (t.pendingSync) 'Waiting to sync',
                   ].join(' · '),
                   style: TextStyle(color: t.overdue ? AppColors.roseInk : AppColors.inkSoft),
                 ),

@@ -200,3 +200,13 @@ Each is cheap to change until the phase named.
 | D116 | Daily entry on mobile | One PATCH of the touched sections; record-owned feed and deaths flagged in the day view, so entries made elsewhere are never replaced |
 | D117 | Offline entry | Drift outbox. The day is re-read before sending; if its version changed, the entry is held for the farmer to send or discard. Cleared on sign-out |
 | D118 | One-handed use | Bottom dock for date, flock and save; sheets with keypads, steppers and chips; targets ≥ 56 dp |
+
+## Added with offline-first
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| D119 | Exactly-once sync | A mutation and its processed record are written in one transaction; resends return the stored result; a duplicate processed id rolls the second attempt back |
+| D120 | One write path | Every mobile change goes through the sync queue (pending, syncing, synced, failed, conflict), online or not |
+| D121 | Conflict policy | Day changes auto-merge when the touched sections are unchanged on the server; otherwise the farmer chooses. Never silently overwritten or dropped |
+| D122 | Queue ownership | Changes are tagged with their user, sent only as them, and kept across sign-out |
+| D123 | Strict command schemas | Offline commands extend the strict request schemas (`.extend`), so a flockId or taskId is never rejected as unknown (fixes the earlier mortality and cull commands) |

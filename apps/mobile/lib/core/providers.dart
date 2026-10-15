@@ -5,6 +5,9 @@ import '../data/datasources/local/photo_store.dart';
 import '../data/datasources/remote/poultrypilot_api.dart';
 import '../data/repositories/farm_work_repositories.dart';
 import '../data/repositories/repositories_impl.dart';
+import '../data/sync/local_refresher.dart';
+import '../data/sync/sync_engine.dart';
+import '../data/sync/sync_queue.dart';
 import '../domain/repositories/repositories.dart';
 import 'database/app_database.dart';
 import 'device/device_identity.dart';
@@ -40,5 +43,26 @@ final profileRepositoryProvider = Provider<ProfileRepository>((ref) => ProfileRe
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) => SettingsRepositoryImpl(api: ref.watch(apiProvider), cache: ref.watch(cacheStoreProvider)));
 
 final photoStoreProvider = Provider<PhotoStore>((ref) => FilePhotoStore());
-final dailyEntryRepositoryProvider = Provider<DailyEntryRepository>((ref) => DailyEntryRepositoryImpl(api: ref.watch(apiProvider), cache: ref.watch(cacheStoreProvider), db: ref.watch(databaseProvider), photos: ref.watch(photoStoreProvider)));
-final farmWorkRepositoryProvider = Provider<FarmWorkRepository>((ref) => FarmWorkRepositoryImpl(api: ref.watch(apiProvider), cache: ref.watch(cacheStoreProvider)));
+final syncQueueProvider = Provider<SyncQueue>((ref) => SyncQueue(ref.watch(databaseProvider)));
+final dailyEntryRepositoryProvider = Provider<DailyEntryRepository>((ref) => DailyEntryRepositoryImpl(api: ref.watch(apiProvider), cache: ref.watch(cacheStoreProvider), queue: ref.watch(syncQueueProvider), photos: ref.watch(photoStoreProvider)));
+final farmWorkRepositoryProvider = Provider<FarmWorkRepository>((ref) => FarmWorkRepositoryImpl(api: ref.watch(apiProvider), cache: ref.watch(cacheStoreProvider), queue: ref.watch(syncQueueProvider)));
+final localRefresherProvider = Provider<LocalRefresher>((ref) => LocalRefresher(dashboard: ref.watch(dashboardRepositoryProvider), entries: ref.watch(dailyEntryRepositoryProvider), work: ref.watch(farmWorkRepositoryProvider)));
+
+/// The user whose changes are sent (null when signed out). Set by the session controller.
+final syncUserProvider = StateProvider<String?>((ref) => null);
+
+final syncEngineProvider = Provider<SyncEngine>((ref) {
+  final store = ref.watch(tokenStoreProvider);
+  return SyncEngine(
+    api: ref.watch(apiProvider),
+    queue: ref.watch(syncQueueProvider),
+    photos: ref.watch(photoStoreProvider),
+    tokens: store,
+    interceptor: ref.watch(apiClientProvider).interceptor,
+    deviceId: () async => (await DeviceIdentity.load(store)).deviceId,
+    refresh: (farmId) async {
+      final user = ref.read(syncUserProvider);
+      if (user != null) await ref.read(localRefresherProvider).refresh(farmId, userId: user);
+    },
+  );
+});

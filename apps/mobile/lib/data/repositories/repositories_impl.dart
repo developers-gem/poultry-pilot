@@ -70,10 +70,8 @@ class AuthRepositoryImpl implements AuthRepository {
     await tokens.clearTokens();
     await tokens.saveSelectedFarm(null);
     await cache.clear();
-    // Unsent entries belong to this person: never send them later under someone else's account.
-    for (final f in await cache.clearOutbox()) {
-      await photos?.delete(f).catchError((_) {});
-    }
+    // The sync queue is kept: each change is tagged with its user and sent only as that user, so nothing recorded
+    // offline is lost when a session ends (sign in again to send it).
   }
 
   @override

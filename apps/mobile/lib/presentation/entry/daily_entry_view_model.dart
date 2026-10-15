@@ -1,11 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/error/app_exception.dart';
 import '../../core/providers.dart';
 import '../../domain/entities/daily_entry.dart';
 import '../../domain/entities/dashboard.dart';
 import '../../domain/repositories/repositories.dart';
 import '../session/session_controller.dart';
+import '../sync/sync_controller.dart';
 
 /// State of the Daily Entry screen. The draft is mutable for speed; [revision] changes on every edit.
 class EntryState {
@@ -21,7 +21,6 @@ class EntryState {
     this.error,
     this.message,
     this.revision = 0,
-    this.pending = const [],
   });
 
   final String? date;
@@ -37,7 +36,6 @@ class EntryState {
   /// A one-off note for the screen ("Saved", "Saved on this phone…").
   final String? message;
   final int revision;
-  final List<PendingEntry> pending;
 
   SheetFlock? get flock => sheet?.data.flocks.where((f) => f.flockId == flockId).firstOrNull;
   bool get hasChanges => (draft?.hasChanges ?? false) || photoPaths.isNotEmpty;
@@ -56,7 +54,6 @@ class EntryState {
     bool clearError = false,
     String? message,
     bool clearMessage = false,
-    List<PendingEntry>? pending,
   }) =>
       EntryState(
         date: date ?? this.date,
@@ -70,7 +67,6 @@ class EntryState {
         error: clearError ? null : (error ?? this.error),
         message: clearMessage ? null : (message ?? this.message),
         revision: revision + 1,
-        pending: pending ?? this.pending,
       );
 }
 
@@ -91,7 +87,7 @@ class DailyEntryViewModel extends Notifier<EntryState> {
   Future<void> open({String? flockId, String? date}) async {
     final farmId = _farmId;
     if (farmId == null) return;
-    if (state.sheet != null && flockId == null && date == null) return refreshPending();
+    if (state.sheet != null && flockId == null && date == null) return;
     state = state.copyWith(loading: true, clearError: true);
     try {
       // Without a date the API answers for today in the farm's time zone (not the phone's).
@@ -100,7 +96,6 @@ class DailyEntryViewModel extends Notifier<EntryState> {
       final chosen = flockId ?? state.flockId ?? flocks.where((f) => !f.isRecorded).firstOrNull?.flockId ?? flocks.firstOrNull?.flockId;
       state = state.copyWith(sheet: sheet, date: sheet.data.date, flockId: chosen, loading: false);
       if (chosen != null) await _loadDay();
-      await refreshPending();
     } catch (e) {
       state = state.copyWith(loading: false, error: e);
     }
@@ -120,7 +115,7 @@ class DailyEntryViewModel extends Notifier<EntryState> {
   }
 
   Future<void> selectFlock(String flockId) async {
-    state = EntryState(date: state.date, flockId: flockId, sheet: state.sheet, pending: state.pending, revision: state.revision + 1);
+    state = EntryState(date: state.date, flockId: flockId, sheet: state.sheet, revision: state.revision + 1);
     await _loadDay();
   }
 
@@ -168,54 +163,33 @@ class DailyEntryViewModel extends Notifier<EntryState> {
     if (day != null) state = state.copyWith(draft: DayDraft(day.data), photoPaths: const []);
   }
 
-  /// Saves the touched sections. Returns true when saved or queued. On a version conflict the day is reloaded
-  /// and the farmer's changes are put back on top, so they can check and save again.
+  /// Saves the touched sections on the phone (always works, offline too); the sync queue sends them.
   Future<bool> save({bool next = false}) async {
     final farmId = _farmId;
     final draft = state.draft;
-    if (farmId == null || draft == null || state.flockId == null || state.date == null || !state.hasChanges) return false;
+    final session = ref.read(sessionProvider);
+    final userId = session is SessionSignedIn ? session.account.user.id : null;
+    if (farmId == null || userId == null || draft == null || state.flockId == null || state.date == null || !state.hasChanges) return false;
     state = state.copyWith(saving: true, clearError: true);
     try {
-      final outcome = await _repo.save(farmId: farmId, flockId: state.flockId!, date: state.date!, patch: draft.toPatch(), photoPaths: state.photoPaths);
-      final msg = outcome == SaveOutcome.saved ? 'Saved' : "Saved on this phone. It will be sent when you're back online.";
-      state = state.copyWith(saving: false, message: msg);
+      await _repo.save(userId: userId, farmId: farmId, draft: draft, photoPaths: state.photoPaths);
+      final online = ref.read(syncControllerProvider).online;
+      state = state.copyWith(saving: false, message: online ? 'Saved. Sending to the farm…' : "Saved on this phone. It's sent when you're back online.");
       final sheet = await _repo.sheet(farmId, state.date!).catchError((_) => state.sheet!);
       state = state.copyWith(sheet: sheet);
       final target = next ? neighbour(1, onlyUnrecorded: true) : null;
       if (target != null && target != state.flockId) {
         await selectFlock(target);
-      } else if (outcome == SaveOutcome.saved) {
+      } else {
         await _loadDay();
-      } else {
-        state = state.copyWith(draft: DayDraft(state.day!.data), photoPaths: const []);
       }
-      await refreshPending();
+      // Send now if possible (does not block the farmer).
+      ref.read(syncControllerProvider.notifier).changed();
       return true;
-    } on AppException catch (e) {
-      if (e.code == 'VERSION_CONFLICT') {
-        final day = await _repo.day(farmId, state.flockId!, state.date!);
-        state = state.copyWith(saving: false, day: day, draft: draft.rebase(day.data), message: 'Someone else saved this day meanwhile. Your changes are kept on top; check and save again.');
-      } else {
-        state = state.copyWith(saving: false, error: e);
-      }
+    } catch (e) {
+      state = state.copyWith(saving: false, error: e);
       return false;
     }
-  }
-
-  Future<void> refreshPending() async {
-    final farmId = _farmId;
-    if (farmId == null) return;
-    state = state.copyWith(pending: await _repo.pending(farmId));
-  }
-
-  Future<void> syncNow() async {
-    await _repo.sync();
-    await refreshPending();
-  }
-
-  Future<void> resolve(int id, {required bool sendAnyway}) async {
-    await _repo.resolveConflict(id, sendAnyway: sendAnyway);
-    await refreshPending();
   }
 }
 

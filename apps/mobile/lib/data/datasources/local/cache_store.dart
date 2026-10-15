@@ -17,9 +17,6 @@ class CacheStore {
   }
 
   Future<void> clear() => _db.clearCache();
-
-  /// Removes entries waiting to be sent; returns the photo copies to delete.
-  Future<List<String>> clearOutbox() => _db.clearOutbox();
   Future<String?> setting(String key) => _db.getSetting(key);
   Future<void> putSetting(String key, String value) => _db.putSetting(key, value);
 }

@@ -1,0 +1,78 @@
+{
+  "results": [
+    {
+      "mutationId": "01a20000-0000-7000-8000-000000000001",
+      "status": "accepted",
+      "entityId": "01a14069-8ab2-729b-ac42-460387437dd3",
+      "version": 2
+    },
+    {
+      "mutationId": "01a20000-0000-7000-8000-000000000002",
+      "status": "rejected",
+      "code": "VALIDATION_FAILED",
+      "message": "2026-10-24 is in the future for this farm (today is 2026-10-15)"
+    },
+    {
+      "mutationId": "01a20000-0000-7000-8000-000000000003",
+      "status": "conflict",
+      "serverVersion": 2,
+      "serverDocument": {
+        "id": "01a14069-8ab2-729b-ac42-460387437dd3",
+        "flockId": "01a14069-8a88-7687-9dcb-2aa9957bf62d",
+        "flockCode": "L1",
+        "houseId": "01a14069-8a7f-7509-8028-be8f1575e295",
+        "flockType": "layer",
+        "date": "2026-10-15",
+        "birdsAliveEndOfDay": 996,
+        "mortality": [
+          {
+            "cause": "unknown",
+            "count": 1,
+            "eventId": "01a14069-8b43-71bd-8c4f-0ecb1cd7cdf7",
+            "fromDailyRecord": true
+          }
+        ],
+        "mortalityTotal": 1,
+        "culls": 0,
+        "feed": [],
+        "feedKg": 0,
+        "waterLitres": 215,
+        "water": {
+          "flags": [],
+          "baselineLitres": null
+        },
+        "temperatureMinC": 24,
+        "temperatureMaxC": 33,
+        "humidityPercent": 61,
+        "eggs": {
+          "collected": 900,
+          "broken": 8,
+          "henDayPercent": 90.27081243731193
+        },
+        "averageWeight": {
+          "averageWeightG": 1780,
+          "sampleSize": 10,
+          "eventId": "01a14069-8b43-71bd-8c4f-13e342d89198"
+        },
+        "healthObservations": [
+          {
+            "id": "01a14069-8b45-74c3-8646-037d3c563bae",
+            "signs": "Two birds coughing",
+            "affectedBirds": 2
+          }
+        ],
+        "photos": [
+          {
+            "assetId": "01a14069-8b39-744b-a191-07d2ca3a1266",
+            "caption": "Drinker line",
+            "url": "/api/v1/farms/01a14069-8a3f-748c-b741-846baab587fd/media/01a14069-8b39-744b-a191-07d2ca3a1266"
+          }
+        ],
+        "version": 2,
+        "createdBy": "01a14069-8a3f-748c-b741-7e3826ea51d5",
+        "createdAt": "2026-10-15T16:33:41.042Z",
+        "updatedAt": "2026-10-15T16:33:41.268Z"
+      }
+    }
+  ]
+}

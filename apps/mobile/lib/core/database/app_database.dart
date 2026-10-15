@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 
@@ -22,7 +24,59 @@ class LocalSettings extends Table {
   Set<Column<Object>> get primaryKey => {settingKey};
 }
 
-/// Daily entries saved while offline, sent when the connection returns (the outbox).
+/// Every change made on the phone, in order, until the server has it (the sync queue).
+/// Status: pending → syncing → synced; or failed (the server refused it) or conflict (needs the farmer).
+/// Rows are never deleted silently: only after syncing (pruned later) or when the farmer discards one.
+@DataClassName('SyncOpRow')
+class SyncOps extends Table {
+  /// The mutation id the server de-duplicates on (a UUID made on the phone).
+  TextColumn get id => text()();
+
+  /// Order of creation on this phone.
+  IntColumn get seq => integer()();
+  TextColumn get userId => text()();
+  TextColumn get farmId => text()();
+  TextColumn get command => text()();
+
+  /// What the change is about (e.g. day:<flock>:<date>, task:<id>), for ordering and showing it locally.
+  TextColumn get entityKey => text()();
+  TextColumn get payloadJson => text()();
+
+  /// The record version the farmer saw; null for creations, or "after the previous change to the same thing".
+  IntColumn get baseVersion => integer().nullable()();
+
+  /// Made while an earlier change to the same thing was still unsent: its base version is the earlier change's
+  /// result, filled in when that one has synced.
+  BoolColumn get chained => boolean().withDefault(const Constant(false))();
+
+  /// For day changes: the touched sections as the farmer saw them (to merge safely after a conflict).
+  TextColumn get baseSnapshotJson => text().nullable()();
+  TextColumn get status => text().withDefault(const Constant('pending'))();
+  IntColumn get attempts => integer().withDefault(const Constant(0))();
+  TextColumn get errorCode => text().nullable()();
+  TextColumn get lastError => text().nullable()();
+
+  /// The server's answer: the accepted result, or the server's document for a conflict.
+  TextColumn get serverJson => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+  DateTimeColumn get syncedAt => dateTime().nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+/// Photos for a queued change: a copy in the app's storage, and the server's asset id once uploaded (so an
+/// interrupted upload never sends a photo twice).
+@DataClassName('SyncPhotoRow')
+class SyncOpPhotos extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get opId => text()();
+  TextColumn get filePath => text()();
+  TextColumn get assetId => text().nullable()();
+}
+
+/// Legacy (schema 2) outbox, kept only so an upgrade can move its entries into the sync queue.
 @DataClassName('OutboxEntry')
 class PendingEntries extends Table {
   IntColumn get id => integer().autoIncrement()();
@@ -51,12 +105,12 @@ class PendingPhotos extends Table {
   TextColumn get assetId => text().nullable()();
 }
 
-@DriftDatabase(tables: [CachedResponses, LocalSettings, PendingEntries, PendingPhotos])
+@DriftDatabase(tables: [CachedResponses, LocalSettings, PendingEntries, PendingPhotos, SyncOps, SyncOpPhotos])
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? driftDatabase(name: 'poultrypilot'));
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -65,6 +119,10 @@ class AppDatabase extends _$AppDatabase {
           if (from < 2) {
             await m.createTable(pendingEntries);
             await m.createTable(pendingPhotos);
+          }
+          if (from < 3) {
+            await m.createTable(syncOps);
+            await m.createTable(syncOpPhotos);
           }
         },
       );
@@ -82,39 +140,32 @@ class AppDatabase extends _$AppDatabase {
   Future<void> putSetting(String key, String value) => into(localSettings).insertOnConflictUpdate(LocalSettingsCompanion.insert(settingKey: key, value: value));
 }
 
-/// Outbox queries.
-extension Outbox on AppDatabase {
-  Future<int> addPending({required String farmId, required String flockId, required String date, required String patchJson, int? baseVersion}) => into(pendingEntries).insert(
-        PendingEntriesCompanion.insert(farmId: farmId, flockId: flockId, date: date, patchJson: patchJson, baseVersion: Value(baseVersion), createdAt: DateTime.now()),
-      );
-
-  Future<void> addPendingPhoto(int entryId, String filePath) => into(pendingPhotos).insert(PendingPhotosCompanion.insert(entryId: entryId, filePath: filePath));
-
-  Future<List<OutboxEntry>> pendingFor({String? farmId, String? status}) {
-    final q = select(pendingEntries)..orderBy([(t) => OrderingTerm.asc(t.id)]);
-    if (farmId != null) q.where((t) => t.farmId.equals(farmId));
-    if (status != null) q.where((t) => t.status.equals(status));
-    return q.get();
-  }
-
-  Future<List<OutboxPhoto>> photosFor(int entryId) => (select(pendingPhotos)..where((t) => t.entryId.equals(entryId))).get();
-
-  Future<void> markPhotoUploaded(int photoId, String assetId) => (update(pendingPhotos)..where((t) => t.id.equals(photoId))).write(PendingPhotosCompanion(assetId: Value(assetId)));
-
-  Future<void> setPendingStatus(int id, String status, {String? error, int? baseVersion, bool setBase = false}) => (update(pendingEntries)..where((t) => t.id.equals(id))).write(
-        PendingEntriesCompanion(status: Value(status), error: Value(error), baseVersion: setBase ? Value(baseVersion) : const Value.absent()),
-      );
-
-  /// Everything waiting on this phone (on sign-out: entries must not be sent later as someone else).
-  Future<List<String>> clearOutbox() async {
-    final files = (await select(pendingPhotos).get()).map((p) => p.filePath).toList();
-    await delete(pendingPhotos).go();
-    await delete(pendingEntries).go();
-    return files;
-  }
-
-  Future<void> removePending(int id) async {
-    await (delete(pendingPhotos)..where((t) => t.entryId.equals(id))).go();
-    await (delete(pendingEntries)..where((t) => t.id.equals(id))).go();
+/// Moves entries from the schema-2 outbox into the sync queue (once, at start-up), so an upgrade loses nothing.
+extension LegacyOutbox on AppDatabase {
+  Future<int> migrateLegacyOutbox({required String userId, required Future<int> Function() nextSeq, required String Function() newId}) async {
+    final legacy = await select(pendingEntries).get();
+    for (final e in legacy) {
+      final patch = (jsonDecode(e.patchJson) as Map).cast<String, dynamic>()..remove('version')..remove('photos');
+      final id = newId();
+      final now = DateTime.now();
+      await into(syncOps).insert(SyncOpsCompanion.insert(
+        id: id,
+        seq: await nextSeq(),
+        userId: userId,
+        farmId: e.farmId,
+        command: 'daily_record.patch',
+        entityKey: 'day:${e.flockId}:${e.date}',
+        payloadJson: jsonEncode({'flockId': e.flockId, 'date': e.date, 'patch': patch}),
+        baseVersion: Value(e.baseVersion),
+        createdAt: e.createdAt,
+        updatedAt: now,
+      ));
+      for (final p in await (select(pendingPhotos)..where((t) => t.entryId.equals(e.id))).get()) {
+        await into(syncOpPhotos).insert(SyncOpPhotosCompanion.insert(opId: id, filePath: p.filePath, assetId: Value(p.assetId)));
+      }
+      await (delete(pendingPhotos)..where((t) => t.entryId.equals(e.id))).go();
+      await (delete(pendingEntries)..where((t) => t.id.equals(e.id))).go();
+    }
+    return legacy.length;
   }
 }

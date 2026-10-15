@@ -78,6 +78,19 @@ export async function captureMobileFixtures(): Promise<Record<string, unknown>> 
   const created = (await call("post", `/farms/${farmId}/tasks`, { title: "Check fans", dueDate: D(1) })).body;
   out["task_created"] = created;
   out["task_completed"] = (await call("post", `/farms/${farmId}/tasks/${created.id}/complete`, { notes: "All running" })).body;
+  // Offline sync: one push answering accepted, rejected and conflict (with the server's day to merge against).
+  const at = new Date().toISOString();
+  const mid = (n: number) => `01a20000-0000-7000-8000-${String(n).padStart(12, "0")}`;
+  const today = (await call("get", `/farms/${farmId}/flocks/${flock.id}/daily-records/${D(0)}`)).body;
+  out["sync_push"] = (await ctx.api().post("/api/v1/sync/push").set(bearer(token)).send({
+    farmId,
+    deviceId: "pixel-7-abc",
+    mutations: [
+      { mutationId: mid(1), command: "daily_record.patch", payload: { flockId: flock.id, date: D(0), patch: { waterLitres: 215 } }, baseVersion: today.version, clientCreatedAt: at },
+      { mutationId: mid(2), command: "flock.mortality", payload: { flockId: flock.id, date: D(9), count: 1, cause: "unknown" }, clientCreatedAt: at },
+      { mutationId: mid(3), command: "daily_record.patch", payload: { flockId: flock.id, date: D(0), patch: { eggs: { collected: 1, broken: 0 } } }, baseVersion: 0, clientCreatedAt: at },
+    ],
+  })).body;
   out["me"] = (await call("get", "/me")).body;
   out["farm"] = (await call("get", `/farms/${farmId}`)).body;
   out["dashboard"] = (await call("get", `/farms/${farmId}/dashboard`)).body;

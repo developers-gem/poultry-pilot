@@ -4,6 +4,7 @@ import '../../models/account_models.dart';
 import '../../models/daily_entry_models.dart';
 import '../../models/dashboard_models.dart';
 import '../../models/farm_work_models.dart';
+import '../../models/sync_models.dart';
 import '../../models/farm_models.dart';
 
 /// The REST endpoints the mobile app uses: the same /api/v1 the web app calls. No mobile-only backend.
@@ -86,4 +87,19 @@ class PoultryPilotApi {
   Future<List<VaccinationModel>> vaccinations(String farmId) async => ((await _client.get('/farms/$farmId/health/vaccinations'))['items'] as List).cast<Map<String, dynamic>>().map(VaccinationModel.fromJson).toList();
   Future<void> createHealthRecord(String farmId, Map<String, dynamic> body) async => _client.post('/farms/$farmId/health/records', data: body);
   Future<void> administerVaccination(String farmId, String id, Map<String, dynamic> body) async => _client.post('/farms/$farmId/health/vaccinations/$id/administer', data: body);
+
+  // ---- offline sync
+  /// POST /sync/push: the queued changes, in order. The server applies each once (by mutation id).
+  Future<List<SyncResultModel>> push(String farmId, String deviceId, List<Map<String, dynamic>> mutations) async {
+    final body = await _client.post('/sync/push', data: {'farmId': farmId, 'deviceId': deviceId, 'mutations': mutations});
+    return ((body['results'] as List?) ?? const []).cast<Map<String, dynamic>>().map(SyncResultModel.fromJson).toList();
+  }
+
+  // ---- raw JSON reads (cached on the phone exactly as the API sent them)
+  Future<List<dynamic>> tasksJson(String farmId, {String status = 'active', String assignee = 'any'}) async => ((await _client.get('/farms/$farmId/tasks', query: {'status': status, 'assignee': assignee}))['items'] as List?) ?? const [];
+  Future<Map<String, dynamic>> housesJson(String farmId) => _client.get('/farms/$farmId/houses');
+  Future<Map<String, dynamic>> flockJson(String farmId, String flockId) => _client.get('/farms/$farmId/flocks/$flockId');
+  Future<Map<String, dynamic>> weighInsJson(String farmId, String flockId) => _client.get('/farms/$farmId/flocks/$flockId/weighings');
+  Future<Map<String, dynamic>> healthRecordsJson(String farmId) => _client.get('/farms/$farmId/health/records');
+  Future<Map<String, dynamic>> vaccinationsJson(String farmId) => _client.get('/farms/$farmId/health/vaccinations');
 }

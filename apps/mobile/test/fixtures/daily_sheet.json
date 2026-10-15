@@ -4,16 +4,16 @@
   "editWindowStart": "2026-10-14",
   "flocks": [
     {
-      "flockId": "01a13e06-a8ef-7089-bce0-dca1f48c15aa",
+      "flockId": "01a14069-8a88-7687-9dcb-2aa9957bf62d",
       "flockCode": "L1",
       "name": "Layers",
       "type": "layer",
-      "houseId": "01a13e06-a8e7-7044-8f44-e772371261d9",
+      "houseId": "01a14069-8a7f-7509-8028-be8f1575e295",
       "houseName": "House A",
       "expectedBirds": 996,
       "laying": true,
       "record": {
-        "id": "01a13e06-a925-70e7-96b9-3263bb9d6850",
+        "id": "01a14069-8ab2-729b-ac42-460387437dd3",
         "version": 0,
         "summary": {
           "mortality": 1,

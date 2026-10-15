@@ -2,7 +2,7 @@
   "date": "2026-10-15",
   "tasks": [
     {
-      "id": "01a13e06-a973-7768-99f7-b3cfa5d1b0d0",
+      "id": "01a14069-8b0d-753f-8601-6a862251b065",
       "kind": "general",
       "title": "Order litter",
       "description": null,
@@ -21,10 +21,10 @@
       "completedByName": null,
       "resolutionNotes": null,
       "version": 0,
-      "createdAt": "2026-10-15T05:26:26.419Z"
+      "createdAt": "2026-10-15T16:33:41.133Z"
     },
     {
-      "id": "01a13e06-a967-71b3-9b40-fc6cef23f38b",
+      "id": "01a14069-8b02-739f-bfca-bda4b7314137",
       "kind": "general",
       "title": "Clean the drinkers",
       "description": null,
@@ -32,7 +32,7 @@
       "status": "open",
       "priority": "high",
       "overdue": false,
-      "flockId": "01a13e06-a8ef-7089-bce0-dca1f48c15aa",
+      "flockId": "01a14069-8a88-7687-9dcb-2aa9957bf62d",
       "flockCode": "L1",
       "houseId": null,
       "houseName": null,
@@ -43,7 +43,7 @@
       "completedByName": null,
       "resolutionNotes": null,
       "version": 0,
-      "createdAt": "2026-10-15T05:26:26.407Z"
+      "createdAt": "2026-10-15T16:33:41.122Z"
     }
   ],
   "scheduled": [
@@ -52,15 +52,15 @@
       "date": "2026-10-15",
       "title": "IB spray for L1 (due 2026-10-14)",
       "refType": "vaccination",
-      "refId": "01a13e06-a96d-73c4-a7a9-48b70a5c11be",
-      "flockId": "01a13e06-a8ef-7089-bce0-dca1f48c15aa",
-      "id": "vaccination_due:01a13e06-a96d-73c4-a7a9-48b70a5c11be",
+      "refId": "01a14069-8b08-7473-a9d7-c0d3ffe604e8",
+      "flockId": "01a14069-8a88-7687-9dcb-2aa9957bf62d",
+      "id": "vaccination_due:01a14069-8b08-7473-a9d7-c0d3ffe604e8",
       "overdue": true
     }
   ],
   "dailyEntries": [
     {
-      "flockId": "01a13e06-a8ef-7089-bce0-dca1f48c15aa",
+      "flockId": "01a14069-8a88-7687-9dcb-2aa9957bf62d",
       "flockCode": "L1",
       "houseName": "House A",
       "recorded": true

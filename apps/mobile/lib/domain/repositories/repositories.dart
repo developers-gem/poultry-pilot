@@ -44,55 +44,37 @@ abstract class SettingsRepository {
   Future<void> clearCache();
 }
 
-/// The result of saving a day: sent to the API, or kept on the phone until the connection returns.
+/// Saving always writes to the phone first; the sync queue sends it. [queued] = waiting for the connection.
 enum SaveOutcome { saved, queued }
 
 abstract class DailyEntryRepository {
-  /// [date] null = today in the farm's time zone.
+  /// [date] null = today in the farm's time zone. Flocks with unsent changes are marked pendingSync.
   Future<Cached<DailySheet>> sheet(String farmId, String? date);
+
+  /// The day from the server (or the phone's copy), with the farmer's unsent changes applied on top.
   Future<Cached<DayRecord>> day(String farmId, String flockId, String date);
   Future<List<FeedOption>> feedOptions(String farmId);
 
-  /// Uploads [photoPaths] and saves [patch] for the day. Offline, both wait on the phone (outbox).
-  Future<SaveOutcome> save({required String farmId, required String flockId, required String date, required Map<String, dynamic> patch, List<String> photoPaths});
-
-  /// Sends what waited offline. Returns how many entries are still waiting (including conflicts).
-  Future<int> sync();
-
-  /// Entries waiting on this phone, oldest first.
-  Future<List<PendingEntry>> pending(String farmId);
-
-  /// A queued entry whose day changed elsewhere: send it on top of the latest version, or drop it.
-  Future<void> resolveConflict(int id, {required bool sendAnyway});
-}
-
-class PendingEntry {
-  const PendingEntry({required this.id, required this.flockId, required this.date, required this.sections, required this.photoCount, required this.status, this.error});
-
-  final int id;
-  final String flockId;
-  final String date;
-  final List<String> sections;
-  final int photoCount;
-
-  /// waiting, conflict or failed.
-  final String status;
-  final String? error;
+  /// Queues the touched sections (and copies of the photos) for the server.
+  Future<SaveOutcome> save({required String userId, required String farmId, required DayDraft draft, List<String> photoPaths});
 }
 
 abstract class FarmWorkRepository {
-  Future<TodayWork> today(String farmId);
-  Future<List<TaskItem>> tasks(String farmId, {String status = 'active', String assignee = 'any'});
+  Future<TodayWork> today(String farmId, {required String userId});
+  Future<List<TaskItem>> tasks(String farmId, {required String userId, String status = 'active', String assignee = 'any'});
   Future<TaskItem> createTask(String farmId, {required String title, String? dueDate, String priority = 'normal', String? flockId});
-  Future<TaskItem> completeTask(String farmId, String taskId, {String? notes});
-  Future<TaskItem> startTask(String farmId, String taskId);
+
+  /// Queued (works offline); the task shows as done straight away.
+  Future<void> completeTask(String farmId, String taskId, {required String userId, String? notes});
   Future<Cached<List<FlockSummary>>> flocks(String farmId);
   Future<List<HouseItem>> houses(String farmId);
   Future<FlockDetail> flock(String farmId, String flockId);
   Future<List<WeighIn>> weighIns(String farmId, String flockId);
   Future<Cached<List<TrendDay>>> trends(String farmId, {required String from, required String to, String? flockId});
-  Future<List<HealthRecordItem>> healthRecords(String farmId);
-  Future<List<VaccinationItem>> vaccinations(String farmId);
-  Future<void> reportProblem(String farmId, {required String flockId, required String date, required String title, required List<String> symptoms, int? affectedBirds});
-  Future<void> markVaccinated(String farmId, String vaccinationId, {required String date, int? birds});
+  Future<List<HealthRecordItem>> healthRecords(String farmId, {required String userId});
+  Future<List<VaccinationItem>> vaccinations(String farmId, {required String userId});
+
+  /// Queued (works offline), with an id made on the phone so the record is created once.
+  Future<void> reportProblem(String farmId, {required String userId, required String flockId, required String date, required String title, required List<String> symptoms, int? affectedBirds});
+  Future<void> markVaccinated(String farmId, String vaccinationId, {required String userId, required String date, int? birds});
 }

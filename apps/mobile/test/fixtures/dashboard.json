@@ -1,7 +1,7 @@
 {
   "date": "2026-10-15",
   "farm": {
-    "id": "01a13e06-a89d-71b6-8437-be15d9cd8125",
+    "id": "01a14069-8a3f-748c-b741-846baab587fd",
     "name": "Green Valley Poultry",
     "currency": "INR"
   },
@@ -14,7 +14,7 @@
     },
     "latest": [
       {
-        "id": "01a13e06-a958-731d-aa2d-e669131955d6",
+        "id": "01a14069-8af6-73fc-80f8-69398c444164",
         "ruleType": "weather_risk",
         "severity": "warning",
         "status": "open",
@@ -30,7 +30,7 @@
       "mortality": 1,
       "culls": 0,
       "feedKg": 0,
-      "waterLitres": 210,
+      "waterLitres": 215,
       "eggsCollected": 900,
       "eggsBroken": 8,
       "henDayPercent": 90.27081243731193,
@@ -42,15 +42,15 @@
     "flocksRecorded": 1,
     "flocks": [
       {
-        "flockId": "01a13e06-a8ef-7089-bce0-dca1f48c15aa",
+        "flockId": "01a14069-8a88-7687-9dcb-2aa9957bf62d",
         "flockCode": "L1",
         "type": "layer",
-        "houseId": "01a13e06-a8e7-7044-8f44-e772371261d9",
+        "houseId": "01a14069-8a7f-7509-8028-be8f1575e295",
         "birdsAlive": 996,
         "mortality": 1,
         "culls": 0,
         "feedKg": 0,
-        "waterLitres": 210,
+        "waterLitres": 215,
         "eggsCollected": 900,
         "eggsBroken": 8,
         "averageWeightG": 1780,
@@ -99,7 +99,7 @@
       }
     ],
     "stale": false,
-    "fetchedAt": "2026-10-15T05:26:26.389Z"
+    "fetchedAt": "2026-10-15T16:33:41.108Z"
   },
   "upcoming": [
     {
@@ -107,9 +107,9 @@
       "date": "2026-10-15",
       "title": "IB spray for L1 (due 2026-10-14)",
       "refType": "vaccination",
-      "refId": "01a13e06-a96d-73c4-a7a9-48b70a5c11be",
-      "flockId": "01a13e06-a8ef-7089-bce0-dca1f48c15aa",
-      "id": "vaccination_due:01a13e06-a96d-73c4-a7a9-48b70a5c11be",
+      "refId": "01a14069-8b08-7473-a9d7-c0d3ffe604e8",
+      "flockId": "01a14069-8a88-7687-9dcb-2aa9957bf62d",
+      "id": "vaccination_due:01a14069-8b08-7473-a9d7-c0d3ffe604e8",
       "overdue": true
     },
     {
@@ -117,9 +117,9 @@
       "date": "2026-10-17",
       "title": "ND booster for L1",
       "refType": "vaccination",
-      "refId": "01a13e06-a93a-74dc-815d-4bc1f2af0b75",
-      "flockId": "01a13e06-a8ef-7089-bce0-dca1f48c15aa",
-      "id": "vaccination_due:01a13e06-a93a-74dc-815d-4bc1f2af0b75",
+      "refId": "01a14069-8ae0-703c-982e-4052f80eca93",
+      "flockId": "01a14069-8a88-7687-9dcb-2aa9957bf62d",
+      "id": "vaccination_due:01a14069-8ae0-703c-982e-4052f80eca93",
       "overdue": false
     }
   ],
@@ -142,14 +142,14 @@
     "overdue": 1,
     "next": [
       {
-        "id": "01a13e06-a973-7768-99f7-b3cfa5d1b0d0",
+        "id": "01a14069-8b0d-753f-8601-6a862251b065",
         "title": "Order litter",
         "dueDate": "2026-10-14",
         "priority": "normal",
         "overdue": true
       },
       {
-        "id": "01a13e06-a967-71b3-9b40-fc6cef23f38b",
+        "id": "01a14069-8b02-739f-bfca-bda4b7314137",
         "title": "Clean the drinkers",
         "dueDate": "2026-10-15",
         "priority": "high",

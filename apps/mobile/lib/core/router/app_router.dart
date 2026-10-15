@@ -19,6 +19,7 @@ import '../../presentation/session/session_controller.dart';
 import '../../presentation/settings/settings_screen.dart';
 import '../../presentation/shell/home_shell.dart';
 import '../../presentation/splash/splash_screen.dart';
+import '../../presentation/sync/sync_widgets.dart';
 import '../../presentation/tasks/tasks_screen.dart';
 
 class Routes {
@@ -39,6 +40,7 @@ class Routes {
   static const more = '/more';
   static const profile = '/more/profile';
   static const settings = '/more/settings';
+  static const sync = '/more/sync';
 
   static const auth = {login, signup, forgotPassword};
 }
@@ -91,6 +93,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           tab(Routes.more, (_) => const MoreScreen(), routes: [
             GoRoute(path: 'profile', builder: (_, __) => const _Titled(title: 'Profile', child: ProfileScreen())),
             GoRoute(path: 'settings', builder: (_, __) => const _Titled(title: 'Settings', child: SettingsScreen())),
+            GoRoute(path: 'sync', builder: (_, __) => const _Titled(title: 'Sync', child: SyncScreen())),
           ]),
         ],
       ),

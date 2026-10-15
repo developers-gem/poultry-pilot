@@ -23,9 +23,12 @@ class SheetFlock with _$SheetFlock {
     required bool laying,
     DaySummary? recorded,
     DaySummary? previous,
+
+    /// Changes for this flock and day are saved on the phone and not yet on the server.
+    @Default(false) bool pendingSync,
   }) = _SheetFlock;
 
-  bool get isRecorded => recorded != null;
+  bool get isRecorded => recorded != null || pendingSync;
   String get label => houseName == null ? flockCode : '$flockCode · $houseName';
 }
 

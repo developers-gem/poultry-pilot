@@ -1,19 +1,19 @@
 {
   "user": {
-    "id": "01a13e06-a89d-71b6-8437-b78aa2287571",
+    "id": "01a14069-8a3f-748c-b741-7e3826ea51d5",
     "email": "asha@example.com",
     "fullName": "Asha Verma",
     "platformRoles": [],
     "emailVerified": false,
     "hasPassword": true,
     "googleLinked": false,
-    "createdAt": "2026-10-15T05:26:26.205Z"
+    "createdAt": "2026-10-15T16:33:40.927Z"
   },
   "tokens": {
-    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzaWQiOiIwMWExM2UwNi1hOGI1LTc1MmQtYmEwYi0yOTgyMDIzMzg4MmUiLCJzdWIiOiIwMWExM2UwNi1hODlkLTcxYjYtODQzNy1iNzhhYTIyODc1NzEiLCJqdGkiOiIwMWExM2UwNi1hOGI1LTc1MmQtYmEwYi0zMTY3MmFhZTkyYjUiLCJpc3MiOiJwb3VsdHJ5cGlsb3QtdGVzdCIsImF1ZCI6InBvdWx0cnlwaWxvdCIsImlhdCI6MTc5MjA0MTk4NiwiZXhwIjoxNzkyMDQyODg2fQ.O0DYE_wXAuAq1kce1sEDg_rZrQnbmSpS8o8lehw9Zws",
-    "accessTokenExpiresAt": "2026-10-15T05:41:26.000Z",
-    "refreshToken": "Uvi9oRk8V6nepKa5AC7q0k_rvVhcOAHPQPArnNaW3WQ",
-    "refreshTokenExpiresAt": "2026-11-14T05:26:26.229Z",
-    "sessionId": "01a13e06-a8b5-752d-ba0b-29820233882e"
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzaWQiOiIwMWExNDA2OS04YTUzLTczYjgtODNlNS1mOTU4YmJkZmJiMmYiLCJzdWIiOiIwMWExNDA2OS04YTNmLTc0OGMtYjc0MS03ZTM4MjZlYTUxZDUiLCJqdGkiOiIwMWExNDA2OS04YTUzLTczYjgtODNlNi0wMDI2OGI0ZmIzNmEiLCJpc3MiOiJwb3VsdHJ5cGlsb3QtdGVzdCIsImF1ZCI6InBvdWx0cnlwaWxvdCIsImlhdCI6MTc5MjA4MjAyMCwiZXhwIjoxNzkyMDgyOTIwfQ.XwaHRH_w4Xo9pP-fq35Tl-XwGXnEM4ot6LQe1gwzEik",
+    "accessTokenExpiresAt": "2026-10-15T16:48:40.000Z",
+    "refreshToken": "1xSgVrrY57wUjh0qL5_GiHSHJMoUOk-AbzWPwq78J48",
+    "refreshTokenExpiresAt": "2026-11-14T16:33:40.948Z",
+    "sessionId": "01a14069-8a53-73b8-83e5-f958bbdfbb2f"
   }
 }

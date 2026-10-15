@@ -9,7 +9,6 @@ import '../../core/utils/formatters.dart';
 import '../../core/widgets/glass.dart';
 import '../../core/widgets/states.dart';
 import '../../domain/entities/daily_entry.dart';
-import '../../domain/repositories/repositories.dart';
 import '../session/session_controller.dart';
 import 'daily_entry_view_model.dart';
 import 'entry_sheets.dart';
@@ -78,7 +77,8 @@ class _DailyEntryScreenState extends ConsumerState<DailyEntryScreen> {
             ]),
             if (s.sheet!.fromCache || (s.day?.fromCache ?? false))
               const Padding(padding: EdgeInsets.only(top: 6), child: Text("Offline: showing what this phone saved last. You can still record; it's sent later.", style: TextStyle(color: AppColors.amberInk))),
-            if (s.pending.isNotEmpty) _PendingBanner(entries: s.pending, flocks: sheet.flocks),
+            if (s.flock?.pendingSync ?? false)
+              const Padding(padding: EdgeInsets.only(top: 6), child: Row(children: [Icon(Icons.cloud_upload_outlined, size: 18, color: AppColors.cyanInk), SizedBox(width: 6), Expanded(child: Text('Saved on this phone, waiting to sync', style: TextStyle(color: AppColors.cyanInk)))])),
             if (!canRecord) const Padding(padding: EdgeInsets.only(top: 8), child: Text("Your role can view today's records but not enter them.", style: TextStyle(color: AppColors.inkSoft))),
             const SizedBox(height: 12),
             if (s.draft == null) const SkeletonList(count: 3) else _Sections(state: s, enabled: canRecord),
@@ -363,7 +363,7 @@ class _Dock extends ConsumerWidget {
             IconButton(tooltip: 'Previous flock', iconSize: 30, constraints: const BoxConstraints(minWidth: kTarget, minHeight: kTarget), onPressed: () => goFlock(vm.neighbour(-1)), icon: const Icon(Icons.chevron_left)),
             Flexible(
               child: ActionChip(
-                avatar: Icon(state.flock?.isRecorded ?? false ? Icons.check_circle : Icons.radio_button_unchecked, color: state.flock?.isRecorded ?? false ? AppColors.mintInk : AppColors.inkSoft),
+                avatar: Icon(state.flock?.pendingSync ?? false ? Icons.cloud_upload_outlined : (state.flock?.isRecorded ?? false ? Icons.check_circle : Icons.radio_button_unchecked), color: state.flock?.pendingSync ?? false ? AppColors.cyanInk : (state.flock?.isRecorded ?? false ? AppColors.mintInk : AppColors.inkSoft)),
                 label: Text(state.flock?.flockCode ?? 'Flock', overflow: TextOverflow.ellipsis),
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 onPressed: () async {
@@ -412,54 +412,12 @@ class _Dock extends ConsumerWidget {
               ListTile(
                 minTileHeight: 64,
                 selected: f.flockId == current,
-                leading: Icon(f.isRecorded ? Icons.check_circle : Icons.radio_button_unchecked, color: f.isRecorded ? AppColors.mintInk : AppColors.inkSoft),
+                leading: Icon(f.pendingSync ? Icons.cloud_upload_outlined : (f.isRecorded ? Icons.check_circle : Icons.radio_button_unchecked), color: f.pendingSync ? AppColors.cyanInk : (f.isRecorded ? AppColors.mintInk : AppColors.inkSoft)),
                 title: Text(f.flockCode, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-                subtitle: Text('${f.houseName ?? ''} · ${Fmt.number(f.expectedBirds)} birds · ${f.isRecorded ? 'recorded' : 'to do'}'),
+                subtitle: Text('${f.houseName ?? ''} · ${Fmt.number(f.expectedBirds)} birds · ${f.pendingSync ? 'waiting to sync' : (f.isRecorded ? 'recorded' : 'to do')}'),
                 onTap: () => Navigator.pop(c, f.flockId),
               ),
           ]),
         ),
       );
-}
-
-/// Entries saved on this phone while offline, and any that need a decision.
-class _PendingBanner extends ConsumerWidget {
-  const _PendingBanner({required this.entries, required this.flocks});
-
-  final List<PendingEntry> entries;
-  final List<SheetFlock> flocks;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final conflicts = entries.where((e) => e.status != 'waiting').toList();
-    final vm = ref.read(dailyEntryProvider.notifier);
-    final code = (String id) => flocks.where((f) => f.flockId == id).firstOrNull?.flockCode ?? 'Flock';
-    return Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: GlassCard(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            const Icon(Icons.cloud_upload_outlined, color: AppColors.amberInk),
-            const SizedBox(width: 8),
-            Expanded(child: Text('${entries.length} entr${entries.length == 1 ? 'y' : 'ies'} saved on this phone', style: const TextStyle(fontWeight: FontWeight.w600))),
-            TextButton(onPressed: vm.syncNow, child: const Text('Send now')),
-          ]),
-          for (final e in conflicts)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('${code(e.flockId)} · ${Fmt.shortDate(e.date)}: ${e.error ?? 'needs your decision'}', style: const TextStyle(color: AppColors.roseInk)),
-                if (e.status == 'conflict')
-                  Row(children: [
-                    TextButton(onPressed: () => vm.resolve(e.id, sendAnyway: true), child: const Text('Send mine anyway')),
-                    TextButton(onPressed: () => vm.resolve(e.id, sendAnyway: false), child: const Text('Discard mine')),
-                  ])
-                else
-                  TextButton(onPressed: () => vm.resolve(e.id, sendAnyway: false), child: const Text('Remove')),
-              ]),
-            ),
-        ]),
-      ),
-    );
-  }
 }
