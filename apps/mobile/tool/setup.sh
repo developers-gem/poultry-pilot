@@ -14,6 +14,12 @@ if ! grep -q 'android.permission.INTERNET' "$MANIFEST"; then
 fi
 grep -q 'android.permission.INTERNET' "$MANIFEST" || { echo "Add <uses-permission android:name=\"android.permission.INTERNET\"/> to $MANIFEST"; exit 1; }
 
+# iOS: Daily Entry attaches photos (camera and library). iOS closes the app without these descriptions.
+PLIST=ios/Runner/Info.plist
+if [ -f "$PLIST" ] && ! grep -q NSCameraUsageDescription "$PLIST"; then
+  perl -0pi -e 's#</dict>\s*</plist>\s*$#\t<key>NSCameraUsageDescription</key>\n\t<string>Take photos of your flock to attach to daily records.</string>\n\t<key>NSPhotoLibraryUsageDescription</key>\n\t<string>Choose photos to attach to daily records.</string>\n</dict>\n</plist>\n#' "$PLIST"
+fi
+
 [ -f config/dev.json ] || cp config/dev.example.json config/dev.json
 flutter pub get
 dart run build_runner build --delete-conflicting-outputs

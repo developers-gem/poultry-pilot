@@ -1,5 +1,5 @@
 {
-  "id": "01a139e3-6e6e-7611-becc-e9ab7af39fbc",
+  "id": "01a13e06-a89d-71b6-8437-be15d9cd8125",
   "name": "Green Valley Poultry",
   "countryCode": "IN",
   "locationLabel": "Ghaziabad",
@@ -15,8 +15,8 @@
     "workerEditWindowDays": 1
   },
   "version": 1,
-  "createdAt": "2026-10-14T10:09:28.686Z",
-  "updatedAt": "2026-10-14T10:09:28.735Z",
+  "createdAt": "2026-10-15T05:26:26.205Z",
+  "updatedAt": "2026-10-15T05:26:26.272Z",
   "myRole": "owner",
   "myPermissions": [
     "farm.read",
@@ -54,6 +54,9 @@
     "inventory.issue",
     "inventory.manage",
     "alert.manage",
+    "task.read",
+    "task.complete",
+    "task.manage",
     "content.read"
   ]
 }

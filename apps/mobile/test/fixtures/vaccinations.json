@@ -1,0 +1,28 @@
+{
+  "items": [
+    {
+      "id": "01a13e06-a96d-73c4-a7a9-48b70a5c11be",
+      "status": "scheduled",
+      "flockId": "01a13e06-a8ef-7089-bce0-dca1f48c15aa",
+      "vaccineName": "IB spray",
+      "dueDate": "2026-10-14",
+      "createdBy": "01a13e06-a89d-71b6-8437-b78aa2287571",
+      "version": 0,
+      "createdAt": "2026-10-15T05:26:26.413Z",
+      "updatedAt": "2026-10-15T05:26:26.413Z",
+      "state": "overdue"
+    },
+    {
+      "id": "01a13e06-a93a-74dc-815d-4bc1f2af0b75",
+      "status": "scheduled",
+      "flockId": "01a13e06-a8ef-7089-bce0-dca1f48c15aa",
+      "vaccineName": "ND booster",
+      "dueDate": "2026-10-17",
+      "createdBy": "01a13e06-a89d-71b6-8437-b78aa2287571",
+      "version": 0,
+      "createdAt": "2026-10-15T05:26:26.362Z",
+      "updatedAt": "2026-10-15T05:26:26.362Z",
+      "state": "due"
+    }
+  ]
+}

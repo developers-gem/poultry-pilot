@@ -1,0 +1,10 @@
+{
+  "error": {
+    "code": "VERSION_CONFLICT",
+    "message": "This day's record was changed by someone else. Reload it first.",
+    "details": {
+      "serverVersion": 1
+    },
+    "requestId": "01a13e06-a9b0-730b-80a1-6d9703630b59"
+  }
+}

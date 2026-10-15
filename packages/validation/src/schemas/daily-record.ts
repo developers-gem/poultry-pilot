@@ -164,7 +164,7 @@ export const DailyRecordView = z.object({
   mortality: z.array(z.object({ cause: MortalityCause, count: z.number(), eventId: z.string(), fromDailyRecord: z.boolean() })),
   mortalityTotal: z.number(),
   culls: z.number(),
-  feed: z.array(z.object({ id: z.string(), kind: FeedConsumptionKind, quantityKg: z.number(), feedItemId: z.string().optional(), cost: Money.optional() })),
+  feed: z.array(z.object({ id: z.string(), kind: FeedConsumptionKind, quantityKg: z.number(), feedItemId: z.string().optional(), cost: Money.optional(), fromDailyRecord: z.boolean() })),
   feedKg: z.number(),
   waterLitres: z.number().optional(),
   water: z

@@ -1,0 +1,57 @@
+{
+  "id": "01a13e06-a925-70e7-96b9-3263bb9d6850",
+  "flockId": "01a13e06-a8ef-7089-bce0-dca1f48c15aa",
+  "flockCode": "L1",
+  "houseId": "01a13e06-a8e7-7044-8f44-e772371261d9",
+  "flockType": "layer",
+  "date": "2026-10-15",
+  "birdsAliveEndOfDay": 996,
+  "mortality": [
+    {
+      "cause": "unknown",
+      "count": 1,
+      "eventId": "01a13e06-a9ab-723e-ab50-bcdde7d214bb",
+      "fromDailyRecord": true
+    }
+  ],
+  "mortalityTotal": 1,
+  "culls": 0,
+  "feed": [],
+  "feedKg": 0,
+  "waterLitres": 210,
+  "water": {
+    "flags": [],
+    "baselineLitres": null
+  },
+  "temperatureMinC": 24,
+  "temperatureMaxC": 33,
+  "humidityPercent": 61,
+  "eggs": {
+    "collected": 900,
+    "broken": 8,
+    "henDayPercent": 90.27081243731193
+  },
+  "averageWeight": {
+    "averageWeightG": 1780,
+    "sampleSize": 10,
+    "eventId": "01a13e06-a9ab-723e-ab50-c1fde4c4391d"
+  },
+  "healthObservations": [
+    {
+      "id": "01a13e06-a9ad-750c-9200-9e658de0c903",
+      "signs": "Two birds coughing",
+      "affectedBirds": 2
+    }
+  ],
+  "photos": [
+    {
+      "assetId": "01a13e06-a99e-71ca-ad27-f70738369687",
+      "caption": "Drinker line",
+      "url": "/api/v1/farms/01a13e06-a89d-71b6-8437-be15d9cd8125/media/01a13e06-a99e-71ca-ad27-f70738369687"
+    }
+  ],
+  "version": 1,
+  "createdBy": "01a13e06-a89d-71b6-8437-b78aa2287571",
+  "createdAt": "2026-10-15T05:26:26.341Z",
+  "updatedAt": "2026-10-15T05:26:26.475Z"
+}

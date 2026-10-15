@@ -1,0 +1,25 @@
+{
+  "items": [
+    {
+      "eventId": "01a13e06-a9ab-723e-ab50-c1fde4c4391d",
+      "date": "2026-10-15",
+      "averageWeightG": 1780,
+      "sampleSize": 10,
+      "note": null
+    },
+    {
+      "eventId": "01a13e06-a960-716c-9a69-e8ff1a680d9d",
+      "date": "2026-10-14",
+      "averageWeightG": 1771.3,
+      "sampleSize": 4,
+      "stats": {
+        "minG": 1720,
+        "maxG": 1810,
+        "sdG": 38.8,
+        "cvPercent": 2.2,
+        "uniformityPercent": 100
+      },
+      "note": null
+    }
+  ]
+}

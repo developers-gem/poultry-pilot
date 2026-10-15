@@ -438,7 +438,8 @@ export function createDailyRecordService(d: DailyRecordDeps) {
       mortality,
       mortalityTotal: mortality.reduce((t, m) => t + m.count, 0),
       culls: day.filter((e) => e.type === "cull").reduce((t, e) => t + (e.birds ?? 0), 0),
-      feed: feed.map((x) => ({ id: x.id, kind: x.kind ?? "consumption", quantityKg: x.quantityKg, ...(x.feedItemId ? { feedItemId: x.feedItemId } : {}), ...(x.cost ? { cost: x.cost } : {}) })),
+      // fromDailyRecord: entered in this record (a PATCH of `feed` replaces these); others came from feed use entries.
+      feed: feed.map((x) => ({ id: x.id, kind: x.kind ?? "consumption", quantityKg: x.quantityKg, ...(x.feedItemId ? { feedItemId: x.feedItemId } : {}), ...(x.cost ? { cost: x.cost } : {}), fromDailyRecord: !!record && x.dailyRecordId === record.id })),
       feedKg: Math.round(feed.filter((x) => (x.kind ?? "consumption") === "consumption").reduce((t, x) => t + x.quantityKg, 0) * 1000) / 1000,
       ...(water ? { waterLitres: water.litres } : {}),
       ...(water

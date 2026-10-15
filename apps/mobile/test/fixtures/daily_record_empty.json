@@ -1,0 +1,17 @@
+{
+  "id": null,
+  "flockId": "01a13e06-a8ef-7089-bce0-dca1f48c15aa",
+  "flockCode": "L1",
+  "houseId": "01a13e06-a8e7-7044-8f44-e772371261d9",
+  "flockType": "layer",
+  "date": "2026-10-16",
+  "birdsAliveEndOfDay": 996,
+  "mortality": [],
+  "mortalityTotal": 0,
+  "culls": 0,
+  "feed": [],
+  "feedKg": 0,
+  "healthObservations": [],
+  "photos": [],
+  "version": null
+}

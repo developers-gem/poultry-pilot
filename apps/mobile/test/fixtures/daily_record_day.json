@@ -1,0 +1,55 @@
+{
+  "id": "01a13e06-a91f-7278-a969-f713e348b7cd",
+  "flockId": "01a13e06-a8ef-7089-bce0-dca1f48c15aa",
+  "flockCode": "L1",
+  "houseId": "01a13e06-a8e7-7044-8f44-e772371261d9",
+  "flockType": "layer",
+  "date": "2026-10-14",
+  "birdsAliveEndOfDay": 997,
+  "mortality": [
+    {
+      "cause": "unknown",
+      "count": 1,
+      "eventId": "01a13e06-a91f-7278-a969-f8f25053bf64",
+      "fromDailyRecord": true
+    }
+  ],
+  "mortalityTotal": 1,
+  "culls": 0,
+  "feed": [
+    {
+      "id": "01a13e06-a97b-7193-bdb3-1d83052803a9",
+      "kind": "consumption",
+      "quantityKg": 110,
+      "feedItemId": "01a13e06-a92b-76aa-a514-19f6a623996f",
+      "cost": {
+        "amountMinor": 308000,
+        "currency": "INR"
+      },
+      "fromDailyRecord": true
+    },
+    {
+      "id": "01a13e06-a984-71da-ad3c-676af177f911",
+      "kind": "wastage",
+      "quantityKg": 5,
+      "feedItemId": "01a13e06-a92b-76aa-a514-19f6a623996f",
+      "cost": {
+        "amountMinor": 14000,
+        "currency": "INR"
+      },
+      "fromDailyRecord": false
+    }
+  ],
+  "feedKg": 110,
+  "eggs": {
+    "collected": 895,
+    "broken": 8,
+    "henDayPercent": 89.67935871743487
+  },
+  "healthObservations": [],
+  "photos": [],
+  "version": 1,
+  "createdBy": "01a13e06-a89d-71b6-8437-b78aa2287571",
+  "createdAt": "2026-10-15T05:26:26.335Z",
+  "updatedAt": "2026-10-15T05:26:26.426Z"
+}

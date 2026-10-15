@@ -1,0 +1,15 @@
+{
+  "id": "01a13e06-a9ca-737a-b778-cc7bc3c06e89",
+  "type": "observation",
+  "date": "2026-10-15",
+  "flockId": "01a13e06-a8ef-7089-bce0-dca1f48c15aa",
+  "title": "Coughing in house A",
+  "symptoms": [
+    "coughing"
+  ],
+  "affectedBirds": 3,
+  "createdBy": "01a13e06-a89d-71b6-8437-b78aa2287571",
+  "version": 0,
+  "createdAt": "2026-10-15T05:26:26.507Z",
+  "updatedAt": "2026-10-15T05:26:26.507Z"
+}

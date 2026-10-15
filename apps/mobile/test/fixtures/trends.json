@@ -1,0 +1,158 @@
+{
+  "from": "2026-10-02",
+  "to": "2026-10-15",
+  "flockIds": [
+    "01a13e06-a8ef-7089-bce0-dca1f48c15aa"
+  ],
+  "days": [
+    {
+      "date": "2026-10-02",
+      "mortality": 0,
+      "culls": 0,
+      "feedKg": 0,
+      "waterLitres": 0,
+      "eggsCollected": 0,
+      "eggsBroken": 0,
+      "records": 0
+    },
+    {
+      "date": "2026-10-03",
+      "mortality": 0,
+      "culls": 0,
+      "feedKg": 0,
+      "waterLitres": 0,
+      "eggsCollected": 0,
+      "eggsBroken": 0,
+      "records": 0
+    },
+    {
+      "date": "2026-10-04",
+      "mortality": 0,
+      "culls": 0,
+      "feedKg": 0,
+      "waterLitres": 0,
+      "eggsCollected": 0,
+      "eggsBroken": 0,
+      "records": 0
+    },
+    {
+      "date": "2026-10-05",
+      "mortality": 0,
+      "culls": 0,
+      "feedKg": 0,
+      "waterLitres": 0,
+      "eggsCollected": 0,
+      "eggsBroken": 0,
+      "records": 0
+    },
+    {
+      "date": "2026-10-06",
+      "mortality": 0,
+      "culls": 0,
+      "feedKg": 0,
+      "waterLitres": 0,
+      "eggsCollected": 0,
+      "eggsBroken": 0,
+      "records": 0
+    },
+    {
+      "date": "2026-10-07",
+      "mortality": 0,
+      "culls": 0,
+      "feedKg": 0,
+      "waterLitres": 0,
+      "eggsCollected": 0,
+      "eggsBroken": 0,
+      "records": 0
+    },
+    {
+      "date": "2026-10-08",
+      "mortality": 0,
+      "culls": 0,
+      "feedKg": 0,
+      "waterLitres": 0,
+      "eggsCollected": 0,
+      "eggsBroken": 0,
+      "records": 0
+    },
+    {
+      "date": "2026-10-09",
+      "mortality": 0,
+      "culls": 0,
+      "feedKg": 0,
+      "waterLitres": 0,
+      "eggsCollected": 0,
+      "eggsBroken": 0,
+      "records": 0
+    },
+    {
+      "date": "2026-10-10",
+      "mortality": 0,
+      "culls": 0,
+      "feedKg": 0,
+      "waterLitres": 0,
+      "eggsCollected": 0,
+      "eggsBroken": 0,
+      "records": 0
+    },
+    {
+      "date": "2026-10-11",
+      "mortality": 0,
+      "culls": 0,
+      "feedKg": 0,
+      "waterLitres": 0,
+      "eggsCollected": 0,
+      "eggsBroken": 0,
+      "records": 0
+    },
+    {
+      "date": "2026-10-12",
+      "mortality": 1,
+      "culls": 0,
+      "feedKg": 0,
+      "waterLitres": 0,
+      "eggsCollected": 885,
+      "eggsBroken": 8,
+      "records": 1
+    },
+    {
+      "date": "2026-10-13",
+      "mortality": 1,
+      "culls": 0,
+      "feedKg": 0,
+      "waterLitres": 0,
+      "eggsCollected": 890,
+      "eggsBroken": 8,
+      "records": 1
+    },
+    {
+      "date": "2026-10-14",
+      "mortality": 1,
+      "culls": 0,
+      "feedKg": 115,
+      "waterLitres": 0,
+      "eggsCollected": 895,
+      "eggsBroken": 8,
+      "records": 1
+    },
+    {
+      "date": "2026-10-15",
+      "mortality": 1,
+      "culls": 0,
+      "feedKg": 0,
+      "waterLitres": 210,
+      "eggsCollected": 900,
+      "eggsBroken": 8,
+      "records": 1
+    }
+  ],
+  "totals": {
+    "mortality": 4,
+    "culls": 0,
+    "feedKg": 115,
+    "waterLitres": 210,
+    "eggsCollected": 3570,
+    "eggsBroken": 32,
+    "records": 4
+  }
+}

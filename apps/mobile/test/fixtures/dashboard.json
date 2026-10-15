@@ -1,7 +1,7 @@
 {
-  "date": "2026-10-14",
+  "date": "2026-10-15",
   "farm": {
-    "id": "01a139e3-6e6e-7611-becc-e9ab7af39fbc",
+    "id": "01a13e06-a89d-71b6-8437-be15d9cd8125",
     "name": "Green Valley Poultry",
     "currency": "INR"
   },
@@ -14,13 +14,13 @@
     },
     "latest": [
       {
-        "id": "01a139e3-6efe-754d-99e1-d8cb874e5330",
+        "id": "01a13e06-a958-731d-aa2d-e669131955d6",
         "ruleType": "weather_risk",
         "severity": "warning",
         "status": "open",
-        "title": "Weather: heat on 2026-10-14",
+        "title": "Weather: heat on 2026-10-15",
         "flockId": null,
-        "date": "2026-10-14"
+        "date": "2026-10-15"
       }
     ]
   },
@@ -30,22 +30,31 @@
       "mortality": 1,
       "culls": 0,
       "feedKg": 0,
-      "waterLitres": 0,
+      "waterLitres": 210,
       "eggsCollected": 900,
       "eggsBroken": 8,
       "henDayPercent": 90.27081243731193,
-      "mortalityRatePercent": 0.10030090270812438
+      "mortalityRatePercent": 0.10030090270812438,
+      "averageWeightG": 1780,
+      "latestWeighingDate": "2026-10-15"
     },
     "flocksTotal": 1,
     "flocksRecorded": 1,
     "flocks": [
       {
-        "flockId": "01a139e3-6eac-713e-b3ab-cd8760075918",
+        "flockId": "01a13e06-a8ef-7089-bce0-dca1f48c15aa",
         "flockCode": "L1",
         "type": "layer",
+        "houseId": "01a13e06-a8e7-7044-8f44-e772371261d9",
         "birdsAlive": 996,
         "mortality": 1,
+        "culls": 0,
+        "feedKg": 0,
+        "waterLitres": 210,
         "eggsCollected": 900,
+        "eggsBroken": 8,
+        "averageWeightG": 1780,
+        "latestWeighingDate": "2026-10-15",
         "recorded": true
       }
     ]
@@ -59,7 +68,7 @@
       "windKph": 12
     },
     "today": {
-      "date": "2026-10-14",
+      "date": "2026-10-15",
       "tempMaxC": 37,
       "tempMinC": 23,
       "rainMm": 0,
@@ -67,14 +76,14 @@
     },
     "next": [
       {
-        "date": "2026-10-15",
+        "date": "2026-10-16",
         "tempMaxC": 32,
         "tempMinC": 23,
         "rainMm": 0,
         "windMaxKph": 15
       },
       {
-        "date": "2026-10-16",
+        "date": "2026-10-17",
         "tempMaxC": 31,
         "tempMinC": 23,
         "rainMm": 0,
@@ -83,32 +92,42 @@
     ],
     "risks": [
       {
-        "date": "2026-10-14",
+        "date": "2026-10-15",
         "kind": "heat",
         "value": 37,
         "reason": "high of 37 °C, 6 °C above this farm's recent average high (31 °C)"
       }
     ],
     "stale": false,
-    "fetchedAt": "2026-10-14T10:09:28.829Z"
+    "fetchedAt": "2026-10-15T05:26:26.389Z"
   },
   "upcoming": [
     {
       "type": "vaccination_due",
-      "date": "2026-10-16",
+      "date": "2026-10-15",
+      "title": "IB spray for L1 (due 2026-10-14)",
+      "refType": "vaccination",
+      "refId": "01a13e06-a96d-73c4-a7a9-48b70a5c11be",
+      "flockId": "01a13e06-a8ef-7089-bce0-dca1f48c15aa",
+      "id": "vaccination_due:01a13e06-a96d-73c4-a7a9-48b70a5c11be",
+      "overdue": true
+    },
+    {
+      "type": "vaccination_due",
+      "date": "2026-10-17",
       "title": "ND booster for L1",
       "refType": "vaccination",
-      "refId": "01a139e3-6eea-753c-b580-c97f4a1e1c86",
-      "flockId": "01a139e3-6eac-713e-b3ab-cd8760075918",
-      "id": "vaccination_due:01a139e3-6eea-753c-b580-c97f4a1e1c86",
+      "refId": "01a13e06-a93a-74dc-815d-4bc1f2af0b75",
+      "flockId": "01a13e06-a8ef-7089-bce0-dca1f48c15aa",
+      "id": "vaccination_due:01a13e06-a93a-74dc-815d-4bc1f2af0b75",
       "overdue": false
     }
   ],
   "inventory": {
-    "totalValueMinor": 2800000,
+    "totalValueMinor": 2478000,
     "lowStockItems": 0,
     "lotsExpiringSoon": 0,
-    "feedDaysRemaining": null,
+    "feedDaysRemaining": 7,
     "eggsInStock": 3538,
     "chicksAvailable": 0
   },
@@ -116,6 +135,27 @@
     "incubating": 0,
     "eggsIncubating": 0,
     "nextHatch": null
+  },
+  "tasks": {
+    "open": 2,
+    "dueToday": 1,
+    "overdue": 1,
+    "next": [
+      {
+        "id": "01a13e06-a973-7768-99f7-b3cfa5d1b0d0",
+        "title": "Order litter",
+        "dueDate": "2026-10-14",
+        "priority": "normal",
+        "overdue": true
+      },
+      {
+        "id": "01a13e06-a967-71b3-9b40-fc6cef23f38b",
+        "title": "Clean the drinkers",
+        "dueDate": "2026-10-15",
+        "priority": "high",
+        "overdue": false
+      }
+    ]
   },
   "finance": {
     "cashMinor": 500000,

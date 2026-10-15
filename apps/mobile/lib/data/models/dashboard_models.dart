@@ -18,6 +18,7 @@ WeatherModel? _weather(Object? j) => _available(j) == null ? null : WeatherModel
 InventoryModel? _inventory(Object? j) => _available(j) == null ? null : InventoryModel.fromJson(_available(j)!);
 HatcheryModel? _hatchery(Object? j) => _available(j) == null ? null : HatcheryModel.fromJson(_available(j)!);
 FinanceModel? _finance(Object? j) => _available(j) == null ? null : FinanceModel.fromJson(_available(j)!);
+TasksModel? _tasks(Object? j) => _available(j) == null ? null : TasksModel.fromJson(_available(j)!);
 List<UpcomingModel> _upcoming(Object? j) => j is List ? j.whereType<Map>().map((e) => UpcomingModel.fromJson(e.cast<String, dynamic>())).toList() : const [];
 
 @freezed
@@ -35,6 +36,7 @@ class DashboardModel with _$DashboardModel {
     @JsonKey(fromJson: _inventory) InventoryModel? inventory,
     @JsonKey(fromJson: _hatchery) HatcheryModel? hatchery,
     @JsonKey(fromJson: _finance) FinanceModel? finance,
+    @JsonKey(fromJson: _tasks) TasksModel? tasks,
   }) = _DashboardModel;
 
   factory DashboardModel.fromJson(Map<String, dynamic> json) => _$DashboardModelFromJson(json);
@@ -58,10 +60,13 @@ class DashboardModel with _$DashboardModel {
                 eggsCollected: production!.totals.eggsCollected.toInt(),
                 eggsBroken: production!.totals.eggsBroken.toInt(),
                 feedKg: production!.totals.feedKg.toDouble(),
+                waterLitres: production!.totals.waterLitres.toDouble(),
+                averageWeightG: production!.totals.averageWeightG?.toDouble(),
+                latestWeighingDate: production!.totals.latestWeighingDate,
                 henDayPercent: production!.totals.henDayPercent?.toDouble(),
                 flocksTotal: production!.flocksTotal,
                 flocksRecorded: production!.flocksRecorded,
-                flocks: production!.flocks.map((f) => FlockToday(flockId: f.flockId, flockCode: f.flockCode, type: f.type, birdsAlive: f.birdsAlive.toInt(), mortality: f.mortality.toInt(), eggsCollected: f.eggsCollected?.toInt(), recorded: f.recorded)).toList(),
+                flocks: production!.flocks.map((f) => FlockToday(flockId: f.flockId, flockCode: f.flockCode, type: f.type, houseId: f.houseId, birdsAlive: f.birdsAlive.toInt(), mortality: f.mortality.toInt(), feedKg: f.feedKg.toDouble(), waterLitres: f.waterLitres.toDouble(), eggsCollected: f.eggsCollected?.toInt(), averageWeightG: f.averageWeightG?.toDouble(), recorded: f.recorded)).toList(),
               ),
         weather: weather == null
             ? null
@@ -80,6 +85,7 @@ class DashboardModel with _$DashboardModel {
         finance: finance == null
             ? null
             : FinanceToday(cashMinor: finance!.cashMinor.toInt(), receivablesMinor: finance!.receivablesMinor.toInt(), payablesMinor: finance!.payablesMinor.toInt(), monthRevenueMinor: finance!.monthToDate.revenueMinor.toInt(), monthExpensesMinor: finance!.monthToDate.expensesMinor.toInt(), monthProfitMinor: finance!.monthToDate.profitMinor.toInt()),
+        tasks: tasks == null ? null : TasksSummary(open: tasks!.open, dueToday: tasks!.dueToday, overdue: tasks!.overdue, next: tasks!.next.map((t) => TaskPreview(id: t.id, title: t.title, dueDate: t.dueDate, priority: t.priority, overdue: t.overdue)).toList()),
       );
 }
 
@@ -109,13 +115,13 @@ class ProductionModel with _$ProductionModel {
 
 @freezed
 class ProductionTotalsModel with _$ProductionTotalsModel {
-  const factory ProductionTotalsModel({required num birdsAlive, required num mortality, @Default(0) num culls, required num feedKg, @Default(0) num waterLitres, required num eggsCollected, required num eggsBroken, num? henDayPercent, num? mortalityRatePercent}) = _ProductionTotalsModel;
+  const factory ProductionTotalsModel({required num birdsAlive, required num mortality, @Default(0) num culls, required num feedKg, @Default(0) num waterLitres, required num eggsCollected, required num eggsBroken, num? henDayPercent, num? mortalityRatePercent, num? averageWeightG, String? latestWeighingDate}) = _ProductionTotalsModel;
   factory ProductionTotalsModel.fromJson(Map<String, dynamic> json) => _$ProductionTotalsModelFromJson(json);
 }
 
 @freezed
 class FlockTodayModel with _$FlockTodayModel {
-  const factory FlockTodayModel({required String flockId, required String flockCode, required String type, required num birdsAlive, required num mortality, num? eggsCollected, required bool recorded}) = _FlockTodayModel;
+  const factory FlockTodayModel({required String flockId, required String flockCode, required String type, String? houseId, required num birdsAlive, required num mortality, @Default(0) num feedKg, @Default(0) num waterLitres, num? eggsCollected, num? averageWeightG, String? latestWeighingDate, required bool recorded}) = _FlockTodayModel;
   factory FlockTodayModel.fromJson(Map<String, dynamic> json) => _$FlockTodayModelFromJson(json);
 }
 
@@ -177,4 +183,16 @@ class FinanceModel with _$FinanceModel {
 class MonthToDateModel with _$MonthToDateModel {
   const factory MonthToDateModel({required num revenueMinor, required num expensesMinor, required num profitMinor}) = _MonthToDateModel;
   factory MonthToDateModel.fromJson(Map<String, dynamic> json) => _$MonthToDateModelFromJson(json);
+}
+
+@freezed
+class TasksModel with _$TasksModel {
+  const factory TasksModel({@Default(0) int open, @Default(0) int dueToday, @Default(0) int overdue, @Default(<TaskPreviewModel>[]) List<TaskPreviewModel> next}) = _TasksModel;
+  factory TasksModel.fromJson(Map<String, dynamic> json) => _$TasksModelFromJson(json);
+}
+
+@freezed
+class TaskPreviewModel with _$TaskPreviewModel {
+  const factory TaskPreviewModel({required String id, required String title, String? dueDate, @Default('normal') String priority, @Default(false) bool overdue}) = _TaskPreviewModel;
+  factory TaskPreviewModel.fromJson(Map<String, dynamic> json) => _$TaskPreviewModelFromJson(json);
 }

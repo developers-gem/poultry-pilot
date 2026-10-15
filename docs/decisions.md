@@ -191,3 +191,12 @@ Each is cheap to change until the phase named.
 | D112 | Offline (mobile) | Dashboard and account cached in Drift; served when offline and marked with the time saved |
 | D113 | API/app contract | Mobile models tested against fixtures captured from the real API; an API test fails when those responses change shape |
 | D114 | Generated code | Freezed, json_serializable and Drift output is generated (setup script and CI), not committed |
+
+## Added with the farmer workflow
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| D115 | Tasks | Stored tasks (general, follow-up, corrective action) with task.read, task.complete and task.manage; "today" adds calendar work and missing daily entries |
+| D116 | Daily entry on mobile | One PATCH of the touched sections; record-owned feed and deaths flagged in the day view, so entries made elsewhere are never replaced |
+| D117 | Offline entry | Drift outbox. The day is re-read before sending; if its version changed, the entry is held for the farmer to send or discard. Cleared on sign-out |
+| D118 | One-handed use | Bottom dock for date, flock and save; sheets with keypads, steppers and chips; targets ≥ 56 dp |

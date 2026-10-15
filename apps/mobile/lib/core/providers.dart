@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/datasources/local/cache_store.dart';
+import '../data/datasources/local/photo_store.dart';
 import '../data/datasources/remote/poultrypilot_api.dart';
+import '../data/repositories/farm_work_repositories.dart';
 import '../data/repositories/repositories_impl.dart';
 import '../domain/repositories/repositories.dart';
 import 'database/app_database.dart';
@@ -30,9 +32,13 @@ final cacheStoreProvider = Provider<CacheStore>((ref) => CacheStore(ref.watch(da
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   final store = ref.watch(tokenStoreProvider);
-  return AuthRepositoryImpl(api: ref.watch(apiProvider), tokens: store, cache: ref.watch(cacheStoreProvider), device: () => DeviceIdentity.load(store));
+  return AuthRepositoryImpl(api: ref.watch(apiProvider), tokens: store, cache: ref.watch(cacheStoreProvider), device: () => DeviceIdentity.load(store), photos: ref.watch(photoStoreProvider));
 });
 final farmRepositoryProvider = Provider<FarmRepository>((ref) => FarmRepositoryImpl(api: ref.watch(apiProvider), tokens: ref.watch(tokenStoreProvider)));
 final dashboardRepositoryProvider = Provider<DashboardRepository>((ref) => DashboardRepositoryImpl(api: ref.watch(apiProvider), cache: ref.watch(cacheStoreProvider)));
 final profileRepositoryProvider = Provider<ProfileRepository>((ref) => ProfileRepositoryImpl(api: ref.watch(apiProvider)));
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) => SettingsRepositoryImpl(api: ref.watch(apiProvider), cache: ref.watch(cacheStoreProvider)));
+
+final photoStoreProvider = Provider<PhotoStore>((ref) => FilePhotoStore());
+final dailyEntryRepositoryProvider = Provider<DailyEntryRepository>((ref) => DailyEntryRepositoryImpl(api: ref.watch(apiProvider), cache: ref.watch(cacheStoreProvider), db: ref.watch(databaseProvider), photos: ref.watch(photoStoreProvider)));
+final farmWorkRepositoryProvider = Provider<FarmWorkRepository>((ref) => FarmWorkRepositoryImpl(api: ref.watch(apiProvider), cache: ref.watch(cacheStoreProvider)));

@@ -1,0 +1,34 @@
+{
+  "items": [
+    {
+      "id": "01a13e06-a9ad-750c-9200-9e658de0c903",
+      "flockId": "01a13e06-a8ef-7089-bce0-dca1f48c15aa",
+      "houseId": "01a13e06-a8e7-7044-8f44-e772371261d9",
+      "type": "observation",
+      "date": "2026-10-15",
+      "title": "Two birds coughing",
+      "observedSigns": "Two birds coughing",
+      "affectedBirds": 2,
+      "dailyRecordId": "01a13e06-a925-70e7-96b9-3263bb9d6850",
+      "createdBy": "01a13e06-a89d-71b6-8437-b78aa2287571",
+      "version": 0,
+      "createdAt": "2026-10-15T05:26:26.475Z",
+      "updatedAt": "2026-10-15T05:26:26.475Z"
+    },
+    {
+      "id": "01a13e06-a9ca-737a-b778-cc7bc3c06e89",
+      "type": "observation",
+      "date": "2026-10-15",
+      "flockId": "01a13e06-a8ef-7089-bce0-dca1f48c15aa",
+      "title": "Coughing in house A",
+      "symptoms": [
+        "coughing"
+      ],
+      "affectedBirds": 3,
+      "createdBy": "01a13e06-a89d-71b6-8437-b78aa2287571",
+      "version": 0,
+      "createdAt": "2026-10-15T05:26:26.507Z",
+      "updatedAt": "2026-10-15T05:26:26.507Z"
+    }
+  ]
+}

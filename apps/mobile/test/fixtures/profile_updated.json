@@ -1,6 +1,6 @@
 {
   "user": {
-    "id": "01a139e3-6e6d-7545-8bd0-a940f4ffe2ec",
+    "id": "01a13e06-a89d-71b6-8437-b78aa2287571",
     "email": "asha@example.com",
     "fullName": "Asha Verma",
     "phone": "+91 98765 43210",
@@ -8,13 +8,13 @@
     "emailVerified": false,
     "hasPassword": true,
     "googleLinked": false,
-    "createdAt": "2026-10-14T10:09:28.685Z"
+    "createdAt": "2026-10-15T05:26:26.205Z"
   },
-  "sessionId": "01a139e3-6e7d-7798-9df3-7d90d5b95aac",
+  "sessionId": "01a13e06-a8b5-752d-ba0b-29820233882e",
   "memberships": [
     {
-      "membershipId": "01a139e3-6e6e-7611-becc-ec3116335752",
-      "farmId": "01a139e3-6e6e-7611-becc-e9ab7af39fbc",
+      "membershipId": "01a13e06-a89e-7616-9aac-67e1f54161df",
+      "farmId": "01a13e06-a89d-71b6-8437-be15d9cd8125",
       "farmName": "Green Valley Poultry",
       "role": "owner",
       "permissions": [
@@ -53,12 +53,15 @@
         "inventory.issue",
         "inventory.manage",
         "alert.manage",
+        "task.read",
+        "task.complete",
+        "task.manage",
         "content.read"
       ]
     },
     {
-      "membershipId": "01a139e3-6f19-70bf-be88-66652641d5a7",
-      "farmId": "01a139e3-6f19-70bf-be88-603b313bf322",
+      "membershipId": "01a13e06-aa20-73d4-a344-776ce849efd1",
+      "farmId": "01a13e06-aa20-73d4-a344-715b90e25c21",
       "farmName": "Second Farm",
       "role": "owner",
       "permissions": [
@@ -97,6 +100,9 @@
         "inventory.issue",
         "inventory.manage",
         "alert.manage",
+        "task.read",
+        "task.complete",
+        "task.manage",
         "content.read"
       ]
     }

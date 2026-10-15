@@ -1,3 +1,4 @@
+import { taskRoutes } from "./http/routes/task.routes.js";
 import { API_PREFIX, HEADERS } from "@poultrypilot/constants";
 import cors from "cors";
 import express, { type Express } from "express";
@@ -112,6 +113,7 @@ export function createApp(c: Container): Express {
   v1.use("/farms/:farmId", ...secured, intelligenceRoutes({ dashboard: c.dashboard, rules: c.rules, weather: c.weather }, c.farms));
   v1.use("/farms/:farmId/chickstart", ...secured, chickStartRoutes(c.chickStart, c.farms));
   v1.use("/farms/:farmId/calendar", ...secured, calendarRoutes(c.calendar, c.farms));
+  v1.use("/farms/:farmId/tasks", ...secured, taskRoutes(c.tasks, c.farms));
   v1.use("/farms", ...secured, farmRoutes(c.farms, c.audit));
   v1.use("/sync", ...secured, syncRoutes(c.sync, c.farms));
 

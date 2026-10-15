@@ -1,0 +1,43 @@
+{
+  "date": "2026-10-15",
+  "today": "2026-10-15",
+  "editWindowStart": "2026-10-14",
+  "flocks": [
+    {
+      "flockId": "01a13e06-a8ef-7089-bce0-dca1f48c15aa",
+      "flockCode": "L1",
+      "name": "Layers",
+      "type": "layer",
+      "houseId": "01a13e06-a8e7-7044-8f44-e772371261d9",
+      "houseName": "House A",
+      "expectedBirds": 996,
+      "laying": true,
+      "record": {
+        "id": "01a13e06-a925-70e7-96b9-3263bb9d6850",
+        "version": 0,
+        "summary": {
+          "mortality": 1,
+          "culls": 0,
+          "feedKg": 0,
+          "waterLitres": null,
+          "eggsCollected": 900,
+          "eggsBroken": 8,
+          "averageWeightG": null,
+          "observations": 0,
+          "photos": 0
+        }
+      },
+      "previous": {
+        "mortality": 1,
+        "culls": 0,
+        "feedKg": 110,
+        "waterLitres": null,
+        "eggsCollected": 895,
+        "eggsBroken": 8,
+        "averageWeightG": null,
+        "observations": 0,
+        "photos": 0
+      }
+    }
+  ]
+}

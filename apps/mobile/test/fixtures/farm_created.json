@@ -1,5 +1,5 @@
 {
-  "id": "01a139e3-6f19-70bf-be88-603b313bf322",
+  "id": "01a13e06-aa20-73d4-a344-715b90e25c21",
   "name": "Second Farm",
   "settings": {
     "timezone": "Asia/Kolkata",
@@ -9,8 +9,8 @@
     "workerEditWindowDays": 1
   },
   "version": 0,
-  "createdAt": "2026-10-14T10:09:28.856Z",
-  "updatedAt": "2026-10-14T10:09:28.856Z",
+  "createdAt": "2026-10-15T05:26:26.592Z",
+  "updatedAt": "2026-10-15T05:26:26.592Z",
   "myRole": "owner",
   "myPermissions": [
     "farm.read",
@@ -48,6 +48,9 @@
     "inventory.issue",
     "inventory.manage",
     "alert.manage",
+    "task.read",
+    "task.complete",
+    "task.manage",
     "content.read"
   ]
 }

@@ -51,7 +51,8 @@ void main() {
     expect(d.weatherUnavailable, isNull);
     expect(d.alerts.open, 1);
     expect(d.alerts.latest.single.ruleType, 'weather_risk');
-    expect(d.upcoming.first.title, contains('ND booster'));
+    expect(d.upcoming.first.title, contains('IB spray')); // overdue comes first
+    expect(d.upcoming.any((u) => u.title.contains('ND booster')), isTrue);
     expect(d.inventory!.eggsInStock, greaterThan(0));
     expect(d.finance!.cashMinor, 500000);
   });

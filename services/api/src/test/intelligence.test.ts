@@ -313,7 +313,7 @@ describe("dashboard, analytics and alerts endpoints", () => {
     await flockWithDeaths(s, "D1", [2, 3]);
     const worker = await joinAs(s.ctx, s.owner, "w@example.com", "worker");
     const own = (await s.call("get", "/dashboard")).body;
-    expect(Object.keys(own).sort()).toEqual(["alerts", "date", "farm", "finance", "hatchery", "inventory", "production", "upcoming", "weather"]);
+    expect(Object.keys(own).sort()).toEqual(["alerts", "date", "farm", "finance", "hatchery", "inventory", "production", "tasks", "upcoming", "weather"]);
     expect(own.production).toMatchObject({ flocksTotal: 1 });
     expect(own.finance).toMatchObject({ cashMinor: 0, receivablesMinor: 0 });
     const w = (await s.call("get", "/dashboard", worker.access)).body;

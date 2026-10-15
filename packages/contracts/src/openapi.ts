@@ -469,10 +469,21 @@ post("/farms/invitations/accept", "Accept an emailed farm invitation", bodyOf(S.
 // ---- Added for the web app -----------------------------------------------------------
 {
   const any = z.record(z.unknown());
-  const r = (method: "get" | "put" | "patch", path: string, tag: string, summary: string, params: z.AnyZodObject, request: Record<string, unknown>, ok: Record<string, unknown>) =>
+  const r = (method: "get" | "put" | "patch" | "post", path: string, tag: string, summary: string, params: z.AnyZodObject, request: Record<string, unknown>, ok: Record<string, unknown>) =>
     registry.registerPath({ method, path: `${API_PREFIX}${path}`, tags: [tag], summary, security: secured, request: { params, ...request }, responses: { ...ok, ...errors } } as never);
   r("patch", "/farms/{farmId}/flocks/{flockId}/daily-records/{date}", "Daily records", "Change only the sections sent (e.g. eggs) and keep the rest of the day as recorded; version required once the record exists", z.object({ farmId: V.Id, flockId: V.Id, date: V.LocalDate }), bodyOf(V.PatchDailyRecordRequest), { 200: json(any, "The day's record"), 409: json(S.ErrorEnvelope, "Changed by someone else") });
   r("get", "/farms/{farmId}/flocks/{flockId}/weighings", "Flocks", "Weigh-ins, newest first, with min, max, CV and uniformity when birds were weighed one by one", z.object({ farmId: V.Id, flockId: V.Id }), {}, { 200: json(z.object({ items: z.array(any) }), "Weigh-ins") });
+  const task = z.object({ farmId: V.Id, taskId: V.Id });
+  const farmP = z.object({ farmId: V.Id });
+  r("get", "/farms/{farmId}/tasks", "Tasks", "Tasks, overdue first; filter by status, assignee (me = mine or unassigned), due window, flock, house", farmP, { query: V.TaskListQuery }, { 200: json(any, "Tasks with counts") });
+  r("get", "/farms/{farmId}/tasks/today", "Tasks", "Today's work: my tasks due today or overdue, scheduled work from the calendar, flocks still needing today's entry", farmP, {}, { 200: json(any, "Today's work") });
+  r("post", "/farms/{farmId}/tasks", "Tasks", "Create a task (task.manage)", farmP, bodyOf(V.CreateTaskRequest), { 201: json(any, "The task") });
+  r("get", "/farms/{farmId}/tasks/{taskId}", "Tasks", "One task", task, {}, { 200: json(any, "The task") });
+  r("put", "/farms/{farmId}/tasks/{taskId}", "Tasks", "Edit a task (version required)", task, bodyOf(V.UpdateTaskRequest), { 200: json(any, "The task"), 409: json(S.ErrorEnvelope, "Changed by someone else") });
+  r("post", "/farms/{farmId}/tasks/{taskId}/start", "Tasks", "Start a task", task, {}, { 200: json(any, "The task") });
+  r("post", "/farms/{farmId}/tasks/{taskId}/complete", "Tasks", "Finish a task (notes required for corrective actions)", task, bodyOf(V.CompleteTaskRequest), { 200: json(any, "The task") });
+  r("post", "/farms/{farmId}/tasks/{taskId}/cancel", "Tasks", "Cancel a task (task.manage)", task, bodyOf(V.CancelTaskRequest), { 200: json(any, "The task") });
+  r("post", "/farms/{farmId}/tasks/{taskId}/reopen", "Tasks", "Reopen a finished or cancelled task (task.manage)", task, {}, { 200: json(any, "The task") });
   r("put", "/me", "Account", "Update your own name and phone", z.object({}), bodyOf(V.UpdateProfileRequest), { 200: json(any, "Your account") });
 }
 

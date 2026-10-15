@@ -30,7 +30,7 @@ export async function captureMobileFixtures(): Promise<Record<string, unknown>> 
   out["error_invalid_credentials"] = (await ctx.api().post("/api/v1/auth/login").send({ email: "asha@example.com", password: "wrong-password1" })).body;
   out["error_validation"] = (await ctx.api().post("/api/v1/auth/register").send({ email: "not-an-email", password: "short", fullName: "", farm: { name: "", timezone: "Asia/Kolkata", currency: "INR" } })).body;
   const token = refreshed.body.accessToken as string;
-  const call = (m: "get" | "post" | "put", p: string, body?: object) => ctx.api()[m](`/api/v1${p}`).set(bearer(token)).send(body ?? {});
+  const call = (m: "get" | "post" | "put" | "patch", p: string, body?: object) => ctx.api()[m](`/api/v1${p}`).set(bearer(token)).send(body ?? {});
   await call("put", "/me", { fullName: "Asha Verma", phone: "+91 98765 43210" });
   const f0 = (await call("get", `/farms/${farmId}`)).body;
   await call("put", `/farms/${farmId}`, { name: f0.name, countryCode: "IN", locationLabel: "Ghaziabad", location: { lat: 28.67, lng: 77.45 }, timezone: "Asia/Kolkata", currency: "INR", unitSystem: "metric", fcrIncludesMortalityWeight: false, workerEditWindowDays: 1, version: f0.version });
@@ -43,6 +43,41 @@ export async function captureMobileFixtures(): Promise<Record<string, unknown>> 
   await call("post", `/farms/${farmId}/health/vaccinations`, { flockId: flock.id, vaccineName: "ND booster", dueDate: D(2) });
   await call("post", `/farms/${farmId}/finance/accounts`, { name: "Cash", type: "cash", openingBalance: INR(5000), openingDate: D(-30) });
   await call("post", `/farms/${farmId}/alerts/evaluate`);
+  // Daily entry: the sheet (with yesterday's values to repeat), a day's record, a partial save, a photo.
+  await call("post", `/farms/${farmId}/flocks/${flock.id}/weighings`, { date: D(-1), weightsG: [1720, 1810, 1765, 1790] });
+  await call("post", `/farms/${farmId}/tasks`, { title: "Clean the drinkers", dueDate: D(0), priority: "high", flockId: flock.id });
+  await call("post", `/farms/${farmId}/health/vaccinations`, { flockId: flock.id, vaccineName: "IB spray", dueDate: D(-1) }); // overdue: shows in today's work
+  await call("post", `/farms/${farmId}/tasks`, { title: "Order litter", dueDate: D(-1) });
+  // Feed for the day: one line in the record, one entered separately (FeedWise), to show both kinds.
+  await call("patch", `/farms/${farmId}/flocks/${flock.id}/daily-records/${D(-1)}`, { feed: [{ feedItemId: item.id, quantityKg: 110 }], version: 0 });
+  await call("post", `/farms/${farmId}/feed/consumption`, { date: D(-1), flockId: flock.id, feedItemId: item.id, quantityKg: 5, kind: "wastage", reason: "Spilled" });
+  out["feed_stock"] = (await call("get", `/farms/${farmId}/feed/stock`)).body;
+  out["daily_sheet"] = (await call("get", `/farms/${farmId}/daily-records/sheet`)).body;
+  out["daily_record_day"] = (await call("get", `/farms/${farmId}/flocks/${flock.id}/daily-records/${D(-1)}`)).body;
+  out["daily_record_empty"] = (await call("get", `/farms/${farmId}/flocks/${flock.id}/daily-records/${D(1)}`)).body;
+  const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01]), Buffer.alloc(64, 1), Buffer.from([0xff, 0xd9])]);
+  const media = await ctx.api().post(`/api/v1/farms/${farmId}/media`).set(bearer(token)).set("Content-Type", "image/jpeg").send(jpeg);
+  out["media_uploaded"] = media.body;
+  const todayRec = (await call("get", `/farms/${farmId}/flocks/${flock.id}/daily-records/${D(0)}`)).body;
+  out["daily_record_patched"] = (await ctx.api().patch(`/api/v1/farms/${farmId}/flocks/${flock.id}/daily-records/${D(0)}`).set(bearer(token)).send({
+    waterLitres: 210, temperatureMinC: 24, temperatureMaxC: 33, humidityPercent: 61, averageWeight: { averageWeightG: 1780, sampleSize: 10 },
+    healthObservations: [{ signs: "Two birds coughing", affectedBirds: 2 }], photos: [{ assetId: media.body.id, caption: "Drinker line" }], version: todayRec.version,
+  })).body;
+  out["error_version_conflict"] = (await ctx.api().patch(`/api/v1/farms/${farmId}/flocks/${flock.id}/daily-records/${D(0)}`).set(bearer(token)).send({ waterLitres: 1, version: 0 })).body;
+  // Flocks, production trends, health and tasks.
+  out["houses"] = (await call("get", `/farms/${farmId}/houses`)).body;
+  out["flocks"] = (await call("get", `/farms/${farmId}/flocks`)).body;
+  out["flock_detail"] = (await call("get", `/farms/${farmId}/flocks/${flock.id}`)).body;
+  out["flock_weighings"] = (await call("get", `/farms/${farmId}/flocks/${flock.id}/weighings`)).body;
+  out["trends"] = (await call("get", `/farms/${farmId}/dashboard/trends?from=${D(-13)}&to=${D(0)}`)).body;
+  out["health_record_created"] = (await call("post", `/farms/${farmId}/health/records`, { type: "observation", date: D(0), flockId: flock.id, title: "Coughing in house A", symptoms: ["coughing"], affectedBirds: 3 })).body;
+  out["health_records"] = (await call("get", `/farms/${farmId}/health/records`)).body;
+  out["vaccinations"] = (await call("get", `/farms/${farmId}/health/vaccinations`)).body;
+  out["tasks_today"] = (await call("get", `/farms/${farmId}/tasks/today`)).body;
+  out["tasks"] = (await call("get", `/farms/${farmId}/tasks`)).body;
+  const created = (await call("post", `/farms/${farmId}/tasks`, { title: "Check fans", dueDate: D(1) })).body;
+  out["task_created"] = created;
+  out["task_completed"] = (await call("post", `/farms/${farmId}/tasks/${created.id}/complete`, { notes: "All running" })).body;
   out["me"] = (await call("get", "/me")).body;
   out["farm"] = (await call("get", `/farms/${farmId}`)).body;
   out["dashboard"] = (await call("get", `/farms/${farmId}/dashboard`)).body;

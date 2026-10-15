@@ -1,0 +1,22 @@
+{
+  "id": "01a13e06-a9f0-7328-a33a-d01a540efeae",
+  "kind": "general",
+  "title": "Check fans",
+  "description": null,
+  "dueDate": "2026-10-16",
+  "status": "done",
+  "priority": "normal",
+  "overdue": false,
+  "flockId": null,
+  "flockCode": null,
+  "houseId": null,
+  "houseName": null,
+  "assigneeUserId": null,
+  "assigneeName": null,
+  "related": null,
+  "completedAt": "2026-10-15T05:26:26.550Z",
+  "completedByName": "Asha Verma",
+  "resolutionNotes": "All running",
+  "version": 1,
+  "createdAt": "2026-10-15T05:26:26.544Z"
+}

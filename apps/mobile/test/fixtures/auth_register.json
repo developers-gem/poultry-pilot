@@ -1,16 +1,16 @@
 {
   "user": {
-    "id": "01a139e3-6e6d-7545-8bd0-a940f4ffe2ec",
+    "id": "01a13e06-a89d-71b6-8437-b78aa2287571",
     "email": "asha@example.com",
     "fullName": "Asha Verma",
     "platformRoles": [],
     "emailVerified": false,
     "hasPassword": true,
     "googleLinked": false,
-    "createdAt": "2026-10-14T10:09:28.685Z"
+    "createdAt": "2026-10-15T05:26:26.205Z"
   },
   "farm": {
-    "id": "01a139e3-6e6e-7611-becc-e9ab7af39fbc",
+    "id": "01a13e06-a89d-71b6-8437-be15d9cd8125",
     "name": "Green Valley Poultry",
     "settings": {
       "timezone": "Asia/Kolkata",
@@ -20,8 +20,8 @@
       "workerEditWindowDays": 1
     },
     "version": 0,
-    "createdAt": "2026-10-14T10:09:28.686Z",
-    "updatedAt": "2026-10-14T10:09:28.686Z",
+    "createdAt": "2026-10-15T05:26:26.205Z",
+    "updatedAt": "2026-10-15T05:26:26.205Z",
     "myRole": "owner",
     "myPermissions": [
       "farm.read",
@@ -59,14 +59,17 @@
       "inventory.issue",
       "inventory.manage",
       "alert.manage",
+      "task.read",
+      "task.complete",
+      "task.manage",
       "content.read"
     ]
   },
   "tokens": {
-    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzaWQiOiIwMWExMzllMy02ZTZmLTcxZmUtYjQ5My1iN2Q2ZTBjOTg5NWMiLCJzdWIiOiIwMWExMzllMy02ZTZkLTc1NDUtOGJkMC1hOTQwZjRmZmUyZWMiLCJqdGkiOiIwMWExMzllMy02ZTZmLTcxZmUtYjQ5My1iZjkzNzBhZjI4OGIiLCJpc3MiOiJwb3VsdHJ5cGlsb3QtdGVzdCIsImF1ZCI6InBvdWx0cnlwaWxvdCIsImlhdCI6MTc5MTk3MjU2OCwiZXhwIjoxNzkxOTczNDY4fQ.kDSgU6hQS733_kEHyyHnzd--YWc_cQTsLhxO--ycyvo",
-    "accessTokenExpiresAt": "2026-10-14T10:24:28.000Z",
-    "refreshToken": "XKdHuyGsuC9vSg5kuhw9mOm9DHxj5PbsKP7PJ74hyfQ",
-    "refreshTokenExpiresAt": "2026-11-13T10:09:28.689Z",
-    "sessionId": "01a139e3-6e6f-71fe-b493-b7d6e0c9895c"
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzaWQiOiIwMWExM2UwNi1hODlmLTcwYTgtOWQxNi1hNmU3NmJiZGU1OGIiLCJzdWIiOiIwMWExM2UwNi1hODlkLTcxYjYtODQzNy1iNzhhYTIyODc1NzEiLCJqdGkiOiIwMWExM2UwNi1hOGEwLTczNWItOWQxNy00YjdiNWRjNTg3YWYiLCJpc3MiOiJwb3VsdHJ5cGlsb3QtdGVzdCIsImF1ZCI6InBvdWx0cnlwaWxvdCIsImlhdCI6MTc5MjA0MTk4NiwiZXhwIjoxNzkyMDQyODg2fQ.CLX3e9mIZOl6fftaNe8Eu6b0ptPFYS88wZOBpJz0Gog",
+    "accessTokenExpiresAt": "2026-10-15T05:41:26.000Z",
+    "refreshToken": "_3pJFKY2LNImgLCHBsiZqBgcnXwPxrD2peNL8J8-mkg",
+    "refreshTokenExpiresAt": "2026-11-14T05:26:26.210Z",
+    "sessionId": "01a13e06-a89f-70a8-9d16-a6e76bbde58b"
   }
 }

@@ -35,6 +35,13 @@ class ApiClient {
 
   Future<Map<String, dynamic>> put(String path, {Object? data}) => _send(() => dio.put<dynamic>(path, data: data));
 
+  Future<Map<String, dynamic>> patch(String path, {Object? data}) => _send(() => dio.patch<dynamic>(path, data: data));
+
+  /// Uploads raw bytes (a photo) with its content type.
+  Future<Map<String, dynamic>> postBytes(String path, List<int> bytes, String contentType) => _send(
+        () => dio.post<dynamic>(path, data: Stream.fromIterable([bytes]), options: Options(contentType: contentType, headers: {Headers.contentLengthHeader: bytes.length})),
+      );
+
   Future<void> delete(String path) async {
     await _send(() => dio.delete<dynamic>(path));
   }

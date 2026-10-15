@@ -18,6 +18,7 @@ class DashboardSummary with _$DashboardSummary {
     InventoryToday? inventory,
     HatcheryToday? hatchery,
     FinanceToday? finance,
+    TasksSummary? tasks,
   }) = _DashboardSummary;
 }
 
@@ -39,6 +40,9 @@ class ProductionToday with _$ProductionToday {
     required int eggsCollected,
     required int eggsBroken,
     required double feedKg,
+    @Default(0) double waterLitres,
+    double? averageWeightG,
+    String? latestWeighingDate,
     double? henDayPercent,
     required int flocksTotal,
     required int flocksRecorded,
@@ -48,7 +52,7 @@ class ProductionToday with _$ProductionToday {
 
 @freezed
 class FlockToday with _$FlockToday {
-  const factory FlockToday({required String flockId, required String flockCode, required String type, required int birdsAlive, required int mortality, int? eggsCollected, required bool recorded}) = _FlockToday;
+  const factory FlockToday({required String flockId, required String flockCode, required String type, String? houseId, required int birdsAlive, required int mortality, @Default(0) double feedKg, @Default(0) double waterLitres, int? eggsCollected, double? averageWeightG, required bool recorded}) = _FlockToday;
 }
 
 @freezed
@@ -74,6 +78,16 @@ class HatcheryToday with _$HatcheryToday {
 @freezed
 class FinanceToday with _$FinanceToday {
   const factory FinanceToday({required int cashMinor, required int receivablesMinor, required int payablesMinor, required int monthRevenueMinor, required int monthExpensesMinor, required int monthProfitMinor}) = _FinanceToday;
+}
+
+@freezed
+class TasksSummary with _$TasksSummary {
+  const factory TasksSummary({required int open, required int dueToday, required int overdue, @Default(<TaskPreview>[]) List<TaskPreview> next}) = _TasksSummary;
+}
+
+@freezed
+class TaskPreview with _$TaskPreview {
+  const factory TaskPreview({required String id, required String title, String? dueDate, required String priority, required bool overdue}) = _TaskPreview;
 }
 
 /// Data plus where it came from: fresh from the API, or the device's cache (offline).

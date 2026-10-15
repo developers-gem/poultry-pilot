@@ -1,0 +1,53 @@
+{
+  "today": "2026-10-15",
+  "items": [
+    {
+      "id": "01a13e06-a973-7768-99f7-b3cfa5d1b0d0",
+      "kind": "general",
+      "title": "Order litter",
+      "description": null,
+      "dueDate": "2026-10-14",
+      "status": "open",
+      "priority": "normal",
+      "overdue": true,
+      "flockId": null,
+      "flockCode": null,
+      "houseId": null,
+      "houseName": null,
+      "assigneeUserId": null,
+      "assigneeName": null,
+      "related": null,
+      "completedAt": null,
+      "completedByName": null,
+      "resolutionNotes": null,
+      "version": 0,
+      "createdAt": "2026-10-15T05:26:26.419Z"
+    },
+    {
+      "id": "01a13e06-a967-71b3-9b40-fc6cef23f38b",
+      "kind": "general",
+      "title": "Clean the drinkers",
+      "description": null,
+      "dueDate": "2026-10-15",
+      "status": "open",
+      "priority": "high",
+      "overdue": false,
+      "flockId": "01a13e06-a8ef-7089-bce0-dca1f48c15aa",
+      "flockCode": "L1",
+      "houseId": null,
+      "houseName": null,
+      "assigneeUserId": null,
+      "assigneeName": null,
+      "related": null,
+      "completedAt": null,
+      "completedByName": null,
+      "resolutionNotes": null,
+      "version": 0,
+      "createdAt": "2026-10-15T05:26:26.407Z"
+    }
+  ],
+  "counts": {
+    "total": 2,
+    "overdue": 1
+  }
+}

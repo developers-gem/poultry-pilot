@@ -14,6 +14,7 @@ import type { HatcheryService } from "./hatchery.service.js";
 import type { IntelligenceService } from "./intelligence.service.js";
 import type { InventoryService } from "./inventory.service.js";
 import type { RulesService } from "./rules.service.js";
+import type { TaskService } from "./task.service.js";
 import type { WeatherService } from "./weather.service.js";
 
 const LAYING = new Set(["layer", "breeder", "custom"]);
@@ -22,7 +23,7 @@ const SEVERITIES = ["critical", "warning", "info"] as const;
 /** The home screen and the analytics view: one request each, built on the server from every module. */
 export function createDashboardService(d: {
   repos: Repositories; clock: Clock; dailyRecords: DailyRecordService; weather: WeatherService; calendar: CalendarService; inventory: InventoryService; feed: FeedService;
-  hatchery: HatcheryService; finance: FinanceService; flocks: FlockService; intelligence: IntelligenceService; rules: RulesService;
+  hatchery: HatcheryService; finance: FinanceService; flocks: FlockService; intelligence: IntelligenceService; rules: RulesService; tasks: TaskService;
 }) {
   const { repos, clock } = d;
   /** A section never breaks the dashboard: failures become { unavailable: reason }. */
@@ -53,7 +54,25 @@ export function createDashboardService(d: {
       if (can(ctx.role, "production.read")) {
         out["production"] = await safe(async () => {
           const day = await d.dailyRecords.dashboardDay(ctx, {});
-          return { totals: day.totals, flocksTotal: day.flocksTotal, flocksRecorded: day.flocksRecorded, flocks: day.flocks.map((f) => ({ flockId: f.flockId, flockCode: f.flockCode, type: f.type, birdsAlive: f.birdsAlive, mortality: f.mortality, eggsCollected: f.eggsCollected, recorded: f.recorded })) };
+          const weighings = await repos.flockEvents.find(ctx.farmId, { where: { flockId: day.flocks.map((f) => f.flockId), type: "weighing" } as never, sort: [{ field: "date", dir: -1 }] });
+          const reversed = new Set(weighings.filter((w) => w.reversalOf).map((w) => w.reversalOf!));
+          const lastWeighed = new Map<string, string>();
+          for (const w of weighings) if (!w.reversalOf && !reversed.has(w.id) && !lastWeighed.has(w.flockId)) lastWeighed.set(w.flockId, w.date);
+          // Average weight across weighed flocks, weighted by the birds alive in each.
+          const weighed = day.flocks.filter((f) => f.latestAverageWeightG && f.birdsAlive > 0);
+          const weighedBirds = weighed.reduce((t, f) => t + f.birdsAlive, 0);
+          const averageWeightG = weighedBirds ? Math.round(weighed.reduce((t, f) => t + f.latestAverageWeightG! * f.birdsAlive, 0) / weighedBirds) : null;
+          const latestWeighingDate = [...lastWeighed.values()].sort().at(-1) ?? null;
+          return {
+            totals: { ...day.totals, averageWeightG, latestWeighingDate },
+            flocksTotal: day.flocksTotal,
+            flocksRecorded: day.flocksRecorded,
+            flocks: day.flocks.map((f) => ({
+              flockId: f.flockId, flockCode: f.flockCode, type: f.type, houseId: f.houseId, birdsAlive: f.birdsAlive, mortality: f.mortality, culls: f.culls,
+              feedKg: f.feedKg, waterLitres: f.waterLitres, eggsCollected: f.eggsCollected, eggsBroken: f.eggsBroken,
+              averageWeightG: f.latestAverageWeightG, latestWeighingDate: lastWeighed.get(f.flockId) ?? null, recorded: f.recorded,
+            })),
+          };
         });
       }
       out["weather"] = farm!.location
@@ -82,6 +101,7 @@ export function createDashboardService(d: {
           return { incubating: batches.length, eggsIncubating: batches.reduce((t, b) => t + (b.results?.inIncubation ?? b.eggsSet), 0), nextHatch: batches[0] ? { batchId: batches[0].id, code: batches[0].code, date: batches[0].expectedHatchDate } : null };
         });
       }
+      if (can(ctx.role, "task.read")) out["tasks"] = await safe(() => d.tasks.summary(ctx));
       if (can(ctx.role, "money.read")) {
         out["finance"] = await safe(async () => {
           const monthStart = `${today.slice(0, 8)}01`;

@@ -1,3 +1,4 @@
+import { createTaskService } from "./services/task.service.js";
 import { CullRequest, Id, LocalDate, MortalityRequest, ReplaceFarmRequest, UpsertDailyRecordRequest, WeighingRequest } from "@poultrypilot/validation";
 import { z } from "zod";
 import type { Logger } from "pino";
@@ -187,7 +188,8 @@ export function buildContainer(d: ContainerDeps) {
 
   const intelligence = createIntelligenceService({ repos: d.repos, clock, alerts, rules, flocks, weather });
   const reports = createReportService({ repos: d.repos, clock, audit, flocks, finance, hatchery, inventory, feed });
-  const dashboard = createDashboardService({ repos: d.repos, clock, dailyRecords, weather, calendar, inventory, feed, hatchery, finance, flocks, intelligence, rules });
+  const tasks = createTaskService({ repos: d.repos, clock, audit, calendar, dailyRecords });
+  const dashboard = createDashboardService({ repos: d.repos, clock, dailyRecords, weather, calendar, inventory, feed, hatchery, finance, flocks, intelligence, rules, tasks });
 
   const FeedCommand = FeedConsumptionRequest;
   sync.register("feed.consume", {
@@ -198,7 +200,7 @@ export function buildContainer(d: ContainerDeps) {
     },
   });
 
-  return { ...d, clock, startedAt: clock.now(), accessTokens, audit, sync, auth, farms, houses, flocks, dailyRecords, media, inventory, feed, alerts, flockHealth, biosecurity, content, hatchery, chickStart, calendar, finance, market, rules, notifications, weather, intelligence, dashboard, reports };
+  return { ...d, clock, startedAt: clock.now(), accessTokens, audit, sync, auth, farms, houses, flocks, dailyRecords, media, inventory, feed, alerts, flockHealth, biosecurity, content, hatchery, chickStart, calendar, finance, market, rules, notifications, weather, intelligence, dashboard, reports, tasks };
 }
 
 export type Container = ReturnType<typeof buildContainer>;

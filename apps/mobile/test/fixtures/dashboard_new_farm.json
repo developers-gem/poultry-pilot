@@ -1,7 +1,7 @@
 {
-  "date": "2026-10-14",
+  "date": "2026-10-15",
   "farm": {
-    "id": "01a139e3-6f19-70bf-be88-603b313bf322",
+    "id": "01a13e06-aa20-73d4-a344-715b90e25c21",
     "name": "Second Farm",
     "currency": "INR"
   },
@@ -24,7 +24,9 @@
       "eggsCollected": 0,
       "eggsBroken": 0,
       "henDayPercent": null,
-      "mortalityRatePercent": null
+      "mortalityRatePercent": null,
+      "averageWeightG": null,
+      "latestWeighingDate": null
     },
     "flocksTotal": 0,
     "flocksRecorded": 0,
@@ -46,6 +48,12 @@
     "incubating": 0,
     "eggsIncubating": 0,
     "nextHatch": null
+  },
+  "tasks": {
+    "open": 0,
+    "dueToday": 0,
+    "overdue": 0,
+    "next": []
   },
   "finance": {
     "cashMinor": 0,

@@ -1,0 +1,24 @@
+{
+  "date": "2026-10-15",
+  "currency": "INR",
+  "items": [
+    {
+      "itemId": "01a13e06-a92b-76aa-a514-19f6a623996f",
+      "name": "Layer mash",
+      "stage": "layer",
+      "quantityKg": 885,
+      "expiredKg": 0,
+      "valueMinor": 2478000,
+      "averageDailyUseKg": 115,
+      "daysRemaining": 7,
+      "status": "ok",
+      "reorderDays": 7
+    }
+  ],
+  "totals": {
+    "quantityKg": 885,
+    "valueMinor": 2478000,
+    "averageDailyUseKg": 115,
+    "daysRemaining": 7
+  }
+}

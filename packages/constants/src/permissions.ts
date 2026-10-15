@@ -47,6 +47,9 @@ export const ACTIONS = [
   "inventory.issue", // record use and wastage
   "inventory.manage", // catalog, purchases, stock counts
   "alert.manage", // acknowledge alerts, run checks
+  "task.read",
+  "task.complete", // start and finish tasks
+  "task.manage", // create, assign, edit, cancel and reopen tasks
   // content
   "content.read",
 ] as const;
@@ -70,6 +73,8 @@ const WORKER: Action[] = [
   "biosecurity.read",
   "biosecurity.record",
   "content.read",
+  "task.read",
+  "task.complete",
 ];
 
 /**
@@ -113,8 +118,11 @@ export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Action>> = {
     "hatchery.record",
     "hatchery.manage",
     "content.read",
+    "task.read",
+    "task.complete",
+    "task.manage",
   ]),
-  supervisor: new Set<Action>([...WORKER, "member.read", "production.edit_any", "biosecurity.manage", "alert.manage", "health.vaccinate"]),
+  supervisor: new Set<Action>([...WORKER, "member.read", "production.edit_any", "biosecurity.manage", "alert.manage", "health.vaccinate", "task.manage"]),
   worker: new Set<Action>(WORKER),
   accountant: new Set<Action>([
     "farm.read",
@@ -128,6 +136,7 @@ export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Action>> = {
     "inventory.manage",
     "hatchery.read",
     "content.read",
+    "task.read",
   ]),
   vet: new Set<Action>([
     "farm.read",
@@ -141,6 +150,8 @@ export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Action>> = {
     "inventory.issue",
     "hatchery.read",
     "content.read",
+    "task.read",
+    "task.complete",
   ]),
 };
 

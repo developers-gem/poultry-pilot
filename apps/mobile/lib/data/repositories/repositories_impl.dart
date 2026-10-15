@@ -6,16 +6,18 @@ import '../../domain/entities/dashboard.dart';
 import '../../domain/entities/farm.dart';
 import '../../domain/repositories/repositories.dart';
 import '../datasources/local/cache_store.dart';
+import '../datasources/local/photo_store.dart';
 import '../datasources/remote/poultrypilot_api.dart';
 import '../models/account_models.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
-  AuthRepositoryImpl({required this.api, required this.tokens, required this.cache, required this.device});
+  AuthRepositoryImpl({required this.api, required this.tokens, required this.cache, required this.device, this.photos});
 
   final PoultryPilotApi api;
   final TokenStore tokens;
   final CacheStore cache;
   final Future<DeviceIdentity> Function() device;
+  final PhotoStore? photos;
 
   static const _meKey = 'me';
 
@@ -68,6 +70,10 @@ class AuthRepositoryImpl implements AuthRepository {
     await tokens.clearTokens();
     await tokens.saveSelectedFarm(null);
     await cache.clear();
+    // Unsent entries belong to this person: never send them later under someone else's account.
+    for (final f in await cache.clearOutbox()) {
+      await photos?.delete(f).catchError((_) {});
+    }
   }
 
   @override
