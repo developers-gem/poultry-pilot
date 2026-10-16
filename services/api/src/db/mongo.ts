@@ -68,7 +68,9 @@ export function createMongo(opts: MongoOptions, logger: Logger) {
       ]);
       return { status: "up", latencyMs: Math.round(performance.now() - started) };
     } catch (err) {
-      return { status: "down", error: (err as Error).message };
+      // /health is public: the driver's message (hosts, replica set names) stays in the log.
+      log.warn({ err }, "database ping failed");
+      return { status: "down", error: "database did not answer" };
     }
   };
 

@@ -71,10 +71,11 @@ const Env = z
     LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
     LOG_FORMAT: z.enum(["json", "pretty"]).default("json"),
     SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().min(1000).default(10_000),
+    /** The API contract at /api/v1/openapi.json. Unset: on outside production, off in production (OWASP API9). */
     OPENAPI_ENABLED: z
       .enum(["true", "false"])
-      .default("true")
-      .transform((v) => v === "true"),
+      .optional()
+      .transform((v) => (v === undefined ? undefined : v === "true")),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === "production" && env.CORS_ORIGINS.some((o) => o === "*")) {

@@ -192,7 +192,11 @@ export function errorHandler(logger: Logger): ErrorRequestHandler {
       logger.error({ err, requestId }, "unhandled error");
       body = { code: "INTERNAL", message: "Something went wrong. Please try again." };
     }
-    if (status >= 500) logger.error({ err, requestId }, body.message);
+    if (status >= 500) {
+      logger.error({ err, requestId }, body.message);
+      // Never echo internals to the client: whatever the error says, a 5xx answer is generic.
+      body = { code: body.code === "INTERNAL" || !(err instanceof AppError) ? "INTERNAL" : body.code, message: "Something went wrong. Please try again." };
+    }
     res.status(status).json({ error: { ...body, requestId } });
   };
 }

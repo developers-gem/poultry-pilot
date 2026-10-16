@@ -44,6 +44,9 @@ const limited = (windowLimit: number) =>
 export function createApp(c: Container): Express {
   const app = express();
   app.disable("x-powered-by");
+  // Query strings parse to flat strings only (?a[$ne]=x is the key "a[$ne]", never an object), so query
+  // values can never smuggle database operators. Explicit, not left to the framework default.
+  app.set("query parser", "simple");
   app.set("trust proxy", c.config.trustProxy);
 
   app.use(requestId);

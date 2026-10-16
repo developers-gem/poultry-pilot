@@ -484,6 +484,8 @@ post("/farms/invitations/accept", "Accept an emailed farm invitation", bodyOf(S.
   r("post", "/farms/{farmId}/tasks/{taskId}/complete", "Tasks", "Finish a task (notes required for corrective actions)", task, bodyOf(V.CompleteTaskRequest), { 200: json(any, "The task") });
   r("post", "/farms/{farmId}/tasks/{taskId}/cancel", "Tasks", "Cancel a task (task.manage)", task, bodyOf(V.CancelTaskRequest), { 200: json(any, "The task") });
   r("post", "/farms/{farmId}/tasks/{taskId}/reopen", "Tasks", "Reopen a finished or cancelled task (task.manage)", task, {}, { 200: json(any, "The task") });
+  r("get", "/farms/{farmId}/audit", "Farms", "The farm's audit log, newest first (audit.read)", farmP, { query: V.PageQuery }, { 200: json(any, "Audit entries") });
+  r("post", "/farms/{farmId}/chick-orders/{id}/payments", "Hatchery", "Record a payment on a chick order (payment.record)", z.object({ farmId: V.Id, id: V.Id }), bodyOf(V.PaymentRequest), { 201: json(any, "The order and payment") });
   r("put", "/me", "Account", "Update your own name and phone", z.object({}), bodyOf(V.UpdateProfileRequest), { 200: json(any, "Your account") });
 }
 

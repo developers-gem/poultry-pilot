@@ -221,3 +221,13 @@ Each is cheap to change until the phase named.
 | D127 | Push provider | FCM HTTP v1 per device: sent, retry, gone (disabled) or dropped; refused credentials are not retried |
 | D128 | Foreground messages | An in-app banner while the app is open (no flutter_local_notifications, so no Android build changes) |
 | D129 | Rule defaults | Every alert rule includes push by default; each person opts out per category |
+
+## Added with the security audit
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| D130 | Authorization testing | A sweep over every documented operation (forged tokens, cross-farm, IDOR) plus a route inventory that fails on undocumented routes |
+| D131 | Error responses | Every 5xx is generic with a request id; details only in logs; public /health never shows driver errors |
+| D132 | API contract exposure | /openapi.json off by default in production |
+| D133 | Media downloads | Sandboxing CSP, nosniff, PDFs as attachments; type from bytes only |
+| D134 | Dependencies | pnpm audit clean; vulnerable transitive packages pinned with overrides |

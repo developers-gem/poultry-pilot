@@ -57,7 +57,7 @@ async function main(): Promise<void> {
       bodyLimit: env.REQUEST_BODY_LIMIT,
       rateLimitPerMinute: env.RATE_LIMIT_PER_MINUTE,
       authRateLimitPerMinute: env.AUTH_RATE_LIMIT_PER_MINUTE,
-      openapiEnabled: env.OPENAPI_ENABLED,
+      openapiEnabled: env.OPENAPI_ENABLED ?? env.NODE_ENV !== "production",
       jwtSecret: env.JWT_ACCESS_SECRET,
       jwtIssuer: env.JWT_ISSUER,
       accessTtlSeconds: env.ACCESS_TOKEN_TTL_SECONDS,

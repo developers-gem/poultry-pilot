@@ -92,7 +92,8 @@ describe("environment configuration", () => {
 
   it("applies defaults", () => {
     const env = loadEnv(base);
-    expect(env).toMatchObject({ PORT: 4000, NODE_ENV: "development", CORS_ORIGINS: ["http://localhost:5173"], OPENAPI_ENABLED: true });
+    expect(env).toMatchObject({ PORT: 4000, NODE_ENV: "development", CORS_ORIGINS: ["http://localhost:5173"] });
+    expect(env.OPENAPI_ENABLED).toBeUndefined(); // unset: on outside production, off in production (server.ts)
   });
 
   it("lists every problem at once", () => {

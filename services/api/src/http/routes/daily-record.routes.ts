@@ -67,7 +67,12 @@ export function mediaRoutes(media: MediaService, farms: FarmService): Router {
   });
   r.get("/:assetId", validate("params", z.object({ farmId: Id, assetId: Id })), requireFarm(farms), requirePermission("production.read"), async (req, res) => {
     const obj = await media.read(req.farmCtx!, req.params["assetId"] as string);
+    // The type comes from the bytes (sniffed on upload), never from the client. Nothing served here may run
+    // script: a sandboxing CSP, no sniffing, and PDFs are downloaded rather than opened in the browser.
     res.setHeader("Content-Type", obj.contentType);
+    res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Disposition", obj.contentType === "application/pdf" ? `attachment; filename="${req.params["assetId"]}.pdf"` : "inline");
     res.setHeader("Cache-Control", "private, max-age=86400, immutable");
     res.send(obj.bytes);
   });
