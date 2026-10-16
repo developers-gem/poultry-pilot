@@ -9,6 +9,8 @@ import '../../core/widgets/glass.dart';
 import '../../core/widgets/states.dart';
 import '../../domain/entities/account.dart';
 import '../session/session_controller.dart';
+import 'package:go_router/go_router.dart';
+import '../../core/router/app_router.dart';
 
 /// View model: the person's notification preferences (stored on the API, shared with the web app).
 class NotificationPreferencesViewModel extends AutoDisposeAsyncNotifier<NotificationPreferences> {
@@ -33,20 +35,10 @@ final notificationPreferencesProvider = AsyncNotifierProvider.autoDispose<Notifi
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
-  static const _severities = {'info': 'Everything', 'warning': 'Warnings and critical', 'critical': 'Critical only'};
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
-    final prefs = ref.watch(notificationPreferencesProvider);
     final t = Theme.of(context).textTheme;
-    Future<void> save(NotificationPreferences p) async {
-      try {
-        await ref.read(notificationPreferencesProvider.notifier).save(p);
-      } catch (e) {
-        if (context.mounted) showError(context, e);
-      }
-    }
 
     return ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 24), children: [
       const Eyebrow('Settings'),
@@ -64,21 +56,15 @@ class SettingsScreen extends ConsumerWidget {
       ),
       const SizedBox(height: 12),
       GlassCard(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Notifications', style: t.titleMedium),
-          Text('Shared with the web app. Alerts always appear in the app.', style: t.bodySmall?.copyWith(color: AppColors.inkSoft)),
-          const SizedBox(height: 6),
-          prefs.when(
-            loading: () => const Padding(padding: EdgeInsets.all(12), child: LoadingView()),
-            error: (e, _) => ErrorView(error: e, onRetry: () => ref.invalidate(notificationPreferencesProvider)),
-            data: (p) => Column(children: [
-              SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Push notifications'), value: p.pushEnabled, onChanged: (v) => save(p.copyWith(pushEnabled: v))),
-              if (p.pushEnabled) _SeverityPicker(label: 'Push me about', value: p.pushMinSeverity, options: _severities, onChanged: (v) => save(p.copyWith(pushMinSeverity: v))),
-              SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Email notifications'), value: p.emailEnabled, onChanged: (v) => save(p.copyWith(emailEnabled: v))),
-              if (p.emailEnabled) _SeverityPicker(label: 'Email me about', value: p.emailMinSeverity, options: _severities, onChanged: (v) => save(p.copyWith(emailMinSeverity: v))),
-            ]),
-          ),
-        ]),
+        padding: EdgeInsets.zero,
+        child: ListTile(
+          minTileHeight: 64,
+          leading: const Icon(Icons.notifications_outlined, color: AppColors.brandInk),
+          title: const Text('Notifications', style: TextStyle(fontWeight: FontWeight.w600)),
+          subtitle: const Text('What to be told about, push and email, quiet hours'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => context.go(Routes.notificationSettings),
+        ),
       ),
       const SizedBox(height: 12),
       GlassCard(
@@ -122,26 +108,4 @@ class SettingsScreen extends ConsumerWidget {
       ),
     ]);
   }
-}
-
-class _SeverityPicker extends StatelessWidget {
-  const _SeverityPicker({required this.label, required this.value, required this.options, required this.onChanged});
-
-  final String label;
-  final String value;
-  final Map<String, String> options;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: DropdownButtonFormField<String>(
-          value: value,
-          decoration: InputDecoration(labelText: label),
-          items: [for (final e in options.entries) DropdownMenuItem(value: e.key, child: Text(e.value))],
-          onChanged: (v) {
-            if (v != null) onChanged(v);
-          },
-        ),
-      );
 }

@@ -43,7 +43,19 @@ class PoultryPilotApi {
   Future<void> revokeSession(String id) => _client.delete('/me/sessions/$id');
   Future<void> revokeOtherSessions() => _client.delete('/me/sessions');
   Future<NotificationPreferencesModel> notificationPreferences() async => NotificationPreferencesModel.fromJson(await _client.get('/me/notification-preferences'));
-  Future<NotificationPreferencesModel> saveNotificationPreferences(NotificationPreferencesModel p) async => NotificationPreferencesModel.fromJson(await _client.put('/me/notification-preferences', data: p.toJson()));
+  Future<NotificationPreferencesModel> saveNotificationPreferences(Map<String, dynamic> body) async => NotificationPreferencesModel.fromJson(await _client.put('/me/notification-preferences', data: body));
+
+  // ---- notifications
+  Future<PushDeviceModel> registerPushDevice({required String platform, required String token, String? deviceName}) async =>
+      PushDeviceModel.fromJson(await _client.post('/me/push-devices', data: {'platform': platform, 'token': token, if (deviceName != null) 'deviceName': deviceName}));
+  Future<void> removePushDevice(String id) => _client.delete('/me/push-devices/$id');
+  Future<({int unread, List<InboxItemModel> items})> inbox({bool unreadOnly = false}) async {
+    final body = await _client.get('/me/notifications', query: {if (unreadOnly) 'unreadOnly': 'true'});
+    return (unread: (body['unread'] as num? ?? 0).toInt(), items: ((body['items'] as List?) ?? const []).cast<Map<String, dynamic>>().map(InboxItemModel.fromJson).toList());
+  }
+
+  Future<void> markRead(List<String> ids) async => _client.post('/me/notifications/read', data: {'ids': ids});
+  Future<void> markAllRead() async => _client.post('/me/notifications/read-all');
 
   // ---- farms
   Future<FarmModel> createFarm(String name, String currency, String timezone) async => FarmModel.fromJson(await _client.post('/farms', data: {'name': name, 'currency': currency, 'timezone': timezone}));

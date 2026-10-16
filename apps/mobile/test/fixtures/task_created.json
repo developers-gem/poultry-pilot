@@ -1,9 +1,9 @@
 {
-  "id": "01a14069-8b7a-7468-bf34-d1d24617ddec",
+  "id": "01a14298-59b1-73f3-be0d-7090852efce9",
   "kind": "general",
   "title": "Check fans",
   "description": null,
-  "dueDate": "2026-10-16",
+  "dueDate": "2026-10-17",
   "status": "open",
   "priority": "normal",
   "overdue": false,
@@ -18,5 +18,5 @@
   "completedByName": null,
   "resolutionNotes": null,
   "version": 0,
-  "createdAt": "2026-10-15T16:33:41.242Z"
+  "createdAt": "2026-10-16T02:44:03.121Z"
 }

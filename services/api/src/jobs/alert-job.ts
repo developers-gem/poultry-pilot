@@ -5,7 +5,7 @@ import type { FarmContext } from "../services/context.js";
 /** The identity system jobs act as. Alerts it raises carry createdBy "system". */
 export const systemContext = (farmId: string): FarmContext => ({ userId: "system", farmId, role: "owner", membershipId: "system" });
 
-type JobDeps = Pick<Container, "repos" | "alerts" | "flockHealth" | "hatchery" | "finance" | "intelligence" | "weather">;
+type JobDeps = Pick<Container, "repos" | "alerts" | "flockHealth" | "hatchery" | "finance" | "intelligence" | "weather"> & Partial<Pick<Container, "notifications">>;
 
 /** Every scheduled check for one farm, in one transaction: stock, health, hatchery, recurring bills and the rule engine. */
 export async function runFarmChecks(c: JobDeps, ctx: FarmContext) {
@@ -14,6 +14,7 @@ export async function runFarmChecks(c: JobDeps, ctx: FarmContext) {
     await c.flockHealth.evaluateAlerts(ctx, tx);
     await c.hatchery.evaluateAlerts(ctx, tx);
     await c.finance.runScheduled(ctx, tx);
+    await c.notifications?.notifyTasksDue(ctx, tx);
     return c.intelligence.evaluate(ctx, tx);
   });
 }

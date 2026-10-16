@@ -1,3 +1,4 @@
+import type { NotificationService } from "./notification.service.js";
 import type { OrderStatus } from "@poultrypilot/types";
 import { ORDER_TRANSITIONS, RESERVING_STATUSES, assertOrderTransition, localDateOf, q3, type OrderActor } from "../domain/index.js";
 import { AppError, notFound } from "../lib/errors.js";
@@ -39,7 +40,7 @@ export interface ListingInput {
  * Every status change goes through assertOrderTransition; accepted orders reserve listing quantity; delivery moves
  * stock; acceptance creates the receivable in Finance and payments settle it.
  */
-export function createMarketService(d: { repos: Repositories; clock: Clock; audit: AuditService; sync: SyncService; finance: FinanceService; flocks: FlockService; inventory: InventoryService; hatchery: HatcheryService }) {
+export function createMarketService(d: { repos: Repositories; clock: Clock; audit: AuditService; sync: SyncService; finance: FinanceService; flocks: FlockService; inventory: InventoryService; hatchery: HatcheryService; notifications?: NotificationService }) {
   const { repos, clock } = d;
   const defined = <T extends object>(o: T) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T;
   const strip = <T extends { farmId: string; deletedAt?: Date; deletedBy?: string; createdAt: Date; updatedAt: Date }>({ farmId: _f, deletedAt: _d, deletedBy: _db, createdAt, updatedAt, ...r }: T) => ({
@@ -182,6 +183,8 @@ export function createMarketService(d: { repos: Repositories; clock: Clock; audi
       const next = await repos.orders.update(ctx.farmId, id, { ...patch, status: to, statusHistory: [...fresh.statusHistory, { status: to, at: now, by: ctx.userId }], updatedBy: ctx.userId, updatedAt: now }, { expectedVersion: fresh.version }, tx);
       if (!next) throw new AppError("VERSION_CONFLICT", "This order was changed at the same time. Reload and try again.");
       await d.audit.record(ctx, { action: `order.${to}`, entity: "order", entityId: id, before: { status: o.status }, after: { status: to, by: actor, ...(extra.reason ? { reason: extra.reason } : {}) } }, tx);
+      // In the same transaction: a change that rolls back tells nobody.
+      await d.notifications?.onOrderEvent(ctx, next, { kind: "status", to, actor }, tx);
       await d.sync.recordChange(ctx.farmId, { entity: "order", entityId: id, op: "upsert", version: next.version }, tx);
       return next;
     });
@@ -208,6 +211,7 @@ export function createMarketService(d: { repos: Repositories; clock: Clock; audi
       const status: OrderRecord["paymentStatus"] = paid.amountMinor <= 0 ? (kind === "refund" ? "refunded" : "unpaid") : paid.amountMinor >= o.total.amountMinor ? "paid" : "partially_paid";
       const next = await repos.orders.update(ctx.farmId, o.id, { amountPaid: paid, paymentStatus: status, updatedBy: ctx.userId, updatedAt: now }, { expectedVersion: o.version }, tx);
       await d.audit.record(ctx, { action: `order.${kind}`, entity: "order", entityId: o.id, after: { amountMinor: r.amount.amountMinor, paymentStatus: status } }, tx);
+      await d.notifications?.onOrderEvent(ctx, next!, { kind: "payment", payment: pay }, tx);
       return { order: orderView(next!, "seller"), payment: strip(pay) };
     });
   }
@@ -308,6 +312,7 @@ export function createMarketService(d: { repos: Repositories; clock: Clock; audi
         };
         await repos.orders.insert(order, tx);
         await d.audit.record(sellerCtx, { action: "order.placed", entity: "order", entityId: order.id, after: { listingId: listing.id, quantity: r.quantity, totalMinor: total.amountMinor } }, tx);
+        await d.notifications?.onOrderEvent(sellerCtx, order, { kind: "placed" }, tx);
         return orderView(order, "buyer", null);
       });
     },

@@ -1,6 +1,8 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../notifications/push_controller.dart';
+import '../session/session_controller.dart';
 import '../sync/sync_controller.dart';
 
 /// Starts the sync controller and syncs when the app returns to the foreground. (Reconnecting, saving a change
@@ -19,6 +21,11 @@ class _SyncTriggerState extends ConsumerState<SyncTrigger> with WidgetsBindingOb
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Push for the signed-in person (registration, taps, banners). Without Firebase in this build it stays off.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final s = ref.read(sessionProvider);
+      if (s is SessionSignedIn) ref.read(pushControllerProvider.notifier).start(s.account.user.id);
+    });
   }
 
   @override

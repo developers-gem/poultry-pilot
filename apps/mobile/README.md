@@ -97,6 +97,38 @@ Screens show that copy when offline, with the farmer's own unsent changes applie
 
 **Accounts.** Each change is tagged with the person who made it and sent only as them. Signing out does not delete unsent changes; they are sent when that person signs in again. Another person on the same phone sees them listed, never sent as themselves. Changes from the previous app version's outbox are moved into the queue on upgrade.
 
+### Notifications
+
+**Types.** Twelve, each with its own push and email switch (Settings → Notifications):
+
+| Type | Comes from |
+| --- | --- |
+| Vaccinations and vet visits, stock, deaths, feed, water, egg production, bird weight, hatchery, weather | the farm's alert rules |
+| Tasks | tasks due today and overdue tasks, told once each, to the assignee or to everyone who can do tasks |
+| Orders | new orders, and every status change, told to the other side, never to the person who made the change |
+| Payments | payments and refunds on orders, and overdue payments |
+
+**Settings.** Besides the twelve switches, alerts have a minimum severity for push and for email. Quiet hours make push wait until morning, while critical alerts still come through. Every notification is always kept in the in-app inbox (More → Notifications).
+
+**No duplicates.**
+- **Server:** every notification has a key made of the event, the person and the channel, which is unique in the database. Re-running the hourly job, retrying a request or two servers at once cannot notify anyone twice.
+- **Push retries:** a retry goes only to devices that did not get the push.
+- **Phone:** every push carries its notification id as the Android tag and collapse key and the iOS collapse id, so a repeat replaces instead of adding. The app also remembers the last 200 ids it showed.
+- **Accounts:** a phone registered by a new person stops receiving the previous person's notifications.
+
+**On the phone.**
+- In the background or closed, the system shows the notification. Tapping it opens the right screen: tasks, health, production or the inbox.
+- While the app is open, a banner appears with an "Open" button.
+- The phone's token is registered once per person and token, registered again when it changes, and removed on sign-out.
+
+**Firebase setup** (push is off until this is done; the app works without it):
+```bash
+dart pub global activate flutterfire_cli
+flutterfire configure        # adds google-services.json / GoogleService-Info.plist and the Gradle plugin
+```
+- **iOS:** add the Push Notifications capability and Background Modes → Remote notifications in Xcode, then upload an APNs key in the Firebase console.
+- **Server:** set `FCM_PROJECT_ID`, `FCM_CLIENT_EMAIL` and `FCM_PRIVATE_KEY` from a service account with the Firebase Cloud Messaging API Admin role. Without them, the API only logs pushes.
+
 ## The contract with the API
 
 The models are tested against **responses captured from the real API** (`test/fixtures/*.json`):
@@ -140,5 +172,4 @@ CI (`.github/workflows/ci.yml`, job `mobile`) runs code generation, `flutter ana
 ## Not yet included
 
 - **Google sign-in:** needs `google_sign_in` and a client ID; the API's `POST /auth/google` is ready.
-- **Push notifications:** need Firebase. The API's `POST /me/push-devices` is ready; until then the push preference applies once a device is registered.
 - **Editing past weigh-ins and tasks' details** is on the web app; the phone records and completes.

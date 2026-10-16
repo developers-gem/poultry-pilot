@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../core/providers.dart';
+import '../notifications/push_controller.dart';
 import '../../domain/entities/account.dart';
 
 part 'session_controller.freezed.dart';
@@ -90,6 +91,8 @@ class SessionController extends Notifier<SessionState> {
   }
 
   Future<void> logout() async {
+    // Stop pushes to this phone for this person while the session can still tell the server.
+    await ref.read(pushControllerProvider.notifier).stop().catchError((_) {});
     await ref.read(authRepositoryProvider).logout();
     state = const SessionState.signedOut();
   }

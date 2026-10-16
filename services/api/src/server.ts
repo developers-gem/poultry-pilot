@@ -1,3 +1,4 @@
+import { fcmPushProvider } from "./adapters/fcm.js";
 import type { Server } from "node:http";
 import { localDiskMediaStorage } from "./adapters/storage.js";
 import { argon2Hasher, googleVerifier, logEmailSender } from "./adapters/external.js";
@@ -41,7 +42,12 @@ async function main(): Promise<void> {
     hasher: argon2Hasher,
     media: localDiskMediaStorage(env.MEDIA_DIR),
     weatherProvider: openMeteoProvider(),
-    notificationProviders: [emailNotificationProvider(logEmailSender(logger)), logPushProvider(logger)],
+    notificationProviders: [
+      emailNotificationProvider(logEmailSender(logger)),
+      env.FCM_PROJECT_ID && env.FCM_CLIENT_EMAIL && env.FCM_PRIVATE_KEY
+        ? fcmPushProvider({ projectId: env.FCM_PROJECT_ID, clientEmail: env.FCM_CLIENT_EMAIL, privateKey: env.FCM_PRIVATE_KEY.replace(/\\n/g, "\n") })
+        : logPushProvider(logger),
+    ],
     email: logEmailSender(logger),
     ...(env.GOOGLE_CLIENT_IDS.length ? { google: googleVerifier(env.GOOGLE_CLIENT_IDS) } : {}),
     config: {

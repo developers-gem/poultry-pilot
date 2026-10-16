@@ -3,7 +3,7 @@
 > Generated from the Mongoose schemas in `services/api/src/adapters/mongo/models`. Do not edit by hand:
 > run `pnpm --filter @poultrypilot/api docs:data-dictionary`. A test fails if this file is out of date.
 
-63 collections, 104 secondary indexes (plus the default `_id` index on each). Design rules and relationships: `docs/data-model.md`.
+63 collections, 105 secondary indexes (plus the default `_id` index on each). Design rules and relationships: `docs/data-model.md`.
 
 | Collection | Domain | Ownership | Indexes | Purpose |
 | --- | --- | --- | --- | --- |
@@ -55,7 +55,7 @@
 | [`tasks`](#tasks) | Operations | farm | 2 | A piece of work assigned to someone on the farm, optionally linked to a flock, house or other record |
 | [`alert_rules`](#alert_rules) | Operations | farm | 1 | A farm's settings for one rule from the catalog (mortality, egg production, feed, water, weight, FCR, stock, expiry, vaccination, vet appointment, hatch, delivery, payment, weather): on or off, parameters, scope, severity, who is told and how |
 | [`alerts`](#alerts) | Operations | farm | 2 | Something that needs attention, raised by the server-side alert job |
-| [`notifications`](#notifications) | Operations | user | 3 | A message to one person on one channel (in-app, push, email) with delivery state |
+| [`notifications`](#notifications) | Operations | user | 4 | A message to one person on one channel (in-app, push, email) with delivery state |
 | [`push_devices`](#push_devices) | Operations | user | 2 | A phone or browser registered for push notifications |
 | [`notification_preferences`](#notification_preferences) | Operations | user | 1 | How a person wants to be told: push and email on or off, the lowest severity for each, and rules they have muted |
 | [`weather_observations`](#weather_observations) | Operations | global | 1 | Observed daily weather for a location (temperature, humidity, rain, wind), kept as history |
@@ -1819,6 +1819,9 @@ A message to one person on one channel (in-app, push, email) with delivery state
 | `link.path` | String |  | ≤ 300 chars |  |
 | `alertId` | String |  |  | `Alert` |
 | `ruleKey` | String |  | one of: `mortality`, `egg_production`, `feed_consumption`, `water_consumption`, `weight_variance`, `fcr_variance`, `inventory`, `medicine_expiry`, `vaccination_due`, `vet_appointment`, `hatch_date`, `order_delivery`, `payment_overdue`, `weather_risk` |  |
+| `category` | String |  | one of: `vaccination_due`, `task_due`, `inventory_low`, `mortality`, `feed`, `water`, `egg_production`, `weight_variance`, `hatch_date`, `order_update`, `payment_update`, `weather_risk` |  |
+| `dedupeKey` | String |  | ≤ 300 chars |  |
+| `sentTokens` | array of String |  | ≤ 4096 chars |  |
 | `severity` | String |  | one of: `info`, `warning`, `critical` |  |
 | `sentAt` | Date |  |  |  |
 | `deliveredAt` | Date |  |  |  |
@@ -1833,6 +1836,7 @@ A message to one person on one channel (in-app, push, email) with delivery state
 | userId, createdAt ↓ |  | A person's notification inbox, newest first; unread count |
 | status, nextAttemptAt | partial: {"status":"queued"} | Delivery queue: queued push and email notifications due for an attempt |
 | createdAt | TTL 180 d | TTL: delete notifications after 180 days |
+| dedupeKey | unique, partial: {"dedupeKey":{"$type":"string"}} | No duplicates: one notification per person, channel and event |
 
 ### push_devices
 
@@ -1872,6 +1876,11 @@ How a person wants to be told: push and email on or off, the lowest severity for
 | `pushMinSeverity` | String | yes | one of: `info`, `warning`, `critical`; default `"warning"` |  |
 | `emailMinSeverity` | String | yes | one of: `info`, `warning`, `critical`; default `"warning"` |  |
 | `mutedRuleKeys` | array of String |  | one of: `mortality`, `egg_production`, `feed_consumption`, `water_consumption`, `weight_variance`, `fcr_variance`, `inventory`, `medicine_expiry`, `vaccination_due`, `vet_appointment`, `hatch_date`, `order_delivery`, `payment_overdue`, `weather_risk` |  |
+| `categories` | Mixed |  |  |  |
+| `quietHours` | object |  |  |  |
+| `quietHours.start` | String | yes | ≤ 5 chars |  |
+| `quietHours.end` | String | yes | ≤ 5 chars |  |
+| `quietHours.timezone` | String | yes | ≤ 60 chars |  |
 
 | Index | Options | Serves |
 | --- | --- | --- |

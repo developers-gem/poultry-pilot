@@ -1032,6 +1032,15 @@ export interface NotificationRecord {
   link?: { entity?: string; id?: string; path?: string };
   alertId?: string;
   ruleKey?: RuleKeyValue;
+  /** What the person can switch off (vaccination_due, task_due, ...). */
+  category?: string;
+  /**
+   * One notification per person, channel and event: e.g. "alert:<id>:new:<user>:push". Unique: the same event can
+   * never be stored (or sent) twice, however often the job or the request that raised it runs.
+   */
+  dedupeKey?: string;
+  /** Push: the device tokens already sent to, so a retry only goes to the devices that failed. */
+  sentTokens?: string[];
   severity?: "info" | "warning" | "critical";
   sentAt?: Date;
   deliveredAt?: Date;
@@ -1064,6 +1073,10 @@ export interface NotificationPreferenceRecord {
   pushMinSeverity: "info" | "warning" | "critical";
   emailMinSeverity: "info" | "warning" | "critical";
   mutedRuleKeys?: RuleKeyValue[];
+  /** Per category, per channel (absent = on). In-app is always kept, so the inbox is complete. */
+  categories?: Record<string, { push?: boolean; email?: boolean }>;
+  /** Push (except critical) waits until the end of quiet hours, in the person's time zone. */
+  quietHours?: { start: string; end: string; timezone: string };
   createdAt: Date;
   updatedAt: Date;
 }

@@ -12,6 +12,7 @@ import '../../presentation/flocks/flocks_screens.dart';
 import '../../presentation/health/health_screen.dart';
 import '../../presentation/home/home_screen.dart';
 import '../../presentation/more/more_screen.dart';
+import '../../presentation/notifications/notification_screens.dart';
 import '../../presentation/onboarding/onboarding_screen.dart';
 import '../../presentation/production/production_screen.dart';
 import '../../presentation/profile/profile_screen.dart';
@@ -41,6 +42,8 @@ class Routes {
   static const profile = '/more/profile';
   static const settings = '/more/settings';
   static const sync = '/more/sync';
+  static const inbox = '/more/notifications';
+  static const notificationSettings = '/more/notification-settings';
 
   static const auth = {login, signup, forgotPassword};
 }
@@ -94,6 +97,8 @@ final routerProvider = Provider<GoRouter>((ref) {
             GoRoute(path: 'profile', builder: (_, __) => const _Titled(title: 'Profile', child: ProfileScreen())),
             GoRoute(path: 'settings', builder: (_, __) => const _Titled(title: 'Settings', child: SettingsScreen())),
             GoRoute(path: 'sync', builder: (_, __) => const _Titled(title: 'Sync', child: SyncScreen())),
+            GoRoute(path: 'notifications', builder: (_, __) => const _Titled(title: 'Notifications', child: InboxScreen())),
+            GoRoute(path: 'notification-settings', builder: (_, __) => const _Titled(title: 'Notification settings', child: NotificationSettingsScreen())),
           ]),
         ],
       ),

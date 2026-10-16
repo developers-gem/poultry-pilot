@@ -1,0 +1,59 @@
+{
+  "unread": 3,
+  "items": [
+    {
+      "id": "01a14298-59ce-71ab-8000-dc48a3128b6b",
+      "userId": "01a14298-58e2-703f-9160-182f006b8ccb",
+      "farmId": "01a14298-58e3-7722-b763-03a1b6a135c1",
+      "channel": "in_app",
+      "status": "delivered",
+      "title": "Overdue: Order litter",
+      "link": {
+        "entity": "task",
+        "id": "01a14298-5961-771c-80b0-33ea88c76da1",
+        "path": "/tasks"
+      },
+      "category": "task_due",
+      "severity": "warning",
+      "createdAt": "2026-10-16T02:44:03.150Z",
+      "readAt": null
+    },
+    {
+      "id": "01a14298-59cd-77b7-95c3-caadf7cfc5a8",
+      "userId": "01a14298-58e2-703f-9160-182f006b8ccb",
+      "farmId": "01a14298-58e3-7722-b763-03a1b6a135c1",
+      "channel": "in_app",
+      "status": "delivered",
+      "title": "Due today: Clean the drinkers",
+      "link": {
+        "entity": "task",
+        "id": "01a14298-595a-7079-9cda-e4187e6106d2",
+        "path": "/tasks"
+      },
+      "category": "task_due",
+      "severity": "info",
+      "createdAt": "2026-10-16T02:44:03.149Z",
+      "readAt": null
+    },
+    {
+      "id": "01a14298-5951-73f0-8c58-c7dd964ec477",
+      "userId": "01a14298-58e2-703f-9160-182f006b8ccb",
+      "farmId": "01a14298-58e3-7722-b763-03a1b6a135c1",
+      "channel": "in_app",
+      "status": "delivered",
+      "title": "Weather: heat on 2026-10-16",
+      "body": "Forecast for 2026-10-16: high of 37 °C, 6 °C above this farm's recent average high (31 °C). Plan ventilation, water and feeding times accordingly.",
+      "link": {
+        "entity": "alert",
+        "id": "01a14298-5950-72d6-a24f-e2db15c931b6",
+        "path": "/farms/01a14298-58e3-7722-b763-03a1b6a135c1/alerts/01a14298-5950-72d6-a24f-e2db15c931b6"
+      },
+      "alertId": "01a14298-5950-72d6-a24f-e2db15c931b6",
+      "ruleKey": "weather_risk",
+      "category": "weather_risk",
+      "severity": "warning",
+      "createdAt": "2026-10-16T02:44:03.025Z",
+      "readAt": null
+    }
+  ]
+}

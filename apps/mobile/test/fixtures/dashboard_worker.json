@@ -1,7 +1,7 @@
 {
-  "date": "2026-10-15",
+  "date": "2026-10-16",
   "farm": {
-    "id": "01a14069-8a3f-748c-b741-846baab587fd",
+    "id": "01a14298-58e3-7722-b763-03a1b6a135c1",
     "name": "Green Valley Poultry",
     "currency": "INR"
   },
@@ -14,13 +14,13 @@
     },
     "latest": [
       {
-        "id": "01a14069-8af6-73fc-80f8-69398c444164",
+        "id": "01a14298-5950-72d6-a24f-e2db15c931b6",
         "ruleType": "weather_risk",
         "severity": "warning",
         "status": "open",
-        "title": "Weather: heat on 2026-10-15",
+        "title": "Weather: heat on 2026-10-16",
         "flockId": null,
-        "date": "2026-10-15"
+        "date": "2026-10-16"
       }
     ]
   },
@@ -36,16 +36,16 @@
       "henDayPercent": 90.27081243731193,
       "mortalityRatePercent": 0.10030090270812438,
       "averageWeightG": 1780,
-      "latestWeighingDate": "2026-10-15"
+      "latestWeighingDate": "2026-10-16"
     },
     "flocksTotal": 1,
     "flocksRecorded": 1,
     "flocks": [
       {
-        "flockId": "01a14069-8a88-7687-9dcb-2aa9957bf62d",
+        "flockId": "01a14298-5911-7560-9ec1-e653643bfbbe",
         "flockCode": "L1",
         "type": "layer",
-        "houseId": "01a14069-8a7f-7509-8028-be8f1575e295",
+        "houseId": "01a14298-590c-775c-901e-55516bce6d14",
         "birdsAlive": 996,
         "mortality": 1,
         "culls": 0,
@@ -54,7 +54,7 @@
         "eggsCollected": 900,
         "eggsBroken": 8,
         "averageWeightG": 1780,
-        "latestWeighingDate": "2026-10-15",
+        "latestWeighingDate": "2026-10-16",
         "recorded": true
       }
     ]
@@ -68,7 +68,7 @@
       "windKph": 12
     },
     "today": {
-      "date": "2026-10-15",
+      "date": "2026-10-16",
       "tempMaxC": 37,
       "tempMinC": 23,
       "rainMm": 0,
@@ -76,14 +76,14 @@
     },
     "next": [
       {
-        "date": "2026-10-16",
+        "date": "2026-10-17",
         "tempMaxC": 32,
         "tempMinC": 23,
         "rainMm": 0,
         "windMaxKph": 15
       },
       {
-        "date": "2026-10-17",
+        "date": "2026-10-18",
         "tempMaxC": 31,
         "tempMinC": 23,
         "rainMm": 0,
@@ -92,34 +92,34 @@
     ],
     "risks": [
       {
-        "date": "2026-10-15",
+        "date": "2026-10-16",
         "kind": "heat",
         "value": 37,
         "reason": "high of 37 °C, 6 °C above this farm's recent average high (31 °C)"
       }
     ],
     "stale": false,
-    "fetchedAt": "2026-10-15T16:33:41.108Z"
+    "fetchedAt": "2026-10-16T02:44:03.023Z"
   },
   "upcoming": [
     {
       "type": "vaccination_due",
-      "date": "2026-10-15",
-      "title": "IB spray for L1 (due 2026-10-14)",
+      "date": "2026-10-16",
+      "title": "IB spray for L1 (due 2026-10-15)",
       "refType": "vaccination",
-      "refId": "01a14069-8b08-7473-a9d7-c0d3ffe604e8",
-      "flockId": "01a14069-8a88-7687-9dcb-2aa9957bf62d",
-      "id": "vaccination_due:01a14069-8b08-7473-a9d7-c0d3ffe604e8",
+      "refId": "01a14298-595d-733d-85aa-decc28904a34",
+      "flockId": "01a14298-5911-7560-9ec1-e653643bfbbe",
+      "id": "vaccination_due:01a14298-595d-733d-85aa-decc28904a34",
       "overdue": true
     },
     {
       "type": "vaccination_due",
-      "date": "2026-10-17",
+      "date": "2026-10-18",
       "title": "ND booster for L1",
       "refType": "vaccination",
-      "refId": "01a14069-8ae0-703c-982e-4052f80eca93",
-      "flockId": "01a14069-8a88-7687-9dcb-2aa9957bf62d",
-      "id": "vaccination_due:01a14069-8ae0-703c-982e-4052f80eca93",
+      "refId": "01a14298-5940-708e-b998-40cadaac0af7",
+      "flockId": "01a14298-5911-7560-9ec1-e653643bfbbe",
+      "id": "vaccination_due:01a14298-5940-708e-b998-40cadaac0af7",
       "overdue": false
     }
   ],
@@ -142,16 +142,16 @@
     "overdue": 1,
     "next": [
       {
-        "id": "01a14069-8b0d-753f-8601-6a862251b065",
+        "id": "01a14298-5961-771c-80b0-33ea88c76da1",
         "title": "Order litter",
-        "dueDate": "2026-10-14",
+        "dueDate": "2026-10-15",
         "priority": "normal",
         "overdue": true
       },
       {
-        "id": "01a14069-8b02-739f-bfca-bda4b7314137",
+        "id": "01a14298-595a-7079-9cda-e4187e6106d2",
         "title": "Clean the drinkers",
-        "dueDate": "2026-10-15",
+        "dueDate": "2026-10-16",
         "priority": "high",
         "overdue": false
       }

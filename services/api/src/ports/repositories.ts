@@ -293,6 +293,8 @@ export interface Repositories {
     due(now: Date, limit: number): Promise<NotificationRecord[]>;
     update(id: string, patch: Partial<NotificationRecord>): Promise<void>;
     lastForAlert(alertId: string, userId: string, channel: string): Promise<NotificationRecord | null>;
+  /** Which of these dedupe keys are already stored (checked before inserting, inside the same transaction). */
+  existingDedupeKeys(keys: string[], tx?: Tx): Promise<Set<string>>;
   };
   pushDevices: {
     upsertByToken(rec: PushDeviceRecord): Promise<PushDeviceRecord>;

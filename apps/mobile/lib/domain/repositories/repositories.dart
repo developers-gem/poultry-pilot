@@ -39,6 +39,12 @@ abstract class ProfileRepository {
 abstract class SettingsRepository {
   Future<NotificationPreferences> notificationPreferences();
   Future<NotificationPreferences> saveNotificationPreferences(NotificationPreferences prefs);
+
+  /// The in-app notifications (unread count and newest first).
+  Future<({int unread, List<InboxNotification> items})> inbox();
+
+  /// Marks these as read; an empty list marks all.
+  Future<void> markRead(List<String> ids);
   Future<bool> onboardingSeen();
   Future<void> markOnboardingSeen();
   Future<void> clearCache();

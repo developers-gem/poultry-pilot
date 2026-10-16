@@ -1,16 +1,16 @@
 {
-  "id": "01a14069-8aa9-7522-bb43-fbfb11a0699f",
-  "flockId": "01a14069-8a88-7687-9dcb-2aa9957bf62d",
+  "id": "01a14298-592d-75a9-94ae-aaca73de3169",
+  "flockId": "01a14298-5911-7560-9ec1-e653643bfbbe",
   "flockCode": "L1",
-  "houseId": "01a14069-8a7f-7509-8028-be8f1575e295",
+  "houseId": "01a14298-590c-775c-901e-55516bce6d14",
   "flockType": "layer",
-  "date": "2026-10-14",
+  "date": "2026-10-15",
   "birdsAliveEndOfDay": 997,
   "mortality": [
     {
       "cause": "unknown",
       "count": 1,
-      "eventId": "01a14069-8aa9-7522-bb43-fd380c0b498c",
+      "eventId": "01a14298-592d-75a9-94ae-ae3f0c3ff065",
       "fromDailyRecord": true
     }
   ],
@@ -18,10 +18,10 @@
   "culls": 0,
   "feed": [
     {
-      "id": "01a14069-8b14-73d1-a282-450e7dfc02c6",
+      "id": "01a14298-5966-769f-ad7a-9728046cffbd",
       "kind": "consumption",
       "quantityKg": 110,
-      "feedItemId": "01a14069-8aba-74d8-8000-9617756c7a57",
+      "feedItemId": "01a14298-5935-7672-b11e-c57a00a814ac",
       "cost": {
         "amountMinor": 308000,
         "currency": "INR"
@@ -29,10 +29,10 @@
       "fromDailyRecord": true
     },
     {
-      "id": "01a14069-8b1e-710f-b6a7-23dbfd3c1c67",
+      "id": "01a14298-596c-72b8-ac0d-510a9d35402e",
       "kind": "wastage",
       "quantityKg": 5,
-      "feedItemId": "01a14069-8aba-74d8-8000-9617756c7a57",
+      "feedItemId": "01a14298-5935-7672-b11e-c57a00a814ac",
       "cost": {
         "amountMinor": 14000,
         "currency": "INR"
@@ -49,7 +49,7 @@
   "healthObservations": [],
   "photos": [],
   "version": 1,
-  "createdBy": "01a14069-8a3f-748c-b741-7e3826ea51d5",
-  "createdAt": "2026-10-15T16:33:41.033Z",
-  "updatedAt": "2026-10-15T16:33:41.140Z"
+  "createdBy": "01a14298-58e2-703f-9160-182f006b8ccb",
+  "createdAt": "2026-10-16T02:44:02.989Z",
+  "updatedAt": "2026-10-16T02:44:03.046Z"
 }

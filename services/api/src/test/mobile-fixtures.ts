@@ -91,6 +91,11 @@ export async function captureMobileFixtures(): Promise<Record<string, unknown>> 
       { mutationId: mid(3), command: "daily_record.patch", payload: { flockId: flock.id, date: D(0), patch: { eggs: { collected: 1, broken: 0 } } }, baseVersion: 0, clientCreatedAt: at },
     ],
   })).body;
+  // Notifications: device registration, preferences with categories and quiet hours, the inbox.
+  out["push_device_registered"] = (await call("post", "/me/push-devices", { platform: "android", token: "fcm-token-pixel-7-abcdefghijklmnop", deviceName: "Pixel 7" })).body;
+  out["notification_preferences_saved"] = (await call("put", "/me/notification-preferences", { pushEnabled: true, emailEnabled: false, pushMinSeverity: "warning", emailMinSeverity: "critical", categories: { feed: { push: false } }, quietHours: { start: "21:30", end: "05:30", timezone: "Asia/Kolkata" } })).body;
+  await ctx.container.notifications.notifyTasksDue({ userId: "system", farmId, role: "owner", membershipId: "system" });
+  out["notifications_inbox"] = (await call("get", "/me/notifications")).body;
   out["me"] = (await call("get", "/me")).body;
   out["farm"] = (await call("get", `/farms/${farmId}`)).body;
   out["dashboard"] = (await call("get", `/farms/${farmId}/dashboard`)).body;

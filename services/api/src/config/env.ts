@@ -61,6 +61,11 @@ const Env = z
     REQUEST_BODY_LIMIT: z.string().default("1mb"),
 
     GOOGLE_CLIENT_IDS: csv(""),
+    /** Push through Firebase Cloud Messaging: a service account with the Firebase Messaging role. Unset: push is logged only. */
+    FCM_PROJECT_ID: z.string().optional(),
+    FCM_CLIENT_EMAIL: z.string().email().optional(),
+    /** The service account's private key; "\\n" in the value is turned into new lines. */
+    FCM_PRIVATE_KEY: z.string().optional(),
     APP_BASE_URL: z.string().url().default("http://localhost:5173"),
 
     LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),

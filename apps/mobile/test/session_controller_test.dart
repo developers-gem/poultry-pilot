@@ -47,6 +47,10 @@ class FakeSettings implements SettingsRepository {
   Future<NotificationPreferences> saveNotificationPreferences(NotificationPreferences prefs) => throw UnimplementedError();
   @override
   Future<void> clearCache() async {}
+  @override
+  Future<({int unread, List<InboxNotification> items})> inbox() async => (unread: 0, items: const <InboxNotification>[]);
+  @override
+  Future<void> markRead(List<String> ids) async {}
 }
 
 void main() {

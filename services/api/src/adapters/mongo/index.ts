@@ -407,6 +407,11 @@ export function createMongoRepositories(connection = mongoose.connection): Repos
       async update(id, patch) {
         await NotificationModel.updateOne({ _id: id }, toUpdate(patch as Record<string, unknown>));
       },
+      async existingDedupeKeys(keys, tx) {
+        if (!keys.length) return new Set<string>();
+        const docs = await NotificationModel.find({ dedupeKey: { $in: keys } }, { dedupeKey: 1 }, s(tx)).lean();
+        return new Set(docs.map((d) => (d as { dedupeKey?: string }).dedupeKey).filter((k): k is string => !!k));
+      },
       async lastForAlert(alertId, userId, channel) {
         const d = await NotificationModel.findOne({ alertId, userId, channel }).sort({ createdAt: -1 }).lean();
         return d ? fromDoc<NotificationRecord>(d) : null;

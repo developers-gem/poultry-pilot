@@ -1,15 +1,15 @@
 {
   "items": [
     {
-      "eventId": "01a14069-8b43-71bd-8c4f-13e342d89198",
-      "date": "2026-10-15",
+      "eventId": "01a14298-5986-7196-b747-55d36aefdb6a",
+      "date": "2026-10-16",
       "averageWeightG": 1780,
       "sampleSize": 10,
       "note": null
     },
     {
-      "eventId": "01a14069-8afc-724f-a7a5-3146e8d07e2d",
-      "date": "2026-10-14",
+      "eventId": "01a14298-5955-72ba-8728-a74ed9bdaa17",
+      "date": "2026-10-15",
       "averageWeightG": 1771.3,
       "sampleSize": 4,
       "stats": {

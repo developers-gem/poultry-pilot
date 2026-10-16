@@ -120,7 +120,9 @@ export function buildContainer(d: ContainerDeps) {
   const rules = createRulesService({ repos: d.repos, clock, audit });
   const notifications = createNotificationService({ repos: d.repos, clock, providers: d.notificationProviders ?? [] });
   alerts.hooks.ruleFor = rules.forAlertType;
-  alerts.hooks.onRaised = notifications.onAlert;
+  alerts.hooks.onRaised = async (...args) => {
+    await notifications.onAlert(...args);
+  };
   const weather = createWeatherService({
     repos: d.repos,
     clock,
@@ -140,7 +142,7 @@ export function buildContainer(d: ContainerDeps) {
   const hatchery = createHatcheryService({ repos: d.repos, clock, audit, sync, inventory, alerts });
   const chickStart = createChickStartService({ repos: d.repos, clock, audit, flocks, biosecurity, alerts });
   const calendar = createCalendarService({ repos: d.repos, clock });
-  const market = createMarketService({ repos: d.repos, clock, audit, sync, finance, flocks, inventory, hatchery });
+  const market = createMarketService({ repos: d.repos, clock, audit, sync, finance, flocks, inventory, hatchery, notifications });
   const dailyRecords = createDailyRecordService({ repos: d.repos, clock, audit, sync, flocks, feed, alerts, afterEggsWritten: flockHealth.refreshWithheldEggs,
     waterRules: async (ctx, tx) => {
       const r = await rules.config(ctx, "water_consumption", tx);

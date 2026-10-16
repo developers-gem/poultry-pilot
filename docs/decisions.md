@@ -210,3 +210,14 @@ Each is cheap to change until the phase named.
 | D121 | Conflict policy | Day changes auto-merge when the touched sections are unchanged on the server; otherwise the farmer chooses. Never silently overwritten or dropped |
 | D122 | Queue ownership | Changes are tagged with their user, sent only as them, and kept across sign-out |
 | D123 | Strict command schemas | Offline commands extend the strict request schemas (`.extend`), so a flockId or taskId is never rejected as unknown (fixes the earlier mortality and cull commands) |
+
+## Added with notifications
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| D124 | Categories | Twelve notification categories; every alert rule maps to one; tasks, orders and payments are event sources |
+| D125 | Preferences | Push and email per category; alerts also respect a minimum severity; quiet hours delay push except critical; in-app is always kept |
+| D126 | No duplicates | Unique dedupe key per event, person and channel (checked in the transaction and unique in the database); push retries only to devices not yet reached; notification id as the collapse key and tag; the phone remembers shown ids |
+| D127 | Push provider | FCM HTTP v1 per device: sent, retry, gone (disabled) or dropped; refused credentials are not retried |
+| D128 | Foreground messages | An in-app banner while the app is open (no flutter_local_notifications, so no Android build changes) |
+| D129 | Rule defaults | Every alert rule includes push by default; each person opts out per category |

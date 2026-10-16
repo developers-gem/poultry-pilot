@@ -146,6 +146,45 @@ export const RULE_KEYS = [
 ] as const;
 export const WEATHER_KINDS = ["current", "hourly", "daily"] as const;
 
+/** What a person can switch notifications on and off for (per channel). */
+export const NOTIFICATION_CATEGORIES = [
+  "vaccination_due", "task_due", "inventory_low", "mortality", "feed", "water", "egg_production", "weight_variance", "hatch_date", "order_update", "payment_update", "weather_risk",
+] as const;
+export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
+
+export const NOTIFICATION_CATEGORY_INFO: Record<NotificationCategory, { label: string; description: string }> = {
+  vaccination_due: { label: "Vaccinations and vet visits", description: "A vaccination or vet visit is due or overdue" },
+  task_due: { label: "Tasks", description: "A task given to you (or to anyone) is due today or overdue" },
+  inventory_low: { label: "Stock", description: "Feed, medicine or other stock is low, expiring or expired" },
+  mortality: { label: "Deaths", description: "Deaths are higher than this flock's normal" },
+  feed: { label: "Feed use", description: "Feed eaten or feed conversion moved away from normal" },
+  water: { label: "Water", description: "Water drunk or water quality moved away from normal" },
+  egg_production: { label: "Egg production", description: "Eggs collected fell below this flock's normal" },
+  weight_variance: { label: "Bird weight", description: "Weights are behind target or uneven" },
+  hatch_date: { label: "Hatchery", description: "A transfer or hatch is due" },
+  order_update: { label: "Orders", description: "New orders, and changes to orders you sell or buy" },
+  payment_update: { label: "Payments", description: "Payments received, refunds, and overdue payments" },
+  weather_risk: { label: "Weather", description: "Unusual heat, cold, rain or wind for your farm is forecast" },
+};
+
+/** Which category each alert rule notifies under. */
+export const CATEGORY_FOR_RULE: Record<(typeof RULE_KEYS)[number], NotificationCategory> = {
+  mortality: "mortality",
+  egg_production: "egg_production",
+  feed_consumption: "feed",
+  water_consumption: "water",
+  weight_variance: "weight_variance",
+  fcr_variance: "feed",
+  inventory: "inventory_low",
+  medicine_expiry: "inventory_low",
+  vaccination_due: "vaccination_due",
+  vet_appointment: "vaccination_due",
+  hatch_date: "hatch_date",
+  order_delivery: "order_update",
+  payment_overdue: "payment_update",
+  weather_risk: "weather_risk",
+};
+
 // content & system
 /** Article kinds: short facts, poultry management guides, news, disease information. */
 export const ARTICLE_KINDS = ["fact", "guide", "news", "disease"] as const;

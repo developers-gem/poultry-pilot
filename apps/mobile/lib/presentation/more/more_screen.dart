@@ -6,6 +6,7 @@ import '../../core/router/app_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/glass.dart';
+import '../notifications/push_controller.dart';
 import '../sync/sync_controller.dart';
 import '../session/session_controller.dart';
 
@@ -18,6 +19,7 @@ class MoreScreen extends ConsumerWidget {
     final session = ref.watch(sessionProvider);
     final sync = ref.watch(syncControllerProvider);
     final pending = sync.unsent;
+    final unread = ref.watch(inboxProvider).valueOrNull?.unread ?? 0;
     final user = session is SessionSignedIn ? session.account.user : null;
     Widget item(IconData icon, String title, {String? subtitle, VoidCallback? onTap, Color? color}) => ListTile(
           minTileHeight: 64,
@@ -35,6 +37,7 @@ class MoreScreen extends ConsumerWidget {
       GlassCard(
         padding: EdgeInsets.zero,
         child: Column(children: [
+          item(Icons.notifications_outlined, 'Notifications', subtitle: unread > 0 ? '$unread unread' : 'All read', color: unread > 0 ? AppColors.brandInk : null, onTap: () => context.go(Routes.inbox)),
           item(Icons.sync, 'Sync', subtitle: pending > 0 ? '$pending change${pending == 1 ? '' : 's'} not yet on the server' : 'Everything is on the server', color: pending > 0 ? AppColors.amberInk : null, onTap: () => context.go(Routes.sync)),
           item(Icons.person_outline, 'Profile', subtitle: 'Your details, password and devices', onTap: () => context.go(Routes.profile)),
           item(Icons.settings_outlined, 'Settings', subtitle: 'Notifications and data on this phone', onTap: () => context.go(Routes.settings)),

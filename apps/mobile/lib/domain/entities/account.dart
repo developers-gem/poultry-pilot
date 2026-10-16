@@ -43,7 +43,36 @@ class DeviceSession with _$DeviceSession {
   const factory DeviceSession({required String id, String? deviceName, required String platform, required String createdAt, required String lastUsedAt, required bool current}) = _DeviceSession;
 }
 
+/// How the person wants to be told (shared with the web app). In-app notifications are always kept.
 @freezed
 class NotificationPreferences with _$NotificationPreferences {
-  const factory NotificationPreferences({required bool pushEnabled, required bool emailEnabled, required String pushMinSeverity, required String emailMinSeverity, @Default(<String>[]) List<String> mutedRuleKeys}) = _NotificationPreferences;
+  const factory NotificationPreferences({
+    required bool pushEnabled,
+    required bool emailEnabled,
+    required String pushMinSeverity,
+    required String emailMinSeverity,
+    @Default(<String>[]) List<String> mutedRuleKeys,
+    @Default(<CategoryPreference>[]) List<CategoryPreference> categories,
+    QuietHours? quietHours,
+  }) = _NotificationPreferences;
+}
+
+/// One of the twelve categories (vaccinations, tasks, stock, deaths, ...), with its channels.
+@freezed
+class CategoryPreference with _$CategoryPreference {
+  const factory CategoryPreference({required String key, required String label, required String description, required bool push, required bool email}) = _CategoryPreference;
+}
+
+/// Push waits until the end of quiet hours (critical alerts still come through).
+@freezed
+class QuietHours with _$QuietHours {
+  const factory QuietHours({required String start, required String end, required String timezone}) = _QuietHours;
+}
+
+/// An in-app notification (the inbox).
+@freezed
+class InboxNotification with _$InboxNotification {
+  const InboxNotification._();
+
+  const factory InboxNotification({required String id, required String title, String? body, String? category, String? severity, String? path, String? entity, String? entityId, required String createdAt, required bool read}) = _InboxNotification;
 }

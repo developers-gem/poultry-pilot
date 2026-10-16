@@ -11,6 +11,7 @@ import {
   TASK_PRIORITIES,
   TASK_STATUSES,
   WEATHER_KINDS,
+  NOTIFICATION_CATEGORIES,
 } from "@poultrypilot/constants";
 import { Schema } from "mongoose";
 import { bool, defineCollection, enumOf, instant, int, localDate, num, ref, refs, str, text } from "./base.js";
@@ -114,6 +115,9 @@ export const NotificationModel = defineCollection({
     link: { type: new Schema({ entity: str({ max: 40 }), id: { type: String }, path: str({ max: 300 }) }, { _id: false }) },
     alertId: ref("Alert"),
     ruleKey: enumOf(RULE_KEYS),
+    category: enumOf(NOTIFICATION_CATEGORIES),
+    dedupeKey: str({ max: 300, trim: false }),
+    sentTokens: { type: [str({ max: 4096, trim: false })], default: undefined },
     severity: enumOf(ALERT_SEVERITIES),
     sentAt: instant(),
     deliveredAt: instant(),
@@ -127,6 +131,7 @@ export const NotificationModel = defineCollection({
     { fields: { userId: 1, createdAt: -1 }, why: "A person's notification inbox, newest first; unread count" },
     { fields: { status: 1, nextAttemptAt: 1 }, options: { partialFilterExpression: { status: "queued" } }, why: "Delivery queue: queued push and email notifications due for an attempt" },
     { fields: { createdAt: 1 }, options: { expireAfterSeconds: 180 * 86_400 }, why: "TTL: delete notifications after 180 days" },
+    { fields: { dedupeKey: 1 }, options: { unique: true, partialFilterExpression: { dedupeKey: { $type: "string" } } }, why: "No duplicates: one notification per person, channel and event" },
   ],
 });
 
@@ -163,6 +168,8 @@ export const NotificationPreferenceModel = defineCollection({
     pushMinSeverity: enumOf(ALERT_SEVERITIES, { required: true, default: "warning" }),
     emailMinSeverity: enumOf(ALERT_SEVERITIES, { required: true, default: "warning" }),
     mutedRuleKeys: { type: [enumOf(RULE_KEYS)], default: undefined },
+    categories: { type: Schema.Types.Mixed, default: undefined },
+    quietHours: { type: new Schema({ start: str({ required: true, max: 5 }), end: str({ required: true, max: 5 }), timezone: str({ required: true, max: 60 }) }, { _id: false }), default: undefined },
   },
   indexes: [{ fields: { userId: 1 }, options: { unique: true }, why: "One preference document per person" }],
 });

@@ -46,6 +46,8 @@ export interface NotificationMessage {
   body: string;
   severity?: "info" | "warning" | "critical";
   link?: { entity?: string; id?: string; path?: string };
+  /** The notification category (the app's Android channel and iOS thread). */
+  category?: string;
   /** Filled in by the dispatcher for the channel: the address or the device tokens. */
   email?: string;
   pushTokens?: string[];
@@ -58,7 +60,11 @@ export interface NotificationMessage {
 export interface NotificationProvider {
   channel: "push" | "email";
   name: string;
-  send(message: NotificationMessage): Promise<{ providerMessageId?: string; invalidTokens?: string[] }>;
+  /**
+   * Push: per device. sentTokens = delivered to the provider; retryTokens = temporary failure (try again later);
+   * invalidTokens = the device is gone (disabled). Providers that do not report per device may omit sentTokens.
+   */
+  send(message: NotificationMessage): Promise<{ providerMessageId?: string; invalidTokens?: string[]; sentTokens?: string[]; retryTokens?: string[] }>;
 }
 
 // ---- weather ----------------------------------------------------------------------

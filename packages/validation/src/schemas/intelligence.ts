@@ -1,3 +1,4 @@
+import { NOTIFICATION_CATEGORIES } from "@poultrypilot/constants";
 import * as C from "@poultrypilot/constants";
 import { z } from "zod";
 import { Id, LocalDate, NonEmptyText, OptionalText } from "../primitives.js";
@@ -42,8 +43,20 @@ export const NotificationListQuery = z.object({
 });
 export const MarkReadRequest = z.object({ ids: z.array(Id).min(1).max(200) }).strict();
 export const PushDeviceRequest = z.object({ platform: z.enum(C.PUSH_PLATFORMS), token: z.string().min(10).max(4096), deviceName: OptionalText(100) }).strict();
+const HHMM = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM (24-hour)");
+/** Per category: push and email on or off (in-app is always kept). Categories left out keep their setting. */
+export const NotificationCategoryPrefs = z.record(z.enum(NOTIFICATION_CATEGORIES), z.object({ push: z.boolean().optional(), email: z.boolean().optional() }).strict());
 export const NotificationPreferencesRequest = z
-  .object({ pushEnabled: z.boolean(), emailEnabled: z.boolean(), pushMinSeverity: Severity, emailMinSeverity: Severity, mutedRuleKeys: z.array(RuleKey).max(14).optional() })
+  .object({
+    pushEnabled: z.boolean(),
+    emailEnabled: z.boolean(),
+    pushMinSeverity: Severity,
+    emailMinSeverity: Severity,
+    mutedRuleKeys: z.array(RuleKey).max(14).optional(),
+    categories: NotificationCategoryPrefs.optional(),
+    /** Push waits until the end of quiet hours (critical alerts still go through). null turns quiet hours off. */
+    quietHours: z.object({ start: HHMM, end: HHMM, timezone: z.string().min(1).max(60) }).strict().nullable().optional(),
+  })
   .strict();
 
 export const AppointmentRequest = z.object({ date: LocalDate, title: NonEmptyText(200), vetName: OptionalText(120), flockId: Id.optional(), houseId: Id.optional(), notes: OptionalText(1000) }).strict();

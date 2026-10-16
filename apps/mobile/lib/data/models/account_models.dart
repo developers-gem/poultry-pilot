@@ -85,11 +85,70 @@ class DeviceSessionModel with _$DeviceSessionModel {
 class NotificationPreferencesModel with _$NotificationPreferencesModel {
   const NotificationPreferencesModel._();
 
-  const factory NotificationPreferencesModel({required bool pushEnabled, required bool emailEnabled, required String pushMinSeverity, required String emailMinSeverity, @Default(<String>[]) List<String> mutedRuleKeys}) = _NotificationPreferencesModel;
+  const factory NotificationPreferencesModel({
+    required bool pushEnabled,
+    required bool emailEnabled,
+    required String pushMinSeverity,
+    required String emailMinSeverity,
+    @Default(<String>[]) List<String> mutedRuleKeys,
+    @Default(<CategoryPreferenceModel>[]) List<CategoryPreferenceModel> categories,
+    QuietHoursModel? quietHours,
+  }) = _NotificationPreferencesModel;
 
   factory NotificationPreferencesModel.fromJson(Map<String, dynamic> json) => _$NotificationPreferencesModelFromJson(json);
 
-  factory NotificationPreferencesModel.fromEntity(NotificationPreferences p) => NotificationPreferencesModel(pushEnabled: p.pushEnabled, emailEnabled: p.emailEnabled, pushMinSeverity: p.pushMinSeverity, emailMinSeverity: p.emailMinSeverity, mutedRuleKeys: p.mutedRuleKeys);
+  NotificationPreferences toEntity() => NotificationPreferences(
+        pushEnabled: pushEnabled,
+        emailEnabled: emailEnabled,
+        pushMinSeverity: pushMinSeverity,
+        emailMinSeverity: emailMinSeverity,
+        mutedRuleKeys: mutedRuleKeys,
+        categories: categories.map((c) => CategoryPreference(key: c.key, label: c.label, description: c.description, push: c.push, email: c.email)).toList(),
+        quietHours: quietHours == null ? null : QuietHours(start: quietHours!.start, end: quietHours!.end, timezone: quietHours!.timezone),
+      );
+}
 
-  NotificationPreferences toEntity() => NotificationPreferences(pushEnabled: pushEnabled, emailEnabled: emailEnabled, pushMinSeverity: pushMinSeverity, emailMinSeverity: emailMinSeverity, mutedRuleKeys: mutedRuleKeys);
+@freezed
+class CategoryPreferenceModel with _$CategoryPreferenceModel {
+  const factory CategoryPreferenceModel({required String key, required String label, @Default('') String description, @Default(true) bool push, @Default(true) bool email}) = _CategoryPreferenceModel;
+  factory CategoryPreferenceModel.fromJson(Map<String, dynamic> json) => _$CategoryPreferenceModelFromJson(json);
+}
+
+@freezed
+class QuietHoursModel with _$QuietHoursModel {
+  const factory QuietHoursModel({required String start, required String end, required String timezone}) = _QuietHoursModel;
+  factory QuietHoursModel.fromJson(Map<String, dynamic> json) => _$QuietHoursModelFromJson(json);
+}
+
+/// PUT /me/notification-preferences body (the API's request shape: categories as a map, quiet hours or null).
+Map<String, dynamic> notificationPreferencesRequest(NotificationPreferences p) => {
+      'pushEnabled': p.pushEnabled,
+      'emailEnabled': p.emailEnabled,
+      'pushMinSeverity': p.pushMinSeverity,
+      'emailMinSeverity': p.emailMinSeverity,
+      if (p.mutedRuleKeys.isNotEmpty) 'mutedRuleKeys': p.mutedRuleKeys,
+      'categories': {for (final c in p.categories) c.key: {'push': c.push, 'email': c.email}},
+      'quietHours': p.quietHours == null ? null : {'start': p.quietHours!.start, 'end': p.quietHours!.end, 'timezone': p.quietHours!.timezone},
+    };
+
+@freezed
+class InboxItemModel with _$InboxItemModel {
+  const InboxItemModel._();
+
+  const factory InboxItemModel({required String id, required String title, String? body, String? category, String? severity, InboxLinkModel? link, required String createdAt, String? readAt}) = _InboxItemModel;
+  factory InboxItemModel.fromJson(Map<String, dynamic> json) => _$InboxItemModelFromJson(json);
+
+  InboxNotification toEntity() => InboxNotification(id: id, title: title, body: body, category: category, severity: severity, path: link?.path, entity: link?.entity, entityId: link?.id, createdAt: createdAt, read: readAt != null);
+}
+
+@freezed
+class InboxLinkModel with _$InboxLinkModel {
+  const factory InboxLinkModel({String? entity, String? id, String? path}) = _InboxLinkModel;
+  factory InboxLinkModel.fromJson(Map<String, dynamic> json) => _$InboxLinkModelFromJson(json);
+}
+
+@freezed
+class PushDeviceModel with _$PushDeviceModel {
+  const factory PushDeviceModel({required String id, required String platform, String? deviceName}) = _PushDeviceModel;
+  factory PushDeviceModel.fromJson(Map<String, dynamic> json) => _$PushDeviceModelFromJson(json);
 }

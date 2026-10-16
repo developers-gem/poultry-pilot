@@ -148,7 +148,16 @@ class SettingsRepositoryImpl implements SettingsRepository {
   @override
   Future<NotificationPreferences> notificationPreferences() async => (await api.notificationPreferences()).toEntity();
   @override
-  Future<NotificationPreferences> saveNotificationPreferences(NotificationPreferences prefs) async => (await api.saveNotificationPreferences(NotificationPreferencesModel.fromEntity(prefs))).toEntity();
+  Future<NotificationPreferences> saveNotificationPreferences(NotificationPreferences prefs) async => (await api.saveNotificationPreferences(notificationPreferencesRequest(prefs))).toEntity();
+
+  @override
+  Future<({int unread, List<InboxNotification> items})> inbox() async {
+    final r = await api.inbox();
+    return (unread: r.unread, items: r.items.map((i) => i.toEntity()).toList());
+  }
+
+  @override
+  Future<void> markRead(List<String> ids) => ids.isEmpty ? api.markAllRead() : api.markRead(ids);
   @override
   Future<bool> onboardingSeen() async => (await cache.setting(_onboardingKey)) == 'true';
   @override

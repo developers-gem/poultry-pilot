@@ -3,32 +3,32 @@
     {
       "mutationId": "01a20000-0000-7000-8000-000000000001",
       "status": "accepted",
-      "entityId": "01a14069-8ab2-729b-ac42-460387437dd3",
+      "entityId": "01a14298-5931-7086-96ac-0d17e496a394",
       "version": 2
     },
     {
       "mutationId": "01a20000-0000-7000-8000-000000000002",
       "status": "rejected",
       "code": "VALIDATION_FAILED",
-      "message": "2026-10-24 is in the future for this farm (today is 2026-10-15)"
+      "message": "2026-10-25 is in the future for this farm (today is 2026-10-16)"
     },
     {
       "mutationId": "01a20000-0000-7000-8000-000000000003",
       "status": "conflict",
       "serverVersion": 2,
       "serverDocument": {
-        "id": "01a14069-8ab2-729b-ac42-460387437dd3",
-        "flockId": "01a14069-8a88-7687-9dcb-2aa9957bf62d",
+        "id": "01a14298-5931-7086-96ac-0d17e496a394",
+        "flockId": "01a14298-5911-7560-9ec1-e653643bfbbe",
         "flockCode": "L1",
-        "houseId": "01a14069-8a7f-7509-8028-be8f1575e295",
+        "houseId": "01a14298-590c-775c-901e-55516bce6d14",
         "flockType": "layer",
-        "date": "2026-10-15",
+        "date": "2026-10-16",
         "birdsAliveEndOfDay": 996,
         "mortality": [
           {
             "cause": "unknown",
             "count": 1,
-            "eventId": "01a14069-8b43-71bd-8c4f-0ecb1cd7cdf7",
+            "eventId": "01a14298-5986-7196-b747-510cc566aac6",
             "fromDailyRecord": true
           }
         ],
@@ -52,26 +52,26 @@
         "averageWeight": {
           "averageWeightG": 1780,
           "sampleSize": 10,
-          "eventId": "01a14069-8b43-71bd-8c4f-13e342d89198"
+          "eventId": "01a14298-5986-7196-b747-55d36aefdb6a"
         },
         "healthObservations": [
           {
-            "id": "01a14069-8b45-74c3-8646-037d3c563bae",
+            "id": "01a14298-5987-7549-b38f-b23652126ef2",
             "signs": "Two birds coughing",
             "affectedBirds": 2
           }
         ],
         "photos": [
           {
-            "assetId": "01a14069-8b39-744b-a191-07d2ca3a1266",
+            "assetId": "01a14298-597d-773a-8046-76989796803b",
             "caption": "Drinker line",
-            "url": "/api/v1/farms/01a14069-8a3f-748c-b741-846baab587fd/media/01a14069-8b39-744b-a191-07d2ca3a1266"
+            "url": "/api/v1/farms/01a14298-58e3-7722-b763-03a1b6a135c1/media/01a14298-597d-773a-8046-76989796803b"
           }
         ],
         "version": 2,
-        "createdBy": "01a14069-8a3f-748c-b741-7e3826ea51d5",
-        "createdAt": "2026-10-15T16:33:41.042Z",
-        "updatedAt": "2026-10-15T16:33:41.268Z"
+        "createdBy": "01a14298-58e2-703f-9160-182f006b8ccb",
+        "createdAt": "2026-10-16T02:44:02.993Z",
+        "updatedAt": "2026-10-16T02:44:03.137Z"
       }
     }
   ]

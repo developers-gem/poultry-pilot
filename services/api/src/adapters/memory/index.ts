@@ -498,7 +498,17 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
     alertRules: createMemFarmRepo(store.alertRules, { softDelete: false, versioned: true, unique: [["farmId", "ruleKey"]] }),
     notifications: {
       async insertMany(recs) {
+        // Unique dedupe keys, like the Mongo index: a second copy of the same event is an error.
+        const keys = new Set(store.notifications.all().map((n) => n.dedupeKey).filter(Boolean));
+        for (const r of recs) {
+          if (r.dedupeKey && keys.has(r.dedupeKey)) throw new AppError("DUPLICATE", `Notification ${r.dedupeKey} already exists`);
+          if (r.dedupeKey) keys.add(r.dedupeKey);
+        }
         for (const r of recs) store.notifications.put(r.id, structuredClone(r));
+      },
+      async existingDedupeKeys(keys) {
+        const wanted = new Set(keys);
+        return new Set(store.notifications.all().map((n) => n.dedupeKey).filter((k): k is string => !!k && wanted.has(k)));
       },
       async forUser(userId, q) {
         return store.notifications.all().filter((n) => n.userId === userId && n.channel === "in_app" && (!q.unreadOnly || !n.readAt)).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, q.limit).map((n) => structuredClone(n));

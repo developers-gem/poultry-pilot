@@ -1,10 +1,10 @@
 {
   "id": null,
-  "flockId": "01a14069-8a88-7687-9dcb-2aa9957bf62d",
+  "flockId": "01a14298-5911-7560-9ec1-e653643bfbbe",
   "flockCode": "L1",
-  "houseId": "01a14069-8a7f-7509-8028-be8f1575e295",
+  "houseId": "01a14298-590c-775c-901e-55516bce6d14",
   "flockType": "layer",
-  "date": "2026-10-16",
+  "date": "2026-10-17",
   "birdsAliveEndOfDay": 996,
   "mortality": [],
   "mortalityTotal": 0,

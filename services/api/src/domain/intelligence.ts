@@ -103,7 +103,7 @@ export const RULE_DEFINITIONS: Record<RuleKey, RuleDefinition> = {
     key: "feed_consumption", label: "Feed consumption", alertTypes: ["feed_change"], baseline: "flock_history",
     description: "Feed eaten per bird far from the flock's own recent days, up or down.",
     params: [WINDOW, MIN_BASE, { key: "deviationPercent", label: "Different from the flock's average by more than", unit: "%", default: 20, min: 1, max: 500 }],
-    defaultSeverity: "warning", defaultRoles: FIELD, defaultChannels: ["in_app"],
+    defaultSeverity: "warning", defaultRoles: FIELD, defaultChannels: ["in_app", "push"],
   },
   water_consumption: {
     key: "water_consumption", label: "Water consumption and quality", alertTypes: ["water_abnormal"], baseline: "flock_history",
@@ -115,23 +115,23 @@ export const RULE_DEFINITIONS: Record<RuleKey, RuleDefinition> = {
     key: "weight_variance", label: "Weight variance", alertTypes: ["weight_variance"], baseline: "target",
     description: "Average weight below the farm's target for the age (brooding profile), or recent daily gain well below the flock's own.",
     params: [{ key: "belowTargetPercent", label: "Below the target weight by more than", unit: "%", default: 10, min: 1, max: 90 }, { key: "gainDropPercent", label: "Recent daily gain below the flock's own by more than", unit: "%", default: 25, min: 1, max: 100 }],
-    defaultSeverity: "warning", defaultRoles: FIELD, defaultChannels: ["in_app"],
+    defaultSeverity: "warning", defaultRoles: FIELD, defaultChannels: ["in_app", "push"],
   },
   fcr_variance: {
     key: "fcr_variance", label: "FCR variance", alertTypes: ["fcr_variance"], baseline: "farm_history",
     description: "A flock's FCR above the farm's own past flocks of the same type (at least 2), or above a target FCR if set.",
     params: [{ key: "abovePercent", label: "Above the farm's past flocks by more than", unit: "%", default: 10, min: 1, max: 200 }, { key: "minPastFlocks", label: "Past flocks needed", default: 2, min: 1, max: 50 }, { key: "targetFcr", label: "Target FCR (optional)", min: 0.5, max: 10 }],
-    defaultSeverity: "info", defaultRoles: MANAGERS, defaultChannels: ["in_app"],
+    defaultSeverity: "info", defaultRoles: MANAGERS, defaultChannels: ["in_app", "push"],
   },
   inventory: {
     key: "inventory", label: "Low stock", alertTypes: ["low_inventory", "low_feed_stock"], baseline: "stock",
     description: "Stock at or below each item's own reorder level, or feed for fewer than the item's reorder days.",
-    params: [], defaultSeverity: "warning", defaultRoles: MANAGERS, defaultChannels: ["in_app", "email"],
+    params: [], defaultSeverity: "warning", defaultRoles: MANAGERS, defaultChannels: ["in_app", "push", "email"],
   },
   medicine_expiry: {
     key: "medicine_expiry", label: "Expiry", alertTypes: ["expiry_soon", "expired_stock"], baseline: "stock",
     description: "Lots expiring within each item's own warning window, and expired stock still on hand.",
-    params: [], defaultSeverity: "warning", defaultRoles: MANAGERS, defaultChannels: ["in_app", "email"],
+    params: [], defaultSeverity: "warning", defaultRoles: MANAGERS, defaultChannels: ["in_app", "push", "email"],
   },
   vaccination_due: {
     key: "vaccination_due", label: "Vaccination due", alertTypes: ["vaccination_due"], baseline: "schedule",
@@ -155,13 +155,13 @@ export const RULE_DEFINITIONS: Record<RuleKey, RuleDefinition> = {
     key: "order_delivery", label: "Order delivery", alertTypes: ["order_delivery"], baseline: "schedule",
     description: "Open orders with a delivery date coming up or passed.",
     params: [{ key: "daysAhead", label: "Remind this many days before", unit: "days", default: 1, min: 0, max: 14 }],
-    defaultSeverity: "info", defaultRoles: MANAGERS, defaultChannels: ["in_app", "email"],
+    defaultSeverity: "info", defaultRoles: MANAGERS, defaultChannels: ["in_app", "push", "email"],
   },
   payment_overdue: {
     key: "payment_overdue", label: "Payment overdue", alertTypes: ["payment_overdue"], baseline: "schedule",
     description: "Receivables (and, if chosen, payables) past their due date plus a grace period.",
     params: [{ key: "graceDays", label: "Days after the due date", unit: "days", default: 0, min: 0, max: 90 }, { key: "includePayables", label: "Also bills the farm owes (1 = yes)", default: 1, min: 0, max: 1 }],
-    defaultSeverity: "warning", defaultRoles: ["owner", "admin", "accountant"], defaultChannels: ["in_app", "email"],
+    defaultSeverity: "warning", defaultRoles: ["owner", "admin", "accountant"], defaultChannels: ["in_app", "push", "email"],
   },
   weather_risk: {
     key: "weather_risk", label: "Weather risk", alertTypes: ["weather_risk"], baseline: "weather_history",
