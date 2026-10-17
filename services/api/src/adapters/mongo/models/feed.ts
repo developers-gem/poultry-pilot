@@ -41,6 +41,7 @@ export const FeedConsumptionModel = defineCollection({
     notes: text(500),
   },
   indexes: [
+    { fields: { farmId: 1, dailyRecordId: 1 }, options: { partialFilterExpression: { dailyRecordId: { $type: "string" } } }, why: "A day's own feed lines (every day save and day view)" },
     { fields: { farmId: 1, flockId: 1, date: 1 }, why: "FCR, daily feed per flock, feed-change alerts" },
     { fields: { farmId: 1, feedItemId: 1, date: 1 }, options: { partialFilterExpression: { feedItemId: { $exists: true } } }, why: "Average daily use per feed item for days of feed remaining" },
   ],

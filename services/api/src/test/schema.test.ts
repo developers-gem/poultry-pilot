@@ -131,7 +131,9 @@ describe("indexes", () => {
   it("keeps the index count small", () => {
     const total = registry.reduce((t, c) => t + indexesOf(c).length, 0);
     const max = Math.max(...registry.map((c) => indexesOf(c).length));
-    expect(max).toBeLessThanOrEqual(4);
+    // At most 5 per collection: incomes and expenses each need 5 distinct access paths (P&L by date, aged
+    // receivables/payables by due date, unique recurring bills, postings by source, flock costing).
+    expect(max).toBeLessThanOrEqual(5);
     expect(total).toBeLessThan(registry.length * 2.5);
   });
 });

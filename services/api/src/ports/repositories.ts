@@ -295,6 +295,11 @@ export interface Repositories {
     lastForAlert(alertId: string, userId: string, channel: string): Promise<NotificationRecord | null>;
   /** Which of these dedupe keys are already stored (checked before inserting, inside the same transaction). */
   existingDedupeKeys(keys: string[], tx?: Tx): Promise<Set<string>>;
+  /**
+   * Claim a due notification for sending: atomically moves nextAttemptAt to leaseUntil if it is still queued and
+   * still due at `expected`. Only one worker (of any number of API instances) wins; a crashed worker's lease expires.
+   */
+  claim(id: string, expected: Date, leaseUntil: Date): Promise<boolean>;
   };
   pushDevices: {
     upsertByToken(rec: PushDeviceRecord): Promise<PushDeviceRecord>;

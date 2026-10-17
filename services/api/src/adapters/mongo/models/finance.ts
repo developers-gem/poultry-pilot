@@ -90,6 +90,7 @@ export const ExpenseModel = defineCollection({
     notes: text(1000),
   },
   indexes: [
+    { fields: { farmId: 1, flockId: 1, date: 1 }, options: { partialFilterExpression: { flockId: { $type: "string" } } }, why: "Costs charged to a flock (flock metrics and profitability)" },
     { fields: { farmId: 1, date: -1 }, why: "Expense list, P&L and breakdowns by period" },
     { fields: { farmId: 1, status: 1, dueDate: 1 }, why: "Payables: unpaid and overdue bills" },
     { fields: { farmId: 1, recurringExpenseId: 1, dueDate: 1 }, options: { unique: true, partialFilterExpression: { recurringExpenseId: { $exists: true } } }, why: "Bill generation is idempotent: one bill per recurring expense per due date" },
@@ -127,6 +128,7 @@ export const IncomeModel = defineCollection({
     notes: text(1000),
   },
   indexes: [
+    { fields: { farmId: 1, flockId: 1, date: 1 }, options: { partialFilterExpression: { flockId: { $type: "string" } } }, why: "Income from a flock (flock metrics and profitability)" },
     { fields: { farmId: 1, date: -1 }, why: "Income list, P&L and breakdowns by period" },
     { fields: { farmId: 1, status: 1, dueDate: 1 }, why: "Receivables: unpaid and overdue incomes" },
     { fields: { farmId: 1, sourceId: 1 }, options: { partialFilterExpression: { sourceId: { $exists: true } } }, why: "The income created from a sale event or order" },

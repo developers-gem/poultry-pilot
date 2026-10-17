@@ -231,3 +231,14 @@ Each is cheap to change until the phase named.
 | D132 | API contract exposure | /openapi.json off by default in production |
 | D133 | Media downloads | Sandboxing CSP, nosniff, PDFs as attachments; type from bytes only |
 | D134 | Dependencies | pnpm audit clean; vulnerable transitive packages pinned with overrides |
+
+## Added with the production readiness audit
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| D135 | Email | SMTP via `SMTP_URL`, required in production; sign-in emails best effort (no enumeration on outage) |
+| D136 | Indexes in production | `node dist/create-indexes.js` before traffic (idempotent, fails loudly); built on real MongoDB in CI |
+| D137 | Multi-instance delivery | Notifications are claimed atomically (5-minute lease) before sending |
+| D138 | Media storage | S3-compatible bucket (`S3_BUCKET`) or local disk for a single instance |
+| D139 | Accessibility | Muted text darkened to meet WCAG AA on the tinted backdrop; axe scan kept in apps/web/e2e/a11y.py |
+| D140 | Weather licence | `OPEN_METEO_API_KEY` uses the commercial endpoint |

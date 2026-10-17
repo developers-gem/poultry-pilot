@@ -113,7 +113,7 @@ export function DashboardPage() {
                         <p className="truncate text-[11px] tracking-[0.15em] text-inksoft uppercase">{active[i]!.flockCode} · {label(active[i]!.type)}</p>
                         <p className="mt-2 font-display text-[20px] font-semibold tracking-tight">{m ? `${num(m.currentBirdCount)} birds` : "…"}</p>
                         <p className="mt-1 text-[12px] text-inksoft">Day {m?.ageDays ?? "—"} · {m?.eggsCollected ? `${num(m.eggsCollected)} eggs to date` : `${num(m?.mortalityCount ?? 0)} deaths`}</p>
-                        <div className="mt-3"><ProgressBar value={m?.survivalRate ?? 0} /></div>
+                        <div className="mt-3"><ProgressBar value={m?.survivalRate ?? 0} label={`Survival of ${active[i]!.flockCode}`} /></div>
                         <p className="mt-1.5 text-[11px] font-medium text-mint-ink">{pct(m?.survivalRate)} survival</p>
                       </div>
                     );

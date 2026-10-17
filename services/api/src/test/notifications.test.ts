@@ -199,3 +199,16 @@ describe("FCM provider", () => {
     await expect(denied.send({ ...msg, pushTokens: ["ok"] })).rejects.toMatchObject({ retryable: false });
   });
 });
+
+describe("several API instances", () => {
+  it("two delivery workers running at once send each notification once", async () => {
+    const push = scriptedPush();
+    const { call, n, owner } = await farm(push);
+    await call(owner, "post", "/me/push-devices").send({ platform: "android", token: "fcm-token-only-phone" });
+    for (let i = 0; i < 5; i++) await n.notify({ farmId: owner.farmId, category: "weather_risk", eventKey: `w:${i}`, userIds: [owner.userId], title: `Heat ${i}`, severity: "warning" });
+    const [a, b] = await Promise.all([n.deliverDue(), n.deliverDue()]);
+    expect(a.sent + b.sent).toBe(5);
+    expect(push.calls).toHaveLength(5);
+    expect(new Set(push.calls.map((c) => c.notificationId)).size).toBe(5);
+  });
+});

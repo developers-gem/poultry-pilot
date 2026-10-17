@@ -115,7 +115,7 @@ export function HatcheryPage() {
                       <span className="font-semibold">{b.code}</span>
                       <span className="text-inksoft">Day {day} of {b.incubationDays} · move {shortDate(b.expectedTransferDate)} · hatch {shortDate(b.expectedHatchDate)}</span>
                     </div>
-                    <ProgressBar value={(day / b.incubationDays) * 100} tone={day >= b.incubationDays ? "amber" : "brand"} />
+                    <ProgressBar value={(day / b.incubationDays) * 100} tone={day >= b.incubationDays ? "amber" : "brand"} label={`Incubation of ${b.code}`} />
                   </div>
                 );
               })}

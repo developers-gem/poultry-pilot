@@ -14,6 +14,8 @@ type Severity = keyof typeof RANK;
 type Channel = "in_app" | "push" | "email";
 /** Retry delays after each failed attempt; after the last, the notification is marked failed. */
 const BACKOFF_MS = [60_000, 5 * 60_000, 30 * 60_000, 2 * 3_600_000];
+/** How long a worker holds a claimed notification; if it crashes mid-send, another worker retries after this. */
+const LEASE_MS = 5 * 60_000;
 
 const DEFAULT_PREFS = (userId: string, now: Date): NotificationPreferenceRecord => ({
   id: newId(), userId, pushEnabled: true, emailEnabled: true, pushMinSeverity: "warning", emailMinSeverity: "warning", createdAt: now, updatedAt: now,
@@ -267,6 +269,8 @@ export function createNotificationService(d: { repos: Repositories; clock: Clock
       let failed = 0;
       let retrying = 0;
       for (const n of due) {
+        // Several API instances run this worker: only the one that claims a notification sends it.
+        if (!n.nextAttemptAt || !(await repos.notifications.claim(n.id, n.nextAttemptAt, new Date(now.getTime() + LEASE_MS)))) continue;
         const provider = providerFor(n.channel);
         const fail = async (error: string, retryable: boolean, extra: Partial<NotificationRecord> = {}) => {
           const attempts = n.attempts + 1;

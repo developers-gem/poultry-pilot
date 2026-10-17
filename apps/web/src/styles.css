@@ -26,7 +26,8 @@
   --font-sans: var(--font-body);
 
   --color-ink: oklch(0.22 0.045 275);
-  --color-inksoft: oklch(0.49 0.05 272);
+  /* Muted text: darkened from the prototype's 0.49 so it meets WCAG AA (4.5:1) over the tinted backdrop. */
+  --color-inksoft: oklch(0.4 0.055 272); /* 4.85:1 even on the strongest backdrop tint (axe-verified) */
   --color-brand: oklch(0.64 0.17 268);
   --color-mint: oklch(0.77 0.15 163);
   --color-amber: oklch(0.77 0.16 70);

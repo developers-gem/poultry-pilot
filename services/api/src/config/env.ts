@@ -36,6 +36,13 @@ const Env = z
     LOGIN_MAX_FAILED_ATTEMPTS: z.coerce.number().int().min(3).max(100).default(10),
     /** Directory for uploaded photos in development. Production should use an S3-compatible adapter. */
     MEDIA_DIR: z.string().default("./data/media"),
+    /** Open-Meteo commercial API key (the free API is non-commercial only). */
+    OPEN_METEO_API_KEY: z.string().optional(),
+    /** Photos in an S3-compatible bucket (needed for more than one API instance, or containers without a volume). */
+    S3_BUCKET: z.string().optional(),
+    S3_REGION: z.string().default("us-east-1"),
+    /** For R2, MinIO, B2, Spaces: the service's endpoint URL. */
+    S3_ENDPOINT: z.string().url().optional(),
     /**
      * News feeds to import for editorial review, as JSON:
      * [{"url":"https://…/rss","source":"Publisher","regionCode":"IN","category":"markets"}]. Empty: no import.
@@ -61,6 +68,9 @@ const Env = z
     REQUEST_BODY_LIMIT: z.string().default("1mb"),
 
     GOOGLE_CLIENT_IDS: csv(""),
+    /** Outgoing email (resets, invitations, verification, notifications). Required in production. */
+    SMTP_URL: z.string().url().optional(),
+    EMAIL_FROM: z.string().default("PoultryPilot <no-reply@poultrypilot.app>"),
     /** Push through Firebase Cloud Messaging: a service account with the Firebase Messaging role. Unset: push is logged only. */
     FCM_PROJECT_ID: z.string().optional(),
     FCM_CLIENT_EMAIL: z.string().email().optional(),
@@ -78,6 +88,9 @@ const Env = z
       .transform((v) => (v === undefined ? undefined : v === "true")),
   })
   .superRefine((env, ctx) => {
+    if (env.NODE_ENV === "production" && !env.SMTP_URL) {
+      ctx.addIssue({ code: "custom", path: ["SMTP_URL"], message: "Production needs outgoing email: password resets, invitations and verification cannot work without it" });
+    }
     if (env.NODE_ENV === "production" && env.CORS_ORIGINS.some((o) => o === "*")) {
       ctx.addIssue({ code: "custom", path: ["CORS_ORIGINS"], message: "Wildcard origin is not allowed in production" });
     }

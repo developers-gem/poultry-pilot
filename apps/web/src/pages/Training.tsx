@@ -66,7 +66,7 @@ export function TrainingPage() {
                   </div>
                   <Badge tone="cyan">{label(c.level)}</Badge>
                 </div>
-                <div className="mt-3"><ProgressBar value={c.lessons ? (c.completedLessons / c.lessons) * 100 : 0} tone="mint" /></div>
+                <div className="mt-3"><ProgressBar value={c.lessons ? (c.completedLessons / c.lessons) * 100 : 0} tone="mint" label={`Progress in ${c.title}`} /></div>
                 <p className="mt-1.5 text-[12px] text-inksoft">{c.completedLessons}/{c.lessons} lessons · {c.minutes} min</p>
                 <Button variant="glass" className="mt-3" aria-expanded={open === c.slug} onClick={() => setOpen(open === c.slug ? null : c.slug)}>{open === c.slug ? "Close course" : c.completedLessons ? "Continue" : "Start course"}</Button>
                 {open === c.slug ? <CourseDetail slug={c.slug} /> : null}

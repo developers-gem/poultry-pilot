@@ -506,6 +506,12 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
         }
         for (const r of recs) store.notifications.put(r.id, structuredClone(r));
       },
+      async claim(id, expected, leaseUntil) {
+        const n = store.notifications.get(id);
+        if (!n || n.status !== "queued" || n.nextAttemptAt?.getTime() !== expected.getTime()) return false;
+        store.notifications.put(id, { ...n, nextAttemptAt: leaseUntil });
+        return true;
+      },
       async existingDedupeKeys(keys) {
         const wanted = new Set(keys);
         return new Set(store.notifications.all().map((n) => n.dedupeKey).filter((k): k is string => !!k && wanted.has(k)));

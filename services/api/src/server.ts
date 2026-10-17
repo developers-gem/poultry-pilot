@@ -1,3 +1,5 @@
+import { s3MediaStorage } from "./adapters/s3-storage.js";
+import { bestEffortEmail, smtpEmailSender } from "./adapters/smtp.js";
 import { fcmPushProvider } from "./adapters/fcm.js";
 import type { Server } from "node:http";
 import { localDiskMediaStorage } from "./adapters/storage.js";
@@ -35,20 +37,21 @@ async function main(): Promise<void> {
     logger,
   );
 
+  const mail = env.SMTP_URL ? smtpEmailSender({ url: env.SMTP_URL, from: env.EMAIL_FROM }) : logEmailSender(logger);
   const container = buildContainer({
     repos: createMongoRepositories(mongo.connection),
     health: { mongodb: mongo.check },
     logger,
     hasher: argon2Hasher,
-    media: localDiskMediaStorage(env.MEDIA_DIR),
-    weatherProvider: openMeteoProvider(),
+    media: env.S3_BUCKET ? s3MediaStorage({ bucket: env.S3_BUCKET, region: env.S3_REGION, ...(env.S3_ENDPOINT ? { endpoint: env.S3_ENDPOINT } : {}) }) : localDiskMediaStorage(env.MEDIA_DIR),
+    weatherProvider: openMeteoProvider(env.OPEN_METEO_API_KEY ? { apiKey: env.OPEN_METEO_API_KEY } : {}),
     notificationProviders: [
-      emailNotificationProvider(logEmailSender(logger)),
+      emailNotificationProvider(mail),
       env.FCM_PROJECT_ID && env.FCM_CLIENT_EMAIL && env.FCM_PRIVATE_KEY
         ? fcmPushProvider({ projectId: env.FCM_PROJECT_ID, clientEmail: env.FCM_CLIENT_EMAIL, privateKey: env.FCM_PRIVATE_KEY.replace(/\\n/g, "\n") })
         : logPushProvider(logger),
     ],
-    email: logEmailSender(logger),
+    email: bestEffortEmail(mail, logger),
     ...(env.GOOGLE_CLIENT_IDS.length ? { google: googleVerifier(env.GOOGLE_CLIENT_IDS) } : {}),
     config: {
       version: env.APP_VERSION,
@@ -73,6 +76,7 @@ async function main(): Promise<void> {
   const app = createApp(container);
   const server: Server = app.listen(env.PORT, env.HOST, () => {
     logger.info({ host: env.HOST, port: env.PORT, env: env.NODE_ENV }, "PoultryPilot API listening");
+    if (env.NODE_ENV === "production" && !env.S3_BUCKET) logger.warn({ mediaDir: env.MEDIA_DIR }, "Photos are stored on local disk: use one instance with a persistent volume, or set S3_BUCKET");
   });
   // Keep-alive sockets must not outlive the shutdown window.
   server.keepAliveTimeout = 5_000;

@@ -163,10 +163,10 @@ export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: { id: 
   );
 }
 
-export function ProgressBar({ value, tone = "brand" }: { value: number; tone?: "brand" | "mint" | "rose" | "amber" }) {
+export function ProgressBar({ value, tone = "brand", label }: { value: number; tone?: "brand" | "mint" | "rose" | "amber"; label: string }) {
   const c = { brand: "bg-brand", mint: "bg-mint", rose: "bg-rose", amber: "bg-amber" }[tone];
   return (
-    <div className="h-1.5 overflow-hidden rounded-full bg-black/5" role="progressbar" aria-valuenow={Math.round(value)} aria-valuemin={0} aria-valuemax={100}>
+    <div className="h-1.5 overflow-hidden rounded-full bg-black/5" role="progressbar" aria-label={label} aria-valuenow={Math.round(value)} aria-valuemin={0} aria-valuemax={100}>
       <div className={`h-full rounded-full ${c}`} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
     </div>
   );

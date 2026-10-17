@@ -149,6 +149,7 @@ export const OrderModel = defineCollection({
     notes: text(1000),
   },
   indexes: [
+    { fields: { farmId: 1, hatcheryBatchId: 1 }, options: { partialFilterExpression: { hatcheryBatchId: { $type: "string" } } }, why: "Chicks booked against a hatchery batch" },
     { fields: { farmId: 1, orderNumber: 1 }, options: { unique: true }, why: "Order numbers unique per seller farm; lookup by number" },
     { fields: { farmId: 1, status: 1, createdAt: -1 }, why: "Seller's order board by status" },
     { fields: { farmId: 1, buyerId: 1, createdAt: -1 }, why: "A buyer's order history and outstanding balance" },

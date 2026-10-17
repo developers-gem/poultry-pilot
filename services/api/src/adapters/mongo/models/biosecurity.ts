@@ -98,7 +98,8 @@ export const BiosecurityLogModel = defineCollection({
     attachments: { type: [new Schema({ assetId: ref("MediaAsset", { required: true }), name: str({ max: 200 }) }, { _id: false })], default: undefined },
     details: text(2000),
   },
-  indexes: [{ fields: { farmId: 1, date: -1 }, why: "Biosecurity log list and audits by period" }],
+  indexes: [
+    { fields: { farmId: 1, type: 1, date: -1 }, why: "Latest log of a type (biosecurity summary: last footbath check)" },{ fields: { farmId: 1, date: -1 }, why: "Biosecurity log list and audits by period" }],
 });
 
 export const VisitorModel = defineCollection({

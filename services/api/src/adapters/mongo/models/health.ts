@@ -99,6 +99,7 @@ export const HealthRecordModel = defineCollection({
     dailyRecordId: ref("DailyRecord"),
   },
   indexes: [
+    { fields: { farmId: 1, dailyRecordId: 1 }, options: { partialFilterExpression: { dailyRecordId: { $type: "string" } } }, why: "A day's own health observations (every day save and day view)" },
     { fields: { farmId: 1, flockId: 1, date: -1 }, why: "Flock health history; active withdrawal check before a sale" },
     { fields: { farmId: 1, date: -1 }, why: "Farm-wide health log for vets and managers" },
     { fields: { farmId: 1, followUpDone: 1, followUpDate: 1 }, options: { partialFilterExpression: { followUpDate: { $exists: true } } }, why: "Follow-ups due (reminders, alert job)" },

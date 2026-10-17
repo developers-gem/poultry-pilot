@@ -3,7 +3,7 @@
 > Generated from the Mongoose schemas in `services/api/src/adapters/mongo/models`. Do not edit by hand:
 > run `pnpm --filter @poultrypilot/api docs:data-dictionary`. A test fails if this file is out of date.
 
-63 collections, 105 secondary indexes (plus the default `_id` index on each). Design rules and relationships: `docs/data-model.md`.
+63 collections, 113 secondary indexes (plus the default `_id` index on each). Design rules and relationships: `docs/data-model.md`.
 
 | Collection | Domain | Ownership | Indexes | Purpose |
 | --- | --- | --- | --- | --- |
@@ -18,19 +18,19 @@
 | [`flock_events`](#flock_events) | Production | farm, append-only | 1 | The flock ledger: every placement, death, cull, transfer, split, merge, adjustment, sale and weighing |
 | [`daily_records`](#daily_records) | Production | farm | 2 | One record per flock per farm-local day, entered from web or mobile |
 | [`bird_weights`](#bird_weights) | Production | farm | 1 | A weigh session: individual sample weights of one flock on one day, with statistics computed from those weights |
-| [`egg_records`](#egg_records) | Production | farm | 2 | Eggs collected from one flock on one day, by grade |
+| [`egg_records`](#egg_records) | Production | farm | 3 | Eggs collected from one flock on one day, by grade |
 | [`egg_inventory`](#egg_inventory) | Production | farm, append-only | 2 | Egg stock ledger |
-| [`water_records`](#water_records) | Production | farm | 1 | Water drunk by one flock on one day, with source, quality (pH, dissolved solids, chlorine), treatment and abnormal-consumption flags |
-| [`feed_consumption`](#feed_consumption) | Feed | farm | 2 | Feed eaten by, or wasted in, a flock's house on a day |
+| [`water_records`](#water_records) | Production | farm | 2 | Water drunk by one flock on one day, with source, quality (pH, dissolved solids, chlorine), treatment and abnormal-consumption flags |
+| [`feed_consumption`](#feed_consumption) | Feed | farm | 3 | Feed eaten by, or wasted in, a flock's house on a day |
 | [`inventory_items`](#inventory_items) | Inventory | farm | 1 | The stock catalog: feed, medicine, vaccines, disinfectant, litter, packaging, equipment supplies, spare parts and other consumables |
 | [`inventory_lots`](#inventory_lots) | Inventory | farm | 2 | A batch received into stock (a purchase, or a positive stock-count correction): supplier, batch number, expiry, storage location, unit cost and what remains |
 | [`inventory_transactions`](#inventory_transactions) | Inventory | farm, append-only | 2 | The stock ledger: receipts, issues, wastage, stock-count adjustments and reversals, each against one lot |
 | [`medicines`](#medicines) | Health | farm | 1 | The farm's catalog of vaccines and medicines with default withdrawal periods taken from the product label or the farm's veterinarian |
-| [`health_records`](#health_records) | Health | farm | 3 | Farm health records: observations, veterinary visits, treatments, lab tests and post-mortems |
+| [`health_records`](#health_records) | Health | farm | 4 | Farm health records: observations, veterinary visits, treatments, lab tests and post-mortems |
 | [`vaccination_programmes`](#vaccination_programmes) | Health | farm | 1 | A farm's own vaccination programme (from its veterinarian or hatchery), by bird age |
 | [`vaccinations`](#vaccinations) | Health | farm | 2 | A vaccination planned for a flock and, once given, how: batch numbers and expiry, doses used from stock, route, who gave it |
 | [`checklist_templates`](#checklist_templates) | Biosecurity and equipment | farm | 1 | A farm's own checklist (visitor declaration, PPE, footbath, cleaning, disinfection, vehicle, pest control, audit) |
-| [`biosecurity_logs`](#biosecurity_logs) | Biosecurity and equipment | farm | 1 | Evidence that a biosecurity activity happened: cleaning, disinfection, footbath change or check, vehicle movement, pest control, wild bird observation, or an audit |
+| [`biosecurity_logs`](#biosecurity_logs) | Biosecurity and equipment | farm | 2 | Evidence that a biosecurity activity happened: cleaning, disinfection, footbath change or check, vehicle movement, pest control, wild bird observation, or an audit |
 | [`visitors`](#visitors) | Biosecurity and equipment | farm | 1 | Visitor register: who entered, why, which houses, their declaration, last contact with other poultry and the downtime since, PPE and footbath use |
 | [`cleaning_tasks`](#cleaning_tasks) | Biosecurity and equipment | farm | 1 | A recurring cleaning or disinfection routine, optionally with a checklist template |
 | [`equipment`](#equipment) | Biosecurity and equipment | farm | 1 | Assets: incubators, feeders, heaters, generators, scales, vehicles |
@@ -43,13 +43,13 @@
 | [`brooder_checks`](#brooder_checks) | ChickStart | farm | 1 | A check of young chicks: temperature at chick level, humidity, behaviour, feed and water, crop fill, with optional checklist answers |
 | [`suppliers`](#suppliers) | Money | farm | 1 | The farm's suppliers (feed mills, hatcheries, vets, utilities) |
 | [`money_accounts`](#money_accounts) | Money | farm | 1 | Where the farm keeps money: cash box, bank account, mobile money wallet |
-| [`expenses`](#expenses) | Money | farm | 4 | A bill: an expense or a purchase the farm owes |
-| [`incomes`](#incomes) | Money | farm | 3 | A sale or other income the farm is owed |
+| [`expenses`](#expenses) | Money | farm | 5 | A bill: an expense or a purchase the farm owes |
+| [`incomes`](#incomes) | Money | farm | 4 | A sale or other income the farm is owed |
 | [`recurring_expenses`](#recurring_expenses) | Money | farm | 1 | A repeating bill (electricity, wages, rent) |
 | [`transactions`](#transactions) | Money | farm, append-only | 3 | The cash ledger: money in or out of one of the farm's accounts |
 | [`buyers`](#buyers) | Market | farm | 1 | The farm's own customer book |
 | [`market_listings`](#market_listings) | Market | farm | 3 | Something a farm offers on the marketplace |
-| [`orders`](#orders) | Market | farm | 4 | A sale by the farm (farmId = seller), recorded directly or placed by a marketplace buyer |
+| [`orders`](#orders) | Market | farm | 5 | A sale by the farm (farmId = seller), recorded directly or placed by a marketplace buyer |
 | [`order_payments`](#order_payments) | Market | farm, append-only | 1 | Money received against an order (or refunded) |
 | [`market_prices`](#market_prices) | Market | global | 1 | Reference prices by region, product and date from a named source (fetched behind the API) |
 | [`tasks`](#tasks) | Operations | farm | 2 | A piece of work assigned to someone on the farm, optionally linked to a flock, house or other record |
@@ -447,6 +447,7 @@ Eggs collected from one flock on one day, by grade. Saving it posts a 'collected
 
 | Index | Options | Serves |
 | --- | --- | --- |
+| farmId, dailyRecordId | partial: {"dailyRecordId":{"$type":"string"}} | A day's own egg record (every day save and day view) |
 | farmId, flockId, date | unique, live records only | One record per flock per day; flock production chart and hen-day % |
 | farmId, date |  | Farm egg totals per day (dashboard, 14-day chart, egg-drop alerts) |
 
@@ -508,6 +509,7 @@ Water drunk by one flock on one day, with source, quality (pH, dissolved solids,
 
 | Index | Options | Serves |
 | --- | --- | --- |
+| farmId, dailyRecordId | partial: {"dailyRecordId":{"$type":"string"}} | A day's own water record (every day save and day view) |
 | farmId, flockId, date | unique, live records only | One record per flock per day; water-to-feed ratio chart |
 
 ## Feed
@@ -540,6 +542,7 @@ Feed eaten by, or wasted in, a flock's house on a day. When it names a feed item
 
 | Index | Options | Serves |
 | --- | --- | --- |
+| farmId, dailyRecordId | partial: {"dailyRecordId":{"$type":"string"}} | A day's own feed lines (every day save and day view) |
 | farmId, flockId, date |  | FCR, daily feed per flock, feed-change alerts |
 | farmId, feedItemId, date | partial: {"feedItemId":{"$exists":true}} | Average daily use per feed item for days of feed remaining |
 
@@ -733,6 +736,7 @@ Farm health records: observations, veterinary visits, treatments, lab tests and 
 
 | Index | Options | Serves |
 | --- | --- | --- |
+| farmId, dailyRecordId | partial: {"dailyRecordId":{"$type":"string"}} | A day's own health observations (every day save and day view) |
 | farmId, flockId, date ↓ |  | Flock health history; active withdrawal check before a sale |
 | farmId, date ↓ |  | Farm-wide health log for vets and managers |
 | farmId, followUpDone, followUpDate | partial: {"followUpDate":{"$exists":true}} | Follow-ups due (reminders, alert job) |
@@ -892,6 +896,7 @@ Evidence that a biosecurity activity happened: cleaning, disinfection, footbath 
 
 | Index | Options | Serves |
 | --- | --- | --- |
+| farmId, type, date ↓ |  | Latest log of a type (biosecurity summary: last footbath check) |
 | farmId, date ↓ |  | Biosecurity log list and audits by period |
 
 ### visitors
@@ -1358,6 +1363,7 @@ A bill: an expense or a purchase the farm owes. Unpaid bills are payables; payme
 
 | Index | Options | Serves |
 | --- | --- | --- |
+| farmId, flockId, date | partial: {"flockId":{"$type":"string"}} | Costs charged to a flock (flock metrics and profitability) |
 | farmId, date ↓ |  | Expense list, P&L and breakdowns by period |
 | farmId, status, dueDate |  | Payables: unpaid and overdue bills |
 | farmId, recurringExpenseId, dueDate | unique, partial: {"recurringExpenseId":{"$exists":true}} | Bill generation is idempotent: one bill per recurring expense per due date |
@@ -1409,6 +1415,7 @@ A sale or other income the farm is owed. Unpaid incomes are receivables. Bird sa
 
 | Index | Options | Serves |
 | --- | --- | --- |
+| farmId, flockId, date | partial: {"flockId":{"$type":"string"}} | Income from a flock (flock metrics and profitability) |
 | farmId, date ↓ |  | Income list, P&L and breakdowns by period |
 | farmId, status, dueDate |  | Receivables: unpaid and overdue incomes |
 | farmId, sourceId | partial: {"sourceId":{"$exists":true}} | The income created from a sale event or order |
@@ -1638,6 +1645,7 @@ A sale by the farm (farmId = seller), recorded directly or placed by a marketpla
 
 | Index | Options | Serves |
 | --- | --- | --- |
+| farmId, hatcheryBatchId | partial: {"hatcheryBatchId":{"$type":"string"}} | Chicks booked against a hatchery batch |
 | farmId, orderNumber | unique | Order numbers unique per seller farm; lookup by number |
 | farmId, status, createdAt ↓ |  | Seller's order board by status |
 | farmId, buyerId, createdAt ↓ |  | A buyer's order history and outstanding balance |

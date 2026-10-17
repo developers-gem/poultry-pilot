@@ -25,6 +25,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^4",
+    "axe-core": "4.10.2",
     "openapi-typescript": "^7",
     "tailwindcss": "^4",
     "typescript": "^5.7",

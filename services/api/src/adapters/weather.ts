@@ -5,8 +5,12 @@ import type { ProviderDay, WeatherProvider, WeatherReport } from "../ports/exter
  * history. Behind the WeatherProvider port, so it can be swapped for another service.
  * Note: not exercised from the development sandbox (no outbound access to the service); tests use fakeWeatherProvider.
  */
-export function openMeteoProvider(opts: { baseUrl?: string; fetchImpl?: typeof fetch; timeoutMs?: number } = {}): WeatherProvider {
-  const base = opts.baseUrl ?? "https://api.open-meteo.com/v1/forecast";
+/**
+ * Open-Meteo. The free API (no key) is for non-commercial use only; a commercial deployment needs an API key, which
+ * switches to the customer endpoint (https://open-meteo.com/en/pricing).
+ */
+export function openMeteoProvider(opts: { baseUrl?: string; apiKey?: string; fetchImpl?: typeof fetch; timeoutMs?: number } = {}): WeatherProvider {
+  const base = opts.baseUrl ?? (opts.apiKey ? "https://customer-api.open-meteo.com/v1/forecast" : "https://api.open-meteo.com/v1/forecast");
   const f = opts.fetchImpl ?? fetch;
   return {
     name: "open-meteo",
@@ -21,6 +25,7 @@ export function openMeteoProvider(opts: { baseUrl?: string; fetchImpl?: typeof f
         past_days: String(o.pastDays),
         wind_speed_unit: "kmh",
       });
+      if (opts.apiKey) params.set("apikey", opts.apiKey);
       const res = await f(`${base}?${params}`, { signal: AbortSignal.timeout(opts.timeoutMs ?? 8000) });
       if (!res.ok) throw new Error(`Weather provider returned ${res.status}`);
       const j = (await res.json()) as {

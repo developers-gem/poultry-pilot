@@ -20,6 +20,13 @@ if [ -f "$PLIST" ] && ! grep -q NSCameraUsageDescription "$PLIST"; then
   perl -0pi -e 's#</dict>\s*</plist>\s*$#\t<key>NSCameraUsageDescription</key>\n\t<string>Take photos of your flock to attach to daily records.</string>\n\t<key>NSPhotoLibraryUsageDescription</key>\n\t<string>Choose photos to attach to daily records.</string>\n</dict>\n</plist>\n#' "$PLIST"
 fi
 
+# Android 6+ (API 23): the refresh token is kept with EncryptedSharedPreferences (flutter_secure_storage).
+for GRADLE in android/app/build.gradle android/app/build.gradle.kts; do
+  [ -f "$GRADLE" ] || continue
+  sed -i.bak -E 's/minSdk(Version)? *=? *flutter\.minSdkVersion/minSdk = 23/' "$GRADLE" && rm -f "$GRADLE.bak"
+  grep -qE 'minSdk(Version)? *=? *(23|2[4-9]|[3-9][0-9])' "$GRADLE" || echo "Set minSdk to 23 in $GRADLE"
+done
+
 [ -f config/dev.json ] || cp config/dev.example.json config/dev.json
 flutter pub get
 dart run build_runner build --delete-conflicting-outputs

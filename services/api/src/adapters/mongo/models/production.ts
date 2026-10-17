@@ -247,6 +247,7 @@ export const EggRecordModel = defineCollection({
     notes: text(1000),
   },
   indexes: [
+    { fields: { farmId: 1, dailyRecordId: 1 }, options: { partialFilterExpression: { dailyRecordId: { $type: "string" } } }, why: "A day's own egg record (every day save and day view)" },
     { fields: { farmId: 1, flockId: 1, date: 1 }, options: { unique: true, ...LIVE }, why: "One record per flock per day; flock production chart and hen-day %" },
     { fields: { farmId: 1, date: 1 }, why: "Farm egg totals per day (dashboard, 14-day chart, egg-drop alerts)" },
   ],
@@ -309,5 +310,6 @@ export const WaterRecordModel = defineCollection({
     healthRecordId: ref("HealthRecord"),
     notes: text(500),
   },
-  indexes: [{ fields: { farmId: 1, flockId: 1, date: 1 }, options: { unique: true, ...LIVE }, why: "One record per flock per day; water-to-feed ratio chart" }],
+  indexes: [
+    { fields: { farmId: 1, dailyRecordId: 1 }, options: { partialFilterExpression: { dailyRecordId: { $type: "string" } } }, why: "A day's own water record (every day save and day view)" },{ fields: { farmId: 1, flockId: 1, date: 1 }, options: { unique: true, ...LIVE }, why: "One record per flock per day; water-to-feed ratio chart" }],
 });
