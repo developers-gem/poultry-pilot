@@ -78,21 +78,25 @@ describe("feed and FCR", () => {
     expect(m.weightInKg).toBeCloseTo(39.6, 6);
     expect(m.weightOutKg).toBe(880);
     expect(m.weightProducedKg).toBeCloseTo(1960.4, 6);
-    expect(m.fcr).toBeCloseTo(1.7, 6);
-    expect(m.feedPerKgGainKg).toBeCloseTo(1.734340, 5);
+    // Measured on the last weigh-in (10-06: 960 birds × 2.0 kg = 1920 kg, all 3400 kg eaten by then). The sale on
+    // 10-08 came after it, so it does not enter: mixing the sold birds' newer weight with the others' older one was
+    // the old, inconsistent basis.
+    expect(m.fcrAsOf).toBe("2026-10-06");
+    expect(m.fcr).toBeCloseTo(3400 / 1920, 6);
+    expect(m.feedPerKgGainKg).toBeCloseTo(3400 / (1920 - 39.6), 5);
   });
   it("with the mortality-weight setting, dead birds add their estimated weight (2.571 + 8.571 kg)", () => {
     const withDead = computeFlockMetrics({ ...input, includeMortalityWeight: true });
     // 15 birds × 171.43 g on 09-05 (between 40 g and 500 g) + 10 birds × 857.14 g on 09-20 (between 500 g and 1500 g)
     expect(withDead.weightOutKg).toBeCloseTo(880 + 2.571429 + 8.571429, 5);
-    expect(withDead.fcr).toBeCloseTo(3400 / 2011.142857, 6);
-    expect(withDead.feedPerKgGainKg).toBeCloseTo(3400 / 1971.542857, 6);
+    expect(withDead.fcr).toBeCloseTo(3400 / (1920 + 2.571429 + 8.571429), 5);
+    expect(withDead.feedPerKgGainKg).toBeCloseTo(3400 / (1920 + 2.571429 + 8.571429 - 39.6), 5);
   });
   it("selling birds does not make FCR jump (prototype bug B17)", () => {
     const beforeSale = computeFlockMetrics({ ...input, events: events.filter((e) => e.type !== "sale"), asOf: "2026-10-07" });
-    // 960 birds × 2.0 kg = 1920 kg on the farm before the sale; 2000 kg alive + sold after it.
+    // 960 birds × 2.0 kg = 1920 kg at the last weigh-in; a sale after it does not change an FCR measured then.
     expect(beforeSale.fcr).toBeCloseTo(3400 / 1920, 6);
-    expect(m.fcr! / beforeSale.fcr!).toBeCloseTo(1920 / 2000, 6);
+    expect(m.fcr).toBeCloseTo(beforeSale.fcr!, 6);
   });
 });
 

@@ -668,6 +668,12 @@ export function createDailyRecordService(d: DailyRecordDeps) {
       ]);
       const houseName = new Map(houses.map((h) => [h.id, h.name]));
       const recBy = new Map(records.map((r) => [r.flockId, r]));
+      // Who recorded each flock's day (supervisors follow up with the right person).
+      const nameOf = new Map<string, string>();
+      for (const id of new Set(records.flatMap((r) => [r.createdBy, r.updatedBy].filter((x): x is string => !!x)))) {
+        const u = await repos.users.findById(id);
+        if (u) nameOf.set(id, u.fullName);
+      }
       const prevBy = new Map(previous.map((r) => [r.flockId, r]));
       // Expected birds: today's snapshot, or the ledger for a past date (one aggregate for all flocks).
       let alive = new Map(flocks.map((f) => [f.id, f.population?.alive ?? 0]));
@@ -693,7 +699,7 @@ export function createDailyRecordService(d: DailyRecordDeps) {
               houseName: houseName.get(f.houseId) ?? "",
               expectedBirds: alive.get(f.id) ?? 0,
               laying: LAYING.has(f.type),
-              record: r ? { id: r.id, version: r.version, summary: summaryView(r.summary) } : null,
+              record: r ? { id: r.id, version: r.version, summary: summaryView(r.summary), recordedByName: nameOf.get(r.createdBy) ?? null, lastChangedByName: nameOf.get(r.updatedBy ?? r.createdBy) ?? null, updatedAt: r.updatedAt.toISOString() } : null,
               previous: p ? summaryView(p.summary) : null,
             };
           }),

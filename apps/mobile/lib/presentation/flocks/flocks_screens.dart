@@ -100,7 +100,12 @@ class FlockDetailScreen extends ConsumerWidget {
               child: Column(children: [
                 Row(children: [kv('Alive', Fmt.number(d.alive)), kv('Survival', Fmt.percent(d.survivalRate)), kv('Deaths', Fmt.number(d.mortality))]),
                 const SizedBox(height: 14),
-                Row(children: [kv('Avg weight', d.averageWeightG == null ? '—' : '${Fmt.number(d.averageWeightG)} g'), kv('Daily gain', d.dailyWeightGainG == null ? '—' : '${Fmt.number(d.dailyWeightGainG, digits: 1)} g'), kv('FCR', d.fcr == null ? '—' : d.fcr!.toStringAsFixed(2))]),
+                Row(children: [kv('Avg weight', d.averageWeightG == null ? '—' : '${Fmt.number(d.averageWeightG)} g'), kv('Daily gain', d.dailyWeightGainG == null ? '—' : '${Fmt.number(d.dailyWeightGainG, digits: 1)} g'),
+                  // Layers: feed per dozen eggs; meat birds: FCR at the last weigh-in.
+                  if (d.flock.isLaying) kv('Feed / dozen', d.feedPerDozenEggsKg == null ? '—' : '${d.feedPerDozenEggsKg!.toStringAsFixed(2)} kg') else kv(d.fcrAsOf == null ? 'FCR' : 'FCR (${Fmt.shortDate(d.fcrAsOf)})', d.fcr == null ? '—' : '${d.fcr!.toStringAsFixed(2)}${d.fcrWarning != null ? ' ⚠' : ''}')]),
+                if (d.flock.isLaying && d.eggsPerHenHoused != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('${d.eggsPerHenHoused!.toStringAsFixed(1)} eggs per hen housed', style: const TextStyle(color: AppColors.inkSoft))),
+                if (!d.flock.isLaying && d.epef != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('EPEF ${d.epef}', style: const TextStyle(color: AppColors.inkSoft))),
+                if (d.fcrNote != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text(d.fcrNote!, style: const TextStyle(color: AppColors.amberInk))),
                 const SizedBox(height: 14),
                 Row(children: [kv('Feed used', '${Fmt.number(d.feedConsumedKg)} kg'), kv('Feed / bird', d.feedPerBirdKg == null ? '—' : '${Fmt.number(d.feedPerBirdKg, digits: 2)} kg'), kv('Eggs', Fmt.number(d.eggsCollected))]),
               ]),

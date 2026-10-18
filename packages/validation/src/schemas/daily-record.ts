@@ -215,7 +215,7 @@ export const DailyEntrySheet = z.object({
       houseName: z.string(),
       expectedBirds: z.number(),
       laying: z.boolean(),
-      record: z.object({ id: z.string(), version: z.number(), summary: DailyRecordSummary }).nullable(),
+      record: z.object({ id: z.string(), version: z.number(), summary: DailyRecordSummary, recordedByName: z.string().nullable(), lastChangedByName: z.string().nullable(), updatedAt: z.string() }).nullable(),
       /** Yesterday's figures, to pre-fill or compare. */
       previous: DailyRecordSummary.nullable(),
     }),

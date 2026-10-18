@@ -1,30 +1,10 @@
 {
-  "from": "2026-10-03",
-  "to": "2026-10-16",
+  "from": "2026-10-05",
+  "to": "2026-10-18",
   "flockIds": [
-    "01a14298-5911-7560-9ec1-e653643bfbbe"
+    "01a14d6e-5978-7090-9eaf-4e01c3d4cc8d"
   ],
   "days": [
-    {
-      "date": "2026-10-03",
-      "mortality": 0,
-      "culls": 0,
-      "feedKg": 0,
-      "waterLitres": 0,
-      "eggsCollected": 0,
-      "eggsBroken": 0,
-      "records": 0
-    },
-    {
-      "date": "2026-10-04",
-      "mortality": 0,
-      "culls": 0,
-      "feedKg": 0,
-      "waterLitres": 0,
-      "eggsCollected": 0,
-      "eggsBroken": 0,
-      "records": 0
-    },
     {
       "date": "2026-10-05",
       "mortality": 0,
@@ -107,6 +87,26 @@
     },
     {
       "date": "2026-10-13",
+      "mortality": 0,
+      "culls": 0,
+      "feedKg": 0,
+      "waterLitres": 0,
+      "eggsCollected": 0,
+      "eggsBroken": 0,
+      "records": 0
+    },
+    {
+      "date": "2026-10-14",
+      "mortality": 0,
+      "culls": 0,
+      "feedKg": 0,
+      "waterLitres": 0,
+      "eggsCollected": 0,
+      "eggsBroken": 0,
+      "records": 0
+    },
+    {
+      "date": "2026-10-15",
       "mortality": 1,
       "culls": 0,
       "feedKg": 0,
@@ -116,7 +116,7 @@
       "records": 1
     },
     {
-      "date": "2026-10-14",
+      "date": "2026-10-16",
       "mortality": 1,
       "culls": 0,
       "feedKg": 0,
@@ -126,7 +126,7 @@
       "records": 1
     },
     {
-      "date": "2026-10-15",
+      "date": "2026-10-17",
       "mortality": 1,
       "culls": 0,
       "feedKg": 115,
@@ -136,7 +136,7 @@
       "records": 1
     },
     {
-      "date": "2026-10-16",
+      "date": "2026-10-18",
       "mortality": 1,
       "culls": 0,
       "feedKg": 0,

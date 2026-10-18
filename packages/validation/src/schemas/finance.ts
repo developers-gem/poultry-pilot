@@ -34,7 +34,15 @@ const DocFields = {
 };
 
 export const ExpenseRequest = z
-  .object({ ...DocFields, kind: z.enum(C.EXPENSE_KINDS).default("expense"), category: z.enum(C.EXPENSE_CATEGORIES), supplierId: Id.optional(), vendor: OptionalText(120) })
+  .object({
+    ...DocFields,
+    kind: z.enum(C.EXPENSE_KINDS).default("expense"),
+    category: z.enum(C.EXPENSE_CATEGORIES),
+    supplierId: Id.optional(),
+    vendor: OptionalText(120),
+    /** Save even though a bill with the same amount exists within 3 days (after the person has checked it). */
+    allowDuplicate: z.boolean().optional(),
+  })
   .strict();
 export const IncomeRequest = z
   .object({ ...DocFields, kind: z.enum(C.INCOME_KINDS).default("income"), category: z.enum(C.INCOME_CATEGORIES), buyerId: Id.optional(), customerName: OptionalText(120) })
@@ -92,7 +100,8 @@ export const ListingRequest = z
     /** Price per unit; buyers always pay this price. */
     price: Money,
     priceUnit: z.enum(C.PRICE_UNITS),
-    regionCode: z.string().regex(/^[A-Z]{2}(-[A-Z0-9]{1,3})?$/, "Country code, optionally with region (e.g. IN or IN-UP)"),
+    /** Defaults to the farm's country. */
+    regionCode: z.string().regex(/^[A-Z]{2}(-[A-Z0-9]{1,3})?$/, "Country code, optionally with region (e.g. IN or IN-UP)").optional(),
     locationLabel: OptionalText(200),
     availableFrom: LocalDate.optional(),
     availableUntil: LocalDate.optional(),
@@ -122,7 +131,8 @@ export const PlaceOrderRequest = z
     quantity: z.number().positive().max(100_000_000),
     fulfilment: z.enum(C.FULFILMENT_METHODS),
     deliveryAddress: OptionalText(300),
-    buyerName: NonEmptyText(120),
+    /** Defaults to the signed-in person's name. */
+    buyerName: NonEmptyText(120).optional(),
     buyerPhone: OptionalText(30),
     /** Buying for one of your farms. */
     buyerFarmId: Id.optional(),

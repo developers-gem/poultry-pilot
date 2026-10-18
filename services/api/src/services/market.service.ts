@@ -222,6 +222,11 @@ export function createMarketService(d: { repos: Repositories; clock: Clock; audi
     async createListing(ctx: FarmContext, i: ListingInput) {
       assertCan(ctx, "market.manage");
       const farm = await farmOf(ctx.farmId);
+      // Farmers do not know ISO region codes: default to the farm's country.
+      if (!i.regionCode) {
+        if (!farm.countryCode) throw new AppError("VALIDATION_FAILED", "Set your farm's country on the Farm page, or choose a region", [{ path: "regionCode", message: "Choose a region" }]);
+        i = { ...i, regionCode: farm.countryCode };
+      }
       await validateListing(ctx, farm, i);
       const now = clock.now();
       const rec: MarketListingRecord = { id: newId(), farmId: ctx.farmId, ...defined(i), quantityAvailable: q3(i.quantityAvailable), status: "draft", createdBy: ctx.userId, createdAt: now, updatedAt: now, version: 0 };
@@ -275,7 +280,7 @@ export function createMarketService(d: { repos: Repositories; clock: Clock; audi
     },
 
     /** A buyer places an order. Price comes from the listing; quantity is reserved when the seller accepts. */
-    async placeOrder(ctx: RequestContext, r: { listingId: string; quantity: number; fulfilment: OrderRecord["fulfilment"]; deliveryAddress?: string; buyerName: string; buyerPhone?: string; buyerFarmId?: string; notes?: string }) {
+    async placeOrder(ctx: RequestContext, r: { listingId: string; quantity: number; fulfilment: OrderRecord["fulfilment"]; deliveryAddress?: string; buyerName?: string; buyerPhone?: string; buyerFarmId?: string; notes?: string }) {
       const listing = await repos.market.listingById(r.listingId);
       if (!listing || listing.status !== "active") throw notFound("Listing");
       const sellerMembership = await repos.memberships.findActive(listing.farmId, ctx.userId);
@@ -296,7 +301,7 @@ export function createMarketService(d: { repos: Repositories; clock: Clock; audi
           channel: "marketplace",
           listingId: listing.id,
           buyerUserId: ctx.userId,
-          ...defined({ buyerFarmId: r.buyerFarmId, buyerName: r.buyerName, buyerPhone: r.buyerPhone, deliveryAddress: r.deliveryAddress, notes: r.notes }),
+          ...defined({ buyerFarmId: r.buyerFarmId, buyerName: r.buyerName ?? (await repos.users.findById(ctx.userId, tx))?.fullName ?? "Buyer", buyerPhone: r.buyerPhone, deliveryAddress: r.deliveryAddress, notes: r.notes }),
           fulfilment: r.fulfilment,
           lines: [{ category: listing.category, description: listing.title, quantity: r.quantity, unit: listing.unit, unitPrice: listing.price, total }],
           subtotal: total,

@@ -262,6 +262,7 @@ export function createFlockService(d: FlockDeps) {
     let otherIncomeMinor = 0;
     for (const h of hooks.extraIncomeMinor) otherIncomeMinor += await h(ctx, flock.id, date);
     const m = computeFlockMetrics({
+      flockType: flock.type,
       ...(flock.placementDate ? { placementDate: flock.placementDate } : {}),
       ...(flock.hatchDate ? { hatchDate: flock.hatchDate } : {}),
       ...(flock.ageDaysAtPlacement !== undefined ? { ageDaysAtPlacement: flock.ageDaysAtPlacement } : {}),
@@ -340,12 +341,22 @@ export function createFlockService(d: FlockDeps) {
           await assertCapacity(ctx, input.houseId, input.placement.count - input.placement.deadOnArrival, undefined, tx);
         } else if (!(await repos.houses.findById(ctx.farmId, input.houseId, tx))) throw notFound("House");
         const now = clock.now();
+        // Small farms do not number batches: if no code is given, number it by type and month (B-2610-1, B-2610-2…).
+        let flockCode = input.flockCode;
+        if (!flockCode) {
+          const prefix = { broiler: "B", layer: "L", breeder: "BR", chick: "C", custom: "F" }[input.type] ?? "F";
+          const month = (input.placement?.date ?? now.toISOString().slice(0, 10)).slice(2, 7).replace("-", "");
+          const taken = new Set((await repos.flocks.find(ctx.farmId, {}, tx)).map((f) => f.flockCode));
+          let n = 1;
+          while (taken.has(`${prefix}-${month}-${n}`)) n++;
+          flockCode = `${prefix}-${month}-${n}`;
+        }
         const flock: FlockRecord = {
           id: input.id ?? newId(),
           farmId: ctx.farmId,
           houseId: input.houseId,
           name: input.name,
-          flockCode: input.flockCode,
+          flockCode,
           type: input.type,
           ...(input.customTypeName ? { customTypeName: input.customTypeName } : {}),
           species: input.species,
@@ -362,7 +373,7 @@ export function createFlockService(d: FlockDeps) {
           updatedAt: now,
           version: 0,
         };
-        await repos.flocks.insert(flock, tx).catch(duplicate(`Flock code "${input.flockCode}"`));
+        await repos.flocks.insert(flock, tx).catch(duplicate(`Flock code "${flockCode}"`));
         await d.audit.record(ctx, { action: "flock.created", entity: "flock", entityId: flock.id, after: { name: flock.name, flockCode: flock.flockCode, type: flock.type } }, tx);
         if (!input.placement) {
           await d.sync.recordChange(ctx.farmId, { entity: "flock", entityId: flock.id, op: "upsert", version: 0, document: toFlockView(flock) }, tx);

@@ -14,6 +14,7 @@ PROTO = {
     "/chicks": ("ChickStart", "Chick arrival & brooding", ["Log a brooder check", "Brooding log"]),
     "/hatchery": ("HatcheryHub", "Incubation & chick orders", ["Set a new batch", "Incubation calendar", "Hatch results"]),
     "/eggs": ("EggCount", "Egg collection", ["Record egg collection", "Last 14 days", "Collection history"]),
+    "/daily": ("Production", "Daily sheet", ["Grey figures are already recorded", "Not recorded yet"]),
     "/feed": ("FeedWise", "Feed inventory & cost", ["Record a feed purchase", "Record feed used", "Daily consumption · 14 days", "Purchases & supplier prices"]),
     "/health": ("FlockHealth", "Health, vaccination & mortality", ["Add a health record", "Record deaths", "Mortality · last 14 days", "Vaccination schedule", "Health history"]),
     "/biosecurity": ("BioSecure Farm", "Biosecurity checks & logs", ["Add a biosecurity entry", "Worker cleaning checklist"]),

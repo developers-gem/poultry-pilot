@@ -90,6 +90,13 @@ class FlockModel with _$FlockModel {
       feedConsumedKg: (m?.feedConsumedKg ?? 0).toDouble(),
       feedPerBirdKg: m?.feedPerBirdKg?.toDouble(),
       fcr: m?.fcr?.toDouble(),
+      fcrAsOf: m?.fcrAsOf,
+      fcrWarning: m?.fcrWarning,
+      feedDaysRecorded: m?.feedDaysRecorded?.toInt() ?? 0,
+      feedDaysExpected: m?.feedDaysExpected?.toInt() ?? 0,
+      epef: m?.epef?.toInt(),
+      feedPerDozenEggsKg: m?.feedPerDozenEggsKg?.toDouble(),
+      eggsPerHenHoused: m?.eggsPerHenHoused?.toDouble(),
       eggsCollected: (m?.eggsCollected ?? 0).toInt(),
       stage: m?.stage ?? 'unknown',
     );
@@ -98,7 +105,7 @@ class FlockModel with _$FlockModel {
 
 @freezed
 class FlockMetricsModel with _$FlockMetricsModel {
-  const factory FlockMetricsModel({num? ageDays, num? currentBirdCount, num? mortalityCount, num? mortalityRate, num? survivalRate, num? averageWeightG, String? latestWeighingDate, num? dailyWeightGainG, num? feedConsumedKg, num? feedPerBirdKg, num? fcr, num? eggsCollected, String? stage}) = _FlockMetricsModel;
+  const factory FlockMetricsModel({num? ageDays, num? currentBirdCount, num? mortalityCount, num? mortalityRate, num? survivalRate, num? averageWeightG, String? latestWeighingDate, num? dailyWeightGainG, num? feedConsumedKg, num? feedPerBirdKg, num? fcr, String? fcrAsOf, String? fcrWarning, num? feedDaysRecorded, num? feedDaysExpected, num? epef, num? feedPerDozenEggsKg, num? eggsPerHenHoused, num? eggsCollected, String? stage}) = _FlockMetricsModel;
   factory FlockMetricsModel.fromJson(Map<String, dynamic> json) => _$FlockMetricsModelFromJson(json);
 }
 

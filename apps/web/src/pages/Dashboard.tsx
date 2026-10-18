@@ -21,6 +21,7 @@ interface FeedStock {
   totals: { quantityKg: number; valueMinor: number; daysRemaining: number | null };
 }
 interface Profitability {
+  flocks: { flockId: string }[];
   totals: { revenueMinor: number; costMinor: number; profitMinor: number; costPerBirdMinor: number | null; costPerEggMinor: number | null };
 }
 interface Batch {
@@ -44,7 +45,10 @@ export function DashboardPage() {
   const active = flocks.data?.items ?? [];
   const details = useFlockDetails(active.map((f) => f.id));
   const stock = useFarmQuery<FeedStock>("/feed/stock", { enabled: can("inventory.read") });
-  const profit = useFarmQuery<Profitability>("/finance/reports/flock-profitability", { enabled: can("money.read") });
+  // Profit is only meaningful for batches that have been sold; an active batch has costs and no sales yet, so
+  // adding it in shows a loss that is not one. Closed batches give the profit; active ones, what has been spent.
+  const profit = useFarmQuery<Profitability>("/finance/reports/flock-profitability?status=closed", { enabled: can("money.read") });
+  const spent = useFarmQuery<Profitability>("/finance/reports/flock-profitability?status=active", { enabled: can("money.read") });
   const batches = useFarmQuery<{ items: Batch[] }>("/hatchery/batches", { enabled: can("hatchery.read") });
 
   const d = dash.data;
@@ -91,7 +95,11 @@ export function DashboardPage() {
             <Stat label="Birds alive" value={num(prod?.totals.birdsAlive)} hint={`${num(prod?.flocksRecorded)} of ${num(prod?.flocksTotal)} flocks recorded today`} />
           )}
           {can("money.read") ? (
-            <Stat label="Batch profit" value={profit.data ? money(profit.data.totals.profitMinor, currency) : "—"} badge={`${num(active.length)} batches`} badgeTone="accent" hint={profit.data ? `${money(profit.data.totals.revenueMinor, currency)} sales · ${money(profit.data.totals.costMinor, currency)} costs` : "Loading…"} />
+            profit.data && profit.data.flocks.length ? (
+              <Stat label="Profit on sold batches" value={money(profit.data.totals.profitMinor, currency)} badge={`${num(profit.data.flocks.length)} closed`} badgeTone="accent" hint={spent.data ? `Plus ${money(spent.data.totals.costMinor, currency)} spent so far on ${num(active.length)} active batch${active.length === 1 ? "" : "es"}` : "Loading…"} />
+            ) : (
+              <Stat label="Spent on active batches" value={spent.data ? money(spent.data.totals.costMinor, currency) : "—"} badge={`${num(active.length)} batches`} badgeTone="accent" hint="Profit shows once a batch is sold" />
+            )
           ) : (
             <Stat label="Open alerts" value={num(d.alerts.open)} badgeTone={d.alerts.open ? "rose" : "mint"} badge={d.alerts.bySeverity["critical"] ? `${d.alerts.bySeverity["critical"]} critical` : undefined} />
           )}

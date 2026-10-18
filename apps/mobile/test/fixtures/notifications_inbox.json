@@ -2,57 +2,57 @@
   "unread": 3,
   "items": [
     {
-      "id": "01a14298-59ce-71ab-8000-dc48a3128b6b",
-      "userId": "01a14298-58e2-703f-9160-182f006b8ccb",
-      "farmId": "01a14298-58e3-7722-b763-03a1b6a135c1",
+      "id": "01a14d6e-5a31-75dd-ab15-957c8fd8408d",
+      "userId": "01a14d6e-594b-7775-a2eb-0c5c0b15fb1a",
+      "farmId": "01a14d6e-594b-7775-a2eb-146e6afc9f53",
       "channel": "in_app",
       "status": "delivered",
       "title": "Overdue: Order litter",
       "link": {
         "entity": "task",
-        "id": "01a14298-5961-771c-80b0-33ea88c76da1",
+        "id": "01a14d6e-59c5-775d-a95c-51a94ba0b6af",
         "path": "/tasks"
       },
       "category": "task_due",
       "severity": "warning",
-      "createdAt": "2026-10-16T02:44:03.150Z",
+      "createdAt": "2026-10-18T05:14:00.113Z",
       "readAt": null
     },
     {
-      "id": "01a14298-59cd-77b7-95c3-caadf7cfc5a8",
-      "userId": "01a14298-58e2-703f-9160-182f006b8ccb",
-      "farmId": "01a14298-58e3-7722-b763-03a1b6a135c1",
+      "id": "01a14d6e-5a30-72d2-8af9-660340b13cdd",
+      "userId": "01a14d6e-594b-7775-a2eb-0c5c0b15fb1a",
+      "farmId": "01a14d6e-594b-7775-a2eb-146e6afc9f53",
       "channel": "in_app",
       "status": "delivered",
       "title": "Due today: Clean the drinkers",
       "link": {
         "entity": "task",
-        "id": "01a14298-595a-7079-9cda-e4187e6106d2",
+        "id": "01a14d6e-59bf-72bf-9575-d2885fd6ebd9",
         "path": "/tasks"
       },
       "category": "task_due",
       "severity": "info",
-      "createdAt": "2026-10-16T02:44:03.149Z",
+      "createdAt": "2026-10-18T05:14:00.112Z",
       "readAt": null
     },
     {
-      "id": "01a14298-5951-73f0-8c58-c7dd964ec477",
-      "userId": "01a14298-58e2-703f-9160-182f006b8ccb",
-      "farmId": "01a14298-58e3-7722-b763-03a1b6a135c1",
+      "id": "01a14d6e-59b5-747e-9216-f4bf8da32f2e",
+      "userId": "01a14d6e-594b-7775-a2eb-0c5c0b15fb1a",
+      "farmId": "01a14d6e-594b-7775-a2eb-146e6afc9f53",
       "channel": "in_app",
       "status": "delivered",
-      "title": "Weather: heat on 2026-10-16",
-      "body": "Forecast for 2026-10-16: high of 37 °C, 6 °C above this farm's recent average high (31 °C). Plan ventilation, water and feeding times accordingly.",
+      "title": "Weather: heat on 2026-10-18",
+      "body": "Forecast for 2026-10-18: high of 37 °C, 6 °C above this farm's recent average high (31 °C). Plan ventilation, water and feeding times accordingly.",
       "link": {
         "entity": "alert",
-        "id": "01a14298-5950-72d6-a24f-e2db15c931b6",
-        "path": "/farms/01a14298-58e3-7722-b763-03a1b6a135c1/alerts/01a14298-5950-72d6-a24f-e2db15c931b6"
+        "id": "01a14d6e-59b5-747e-9216-ee778edddbc6",
+        "path": "/farms/01a14d6e-594b-7775-a2eb-146e6afc9f53/alerts/01a14d6e-59b5-747e-9216-ee778edddbc6"
       },
-      "alertId": "01a14298-5950-72d6-a24f-e2db15c931b6",
+      "alertId": "01a14d6e-59b5-747e-9216-ee778edddbc6",
       "ruleKey": "weather_risk",
       "category": "weather_risk",
       "severity": "warning",
-      "createdAt": "2026-10-16T02:44:03.025Z",
+      "createdAt": "2026-10-18T05:13:59.989Z",
       "readAt": null
     }
   ]

@@ -1,7 +1,7 @@
 import { FLOCK_TYPES, HOUSE_TYPES } from "@poultrypilot/constants";
 import { Link } from "@tanstack/react-router";
 import { useAuth } from "../api/auth";
-import { useFarmInfo, useFlockDetails, useFlocks } from "../api/farm";
+import { useFarmInfo, useFlockDetails, useFlocks, feedFigure } from "../api/farm";
 import { useFarmMutation, useFarmQuery } from "../api/hooks";
 import { FormCard } from "../components/forms";
 import { EmptyState, QueryState } from "../components/states";
@@ -44,7 +44,7 @@ export function FlocksPage() {
           submitLabel="Add batch"
           fields={[
             { name: "name", label: "Batch name", required: true, placeholder: "Broilers October" },
-            { name: "flockCode", label: "Batch code", required: true, placeholder: "B-OCT", hint: "Short code shown on records" },
+            { name: "flockCode", label: "Batch code (optional)", placeholder: "Leave empty", hint: "Left empty, the farm numbers it (e.g. B-2610-1)" },
             { name: "type", label: "Bird type", type: "select", defaultValue: "broiler", options: FLOCK_TYPES.map((t) => ({ value: t, label: t === "chick" ? "Day-old chicks" : label(t) })) },
             { name: "customTypeName", label: "Which poultry?", placeholder: "Kadaknath, geese…", show: (v) => v["type"] === "custom" },
             { name: "breed", label: "Breed", placeholder: "Cobb 500" },
@@ -98,7 +98,10 @@ export function FlocksPage() {
                     <dl className="mt-3 grid grid-cols-2 gap-2 text-[12px]">
                       <div><dt className="text-inksoft">Live birds</dt><dd className="font-semibold">{num(m?.currentBirdCount ?? f.currentBirdCount)}</dd></div>
                       <div><dt className="text-inksoft">Feed used</dt><dd className="font-semibold">{m ? `${num(m.feedConsumedKg)} kg` : "—"}</dd></div>
-                      <div><dt className="text-inksoft">Feed ratio (FCR)</dt><dd className="font-semibold">{m?.fcr ? m.fcr.toFixed(2) : "—"}</dd></div>
+                      {(() => {
+                        const ff = feedFigure(f.type, m);
+                        return <div title={ff.note ?? undefined}><dt className="text-inksoft">{ff.label}</dt><dd className={`font-semibold ${ff.note ? "text-amber-ink" : ""}`}>{ff.value}</dd></div>;
+                      })()}
                       <div><dt className="text-inksoft">Avg weight</dt><dd className="font-semibold">{m?.averageWeightG ? `${num(m.averageWeightG)} g` : "—"}</dd></div>
                       {can("money.read") ? (
                         <>

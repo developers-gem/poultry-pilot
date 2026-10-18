@@ -352,9 +352,29 @@ export function createFinanceService(d: { repos: Repositories; clock: Clock; aud
 
     // ---- documents
 
-    async createExpense(ctx: FarmContext, i: ExpenseInput) {
+    async createExpense(ctx: FarmContext, i: ExpenseInput & { allowDuplicate?: boolean }) {
       assertCan(ctx, "money.record");
       const farm = await farmOf(ctx);
+      // The same bill entered twice (often: a feed bill the accountant types in although the feed purchase already
+      // created it) doubles the cost in P&L. Ask first when it looks like one (see the match below).
+      if (!i.allowDuplicate) {
+        const near = (await repos.expenses.find(ctx.farmId, { range: { field: "date", from: addDays(i.date, -3), to: addDays(i.date, 3) } })).find(
+          (e) =>
+            e.status !== "cancelled" &&
+            e.amount.amountMinor === i.amount.amountMinor &&
+            e.amount.currency === i.amount.currency &&
+            // Equal amounts are often genuinely separate (weekly wages, two deliveries). Ask only when the other bill
+            // was created automatically (stock purchase, vet visit, recurring cost), or a hand-entered bill matches
+            // on amount, category, vendor and date.
+            (e.sourceType !== "manual" || (e.category === i.category && (e.vendor ?? "") === (i.vendor ?? "") && e.date === i.date)),
+        );
+        if (near) {
+          const auto = near.sourceType === "inventory_purchase" ? " (created automatically from a stock purchase)" : near.sourceType === "health_record" ? " (created automatically from a health record)" : "";
+          throw new AppError("POSSIBLE_DUPLICATE", `A bill for the same amount on ${near.date} already exists: "${near.description}"${auto}. Save anyway only if this is a different bill.`, { existingId: near.id, date: near.date, description: near.description, sourceType: near.sourceType });
+        }
+      }
+      const { allowDuplicate: _a, ...doc } = i;
+      i = doc;
       return docView(await repos.tx.run((tx) => createDocument(ctx, "expense", i, { sourceType: "manual" }, tx)), todayOf(farm));
     },
 

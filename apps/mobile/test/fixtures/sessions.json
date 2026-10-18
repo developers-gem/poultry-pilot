@@ -1,23 +1,23 @@
 {
   "items": [
     {
-      "id": "01a14298-58ee-763b-abb7-508c06534d0d",
+      "id": "01a14d6e-5956-7082-b42c-678ece49a8b8",
       "deviceName": "Pixel 7",
       "platform": "android",
       "ipAddress": "127.0.0.1",
-      "createdAt": "2026-10-16T02:44:02.926Z",
-      "lastUsedAt": "2026-10-16T02:44:02.929Z",
-      "expiresAt": "2027-01-14T02:44:02.926Z",
+      "createdAt": "2026-10-18T05:13:59.894Z",
+      "lastUsedAt": "2026-10-18T05:13:59.898Z",
+      "expiresAt": "2027-01-16T05:13:59.894Z",
       "current": true
     },
     {
-      "id": "01a14298-58e3-7722-b763-134b460c577c",
+      "id": "01a14d6e-594c-7330-908d-dc5d8f2aa849",
       "deviceName": "Pixel 7",
       "platform": "android",
       "ipAddress": "127.0.0.1",
-      "createdAt": "2026-10-16T02:44:02.915Z",
-      "lastUsedAt": "2026-10-16T02:44:02.915Z",
-      "expiresAt": "2027-01-14T02:44:02.915Z",
+      "createdAt": "2026-10-18T05:13:59.884Z",
+      "lastUsedAt": "2026-10-18T05:13:59.884Z",
+      "expiresAt": "2027-01-16T05:13:59.884Z",
       "current": false
     }
   ]

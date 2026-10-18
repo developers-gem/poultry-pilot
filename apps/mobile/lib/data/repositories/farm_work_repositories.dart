@@ -67,7 +67,7 @@ class DailyEntryRepositoryImpl implements DailyEntryRepository {
   @override
   Future<List<FeedOption>> feedOptions(String farmId) async {
     final c = await cachedRead(cache, 'feed:$farmId', () async => {'items': (await api.feedStock(farmId)).map((i) => i.toJson()).toList()}, (j) => (j['items'] as List).cast<Map<String, dynamic>>().map(FeedStockItemModel.fromJson).toList());
-    return c.data.map((i) => FeedOption(itemId: i.itemId, name: i.name, quantityKg: i.quantityKg.toDouble())).toList();
+    return c.data.map((i) => FeedOption(itemId: i.itemId, name: i.name, quantityKg: i.quantityKg.toDouble(), bagSizeKg: i.bagSizeKg?.toDouble())).toList();
   }
 
   @override

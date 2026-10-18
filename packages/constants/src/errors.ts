@@ -16,6 +16,8 @@ export const ERROR_CODES = {
   ALREADY_MEMBER: 409,
   VERSION_CONFLICT: 409,
   DUPLICATE: 409,
+  /** Looks like something already recorded (e.g. the same bill twice); resend with allowDuplicate after checking. */
+  POSSIBLE_DUPLICATE: 409,
   IDEMPOTENCY_IN_PROGRESS: 409,
   PAYLOAD_TOO_LARGE: 413,
   IDEMPOTENCY_KEY_REUSED: 422,

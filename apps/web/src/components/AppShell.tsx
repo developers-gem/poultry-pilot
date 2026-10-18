@@ -13,7 +13,7 @@ type NavGroup = NavItem & { items?: NavItem[] };
 export const GROUPS: NavGroup[] = [
   { to: "/dashboard", label: "Dashboard" },
   { to: "/flocks", label: "Flocks", items: [{ to: "/lifecycle", label: "Lifecycle" }, { to: "/weights", label: "Weights" }, { to: "/chicks", label: "ChickStart" }, { to: "/hatchery", label: "Hatchery" }] },
-  { to: "/eggs", label: "Production", items: [{ to: "/feed", label: "FeedWise" }] },
+  { to: "/eggs", label: "Production", items: [{ to: "/daily", label: "Daily sheet" }, { to: "/feed", label: "FeedWise" }] },
   { to: "/health", label: "Health", items: [{ to: "/biosecurity", label: "BioSecure" }, { to: "/calendar", label: "Calendar" }, { to: "/weather", label: "Weather" }] },
   { to: "/money", label: "Money", items: [{ to: "/expenses", label: "Running Costs" }] },
   { to: "/market", label: "Market" },

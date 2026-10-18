@@ -20,7 +20,7 @@ interface StockItem {
   status: string;
 }
 interface Analytics {
-  flocks: { flockId: string; flockCode: string; type: string; birdsIn: number; currentBirdCount: number; feedConsumedKg: number; feedWastedKg: number; feedPerBirdKg: number | null; fcr: number | null; feedCostMinor: number; feedCostPerBirdMinor: number | null; eggsCollected: number; feedCostPerEggMinor: number | null; costsComplete: boolean }[];
+  flocks: { flockId: string; flockCode: string; type: string; birdsIn: number; currentBirdCount: number; feedConsumedKg: number; feedWastedKg: number; fcrWarning?: string | null; feedPerBirdKg: number | null; fcr: number | null; feedCostMinor: number; feedCostPerBirdMinor: number | null; eggsCollected: number; feedCostPerEggMinor: number | null; costsComplete: boolean }[];
   stock: { items: StockItem[]; totals: { quantityKg: number; valueMinor: number; averageDailyUseKg: number; daysRemaining: number | null } };
 }
 interface Lot {
@@ -72,6 +72,7 @@ export function FeedPage() {
   const itemName = (id?: string) => feedItems.find((i) => i.id === id)?.name ?? "Not in stock list";
   const days = trends.data?.days ?? [];
 
+  const bagSizeOf = (itemId: string): number | null => (analytics.data?.stock.items.find((x) => x.itemId === itemId) as { bagSizeKg?: number | null } | undefined)?.bagSizeKg ?? null;
   return (
     <>
       <PageHeader eyebrow="FeedWise" title="Feed inventory & cost" subtitle="Stock on hand, daily consumption, supplier prices and what feed costs you per bird and per egg." />
@@ -83,6 +84,7 @@ export function FeedPage() {
       </StatGrid>
 
       <div className="mb-4 grid gap-4 lg:grid-cols-3">
+        {/* Bag sizes come from each feed (set when it was first bought in bags). */}
         <FormCard
           title="Record a feed purchase"
           allowed={can("inventory.manage")}
@@ -91,16 +93,25 @@ export function FeedPage() {
             { name: "itemId", label: "Feed", type: "select", defaultValue: feedItems[0]?.id ?? "new", options: [...feedItems.map((i) => ({ value: i.id, label: i.name })), { value: "new", label: "+ A new feed" }] },
             { name: "newName", label: "New feed name", required: true, placeholder: "Broiler starter", show: (v) => v["itemId"] === "new" },
             { name: "newStage", label: "Stage", type: "select", defaultValue: "starter", options: FEED_STAGES.map((s) => ({ value: s, label: label(s) })), show: (v) => v["itemId"] === "new" },
-            { name: "quantity", label: "Quantity (kg)", type: "number", required: true, min: 0 },
-            { name: "unitCost", label: `Price per kg (${currency})`, type: "money", required: true, min: 0 },
+            { name: "buyUnit", label: "Bought as", type: "select", defaultValue: "bags", options: [{ value: "bags", label: "Bags" }, { value: "kg", label: "Loose, by kg" }] },
+            { name: "bags", label: "Number of bags", type: "number", required: true, min: 0, show: (v) => v["buyUnit"] !== "kg" },
+            { name: "bagSizeKg", label: "Bag size (kg)", type: "number", min: 1, defaultValue: 50, show: (v) => v["buyUnit"] !== "kg", hint: "As printed on the bag" },
+            { name: "pricePerBag", label: `Price per bag (${currency})`, type: "money", required: true, min: 0, show: (v) => v["buyUnit"] !== "kg" },
+            { name: "quantity", label: "Quantity (kg)", type: "number", required: true, min: 0, show: (v) => v["buyUnit"] === "kg" },
+            { name: "unitCost", label: `Price per kg (${currency})`, type: "money", required: true, min: 0, show: (v) => v["buyUnit"] === "kg" },
             { name: "supplier", label: "Supplier" },
             { name: "date", label: "Purchase date", type: "date", defaultValue: today, required: true },
             { name: "batchNumber", label: "Batch number" },
             { name: "expiryDate", label: "Use by", type: "date" },
           ]}
-          onSubmit={async ({ itemId, newName, newStage, unitCost, ...rest }) => {
-            const id = itemId === "new" || !itemId ? (await createItem.mutateAsync({ name: newName, category: "feed", unit: "kg", feed: { stage: newStage ?? "starter" } })).id : String(itemId);
-            await purchase.mutateAsync({ _id: id, ...rest, unitCost: { amountMinor: toMinor(Number(unitCost), currency), currency } });
+          onSubmit={async ({ itemId, newName, newStage, unitCost, buyUnit, bags, bagSizeKg, pricePerBag, quantity, ...rest }) => {
+            // Feed is bought and priced per bag: converted here to the kg and price per kg the stock is kept in.
+            const inBags = buyUnit !== "kg";
+            const size = Number(bagSizeKg ?? 50);
+            const kg = inBags ? Number(bags) * size : Number(quantity);
+            const perKg = inBags ? Number(pricePerBag) / size : Number(unitCost);
+            const id = itemId === "new" || !itemId ? (await createItem.mutateAsync({ name: newName, category: "feed", unit: "kg", feed: { stage: newStage ?? "starter", ...(inBags ? { bagSizeKg: size } : {}) } })).id : String(itemId);
+            await purchase.mutateAsync({ _id: id, ...rest, quantity: kg, unitCost: { amountMinor: toMinor(perKg, currency), currency } });
           }}
         />
         <FormCard
@@ -113,10 +124,14 @@ export function FeedPage() {
             { name: "kind", label: "Eaten or wasted", type: "select", defaultValue: "consumption", options: [{ value: "consumption", label: "Eaten by a flock" }, { value: "wastage", label: "Wasted or spoiled" }] },
             { name: "flockId", label: "Flock", type: "select", defaultValue: flocks[0]?.id ?? "", options: [{ value: "", label: "In the store (wastage only)" }, ...flocks.map((f) => ({ value: f.id, label: `${f.flockCode} · ${f.name}` }))] },
             { name: "feedItemId", label: "Feed", type: "select", defaultValue: feedItems[0]?.id ?? "", options: [...feedItems.map((i) => ({ value: i.id, label: i.name })), { value: "", label: "Not in the stock list" }] },
-            { name: "quantityKg", label: "Quantity (kg)", type: "number", required: true, min: 0 },
+            { name: "useUnit", label: "Counted in", type: "select", defaultValue: "bags", options: [{ value: "bags", label: "Bags" }, { value: "kg", label: "kg" }] },
+            { name: "quantity", label: "Quantity", type: "number", required: true, min: 0, hint: "Half bags are fine (0.5)" },
             { name: "reason", label: "Reason (for wastage)", show: (v) => v["kind"] === "wastage" },
           ]}
-          onSubmit={(v) => use.mutateAsync(v)}
+          onSubmit={({ useUnit, quantity, ...v }) => {
+            const size = bagSizeOf(String(v["feedItemId"] ?? "")) ?? 50;
+            return use.mutateAsync({ ...v, quantityKg: useUnit === "kg" ? Number(quantity) : Number(quantity) * size });
+          }}
         />
         <GlassCard>
           <SectionTitle hint="All flocks, eaten">Daily consumption · 14 days</SectionTitle>
@@ -153,7 +168,7 @@ export function FeedPage() {
               { key: "feedConsumedKg", label: "Eaten", align: "right", render: (r) => `${num(r.feedConsumedKg)} kg` },
               { key: "feedWastedKg", label: "Wasted", align: "right", render: (r) => `${num(r.feedWastedKg)} kg`, hideOnPhone: true },
               { key: "feedPerBirdKg", label: "Per bird", align: "right", render: (r) => (r.feedPerBirdKg !== null ? `${num(r.feedPerBirdKg, 2)} kg` : "—") },
-              { key: "fcr", label: "FCR", align: "right", render: (r) => (r.fcr ? r.fcr.toFixed(2) : "—") },
+              { key: "fcr", label: "FCR", align: "right", render: (r) => (r.type === "layer" || r.type === "breeder" ? "eggs" : r.fcr ? <span title={r.fcrWarning ? "Feed records incomplete or FCR implausible: check feed and weights" : undefined} className={r.fcrWarning ? "text-amber-ink" : ""}>{r.fcr.toFixed(2)}{r.fcrWarning ? " ⚠" : ""}</span> : "—") },
               { key: "feedCostPerBirdMinor", label: "Cost / bird", align: "right", render: (r) => money(r.feedCostPerBirdMinor, currency) },
               { key: "feedCostPerEggMinor", label: "Cost / egg", align: "right", render: (r) => (r.eggsCollected ? money(r.feedCostPerEggMinor, currency) : "—") },
             ]} />

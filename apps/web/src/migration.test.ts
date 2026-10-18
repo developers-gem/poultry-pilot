@@ -14,14 +14,17 @@ const files = (dir: string): string[] => readdirSync(dir).flatMap((f) => (statSy
 const source = files(__dirname).filter((f) => /\.(ts|tsx)$/.test(f) && !f.endsWith(".test.ts"));
 
 describe("migration from the Lovable prototype", () => {
-  it("every prototype route exists at the same path", () => {
-    expect(Object.keys(pages).sort()).toEqual([...PROTOTYPE_ROUTES].sort());
+  /** Pages added after the migration, on purpose (the prototype had none of these). */
+  const ADDED_SINCE = ["/daily"];
+
+  it("every prototype route exists at the same path (plus only the pages deliberately added since)", () => {
+    expect(Object.keys(pages).sort()).toEqual([...PROTOTYPE_ROUTES, ...ADDED_SINCE].sort());
   });
 
   it("every navigation link points at a registered page", () => {
     const links = GROUPS.flatMap((g) => [g.to, ...(g.items ?? []).map((i) => i.to)]);
     expect(links.filter((l) => !pages[l])).toEqual([]);
-    expect(new Set(links).size).toBe(PROTOTYPE_ROUTES.length - 1); // all but /alerts, which is the header pill
+    expect(new Set(links).size).toBe(PROTOTYPE_ROUTES.length - 1 + ADDED_SINCE.length); // all but /alerts (the header pill)
   });
 
   it("has no Supabase, no Lovable runtime, and no third-party API called from the browser", () => {

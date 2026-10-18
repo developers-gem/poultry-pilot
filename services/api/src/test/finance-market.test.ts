@@ -73,7 +73,10 @@ describe("bills, incomes, payments and refunds", () => {
     const bill = (await s.call("post", "/finance/expenses").send({ date: D(0), category: "rent", description: "Rent", amount: INR(8000) })).body;
     await s.call("post", `/finance/expenses/${bill.id}/payments`).send({ date: D(0), amount: INR(1000), accountId: s.cash.id, method: "cash" });
     expect((await s.call("post", `/finance/expenses/${bill.id}/cancel`).send({ reason: "Duplicate" })).body.error.message).toMatch(/refund them before cancelling/);
-    const other = (await s.call("post", "/finance/expenses").send({ date: D(0), category: "rent", description: "Rent 2", amount: INR(8000) })).body;
+    // The same rent, same day: the API asks first (it looks like the same bill typed twice) ...
+    expect((await s.call("post", "/finance/expenses").send({ date: D(0), category: "rent", description: "Rent 2", amount: INR(8000) })).body.error.code).toBe("POSSIBLE_DUPLICATE");
+    // ... and saves it when the person confirms.
+    const other = (await s.call("post", "/finance/expenses").send({ date: D(0), category: "rent", description: "Rent 2", amount: INR(8000), allowDuplicate: true })).body;
     expect((await s.call("post", `/finance/expenses/${other.id}/cancel`).send({ reason: "Duplicate" })).body.status).toBe("cancelled");
   });
 });

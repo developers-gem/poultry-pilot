@@ -1,34 +1,34 @@
 {
   "items": [
     {
-      "id": "01a14298-5987-7549-b38f-b23652126ef2",
-      "flockId": "01a14298-5911-7560-9ec1-e653643bfbbe",
-      "houseId": "01a14298-590c-775c-901e-55516bce6d14",
+      "id": "01a14d6e-59e8-77d2-ad28-7d0cfa34043b",
+      "flockId": "01a14d6e-5978-7090-9eaf-4e01c3d4cc8d",
+      "houseId": "01a14d6e-5973-73fb-a20d-5877d787d395",
       "type": "observation",
-      "date": "2026-10-16",
+      "date": "2026-10-18",
       "title": "Two birds coughing",
       "observedSigns": "Two birds coughing",
       "affectedBirds": 2,
-      "dailyRecordId": "01a14298-5931-7086-96ac-0d17e496a394",
-      "createdBy": "01a14298-58e2-703f-9160-182f006b8ccb",
+      "dailyRecordId": "01a14d6e-5997-71dc-a98d-fbc4d891c959",
+      "createdBy": "01a14d6e-594b-7775-a2eb-0c5c0b15fb1a",
       "version": 0,
-      "createdAt": "2026-10-16T02:44:03.077Z",
-      "updatedAt": "2026-10-16T02:44:03.077Z"
+      "createdAt": "2026-10-18T05:14:00.039Z",
+      "updatedAt": "2026-10-18T05:14:00.039Z"
     },
     {
-      "id": "01a14298-599c-731f-943e-1c472ce62cc1",
+      "id": "01a14d6e-59fd-7383-bba1-dc3fd876b7a7",
       "type": "observation",
-      "date": "2026-10-16",
-      "flockId": "01a14298-5911-7560-9ec1-e653643bfbbe",
+      "date": "2026-10-18",
+      "flockId": "01a14d6e-5978-7090-9eaf-4e01c3d4cc8d",
       "title": "Coughing in house A",
       "symptoms": [
         "coughing"
       ],
       "affectedBirds": 3,
-      "createdBy": "01a14298-58e2-703f-9160-182f006b8ccb",
+      "createdBy": "01a14d6e-594b-7775-a2eb-0c5c0b15fb1a",
       "version": 0,
-      "createdAt": "2026-10-16T02:44:03.100Z",
-      "updatedAt": "2026-10-16T02:44:03.100Z"
+      "createdAt": "2026-10-18T05:14:00.061Z",
+      "updatedAt": "2026-10-18T05:14:00.061Z"
     }
   ]
 }

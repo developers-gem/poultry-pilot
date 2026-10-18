@@ -81,7 +81,7 @@ export function MarketPage() {
                 { name: "unit", label: "Unit", required: true, placeholder: "tray, bird, kg" },
                 { name: "price", label: `Price per unit (${currency})`, type: "money", required: true, min: 0 },
                 { name: "priceUnit", label: "Price basis", type: "select", defaultValue: "per_tray", options: PRICE_UNITS.map((p) => ({ value: p, label: label(p) })) },
-                { name: "regionCode", label: "Region", required: true, defaultValue: farm?.countryCode ?? "", placeholder: "IN or IN-UP", hint: "Country code, optionally with your state" },
+                { name: "regionCode", label: "Region (optional)", placeholder: farm?.countryCode ?? "IN", hint: "Left empty, your farm's country is used" },
                 { name: "pickup", label: "Buyer collects", type: "checkbox", defaultValue: true },
                 { name: "seller_delivery", label: "We deliver", type: "checkbox" },
                 { name: "courier", label: "Courier", type: "checkbox" },

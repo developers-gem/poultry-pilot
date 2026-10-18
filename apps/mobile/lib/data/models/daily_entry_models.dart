@@ -133,7 +133,7 @@ class PhotoModel with _$PhotoModel {
 
 @freezed
 class FeedStockItemModel with _$FeedStockItemModel {
-  const factory FeedStockItemModel({required String itemId, required String name, @Default(0) num quantityKg}) = _FeedStockItemModel;
+  const factory FeedStockItemModel({required String itemId, required String name, @Default(0) num quantityKg, num? bagSizeKg}) = _FeedStockItemModel;
   factory FeedStockItemModel.fromJson(Map<String, dynamic> json) => _$FeedStockItemModelFromJson(json);
 }
 

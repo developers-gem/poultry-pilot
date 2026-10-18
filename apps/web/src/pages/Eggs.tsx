@@ -26,6 +26,7 @@ interface ListItem {
 }
 
 const GRADES = ["large", "medium", "small"] as const;
+const EGGS_PER_TRAY = 30;
 
 /** Collection form for one flock and day: shows what is already recorded and changes only the eggs. */
 function RecordEggs({ flocks, today }: { flocks: { id: string; flockCode: string; name: string }[]; today: string }) {
@@ -47,21 +48,29 @@ function RecordEggs({ flocks, today }: { flocks: { id: string; flockCode: string
       </div>
       {day.isPending ? <LoadingState rows={1} /> : (
         <>
-          {e ? <p className="mb-3 rounded-xl bg-cyan/10 px-3 py-2 text-[12px] text-cyan-ink">Already recorded for this day: {num(e.collected)} collected, {num(e.broken)} broken. Saving replaces these egg figures only.</p> : null}
+          {e ? <p className="mb-3 rounded-xl bg-cyan/10 px-3 py-2 text-[12px] text-cyan-ink">Already recorded for this day: {num(e.collected)} collected, {num(e.broken)} broken. A second collection is added to these.</p> : null}
           <Form
             key={`${flockId}:${date}:${day.data?.version ?? "new"}`}
-            submitLabel="Save egg collection"
-            initial={{ collected: e?.collected ?? "", broken: e?.broken ?? 0, ...Object.fromEntries(GRADES.map((g) => [g, e?.byGrade?.[g] ?? ""])) } as never}
+            submitLabel={e ? "Save collection" : "Save egg collection"}
+            initial={{ mode: e ? "add" : "total", trays: "", loose: "", broken: "" } as never}
             fields={[
-              { name: "collected", label: "Eggs collected (incl. broken)", type: "number", required: true, min: 0 },
+              ...(e ? [{ name: "mode", label: "This entry", type: "select" as const, options: [{ value: "add", label: `Add a collection to today's ${num(e.collected)}` }, { value: "total", label: "Set the day's total (correction)" }] }] : []),
+              { name: "trays", label: `Trays of ${EGGS_PER_TRAY}`, type: "number", min: 0, hint: "Full trays counted" },
+              { name: "loose", label: "Loose eggs", type: "number", min: 0, hint: "Eggs not in a full tray" },
               { name: "broken", label: "Broken eggs", type: "number", min: 0 },
-              ...GRADES.map((g) => ({ name: g, label: `${label(g)} (optional)`, type: "number" as const, min: 0 })),
+              ...(e ? [] : GRADES.map((g) => ({ name: g, label: `${label(g)} (optional)`, type: "number" as const, min: 0 }))),
             ]}
-            errorMap={{ "eggs.collected": "collected", "eggs.broken": "broken", "eggs.byGrade": "large", eggs: "collected" }}
+            errorMap={{ "eggs.collected": "trays", "eggs.broken": "broken", "eggs.byGrade": "trays", eggs: "trays" }}
             resetOnSuccess={false}
-            onSubmit={({ collected, broken, ...g }) => {
+            onSubmit={({ mode, trays, loose, broken, ...g }) => {
+              // Farmers count trays (30) plus loose eggs, and collect two or three times a day: a later collection
+              // is added to the day, never retyped or overwritten.
+              const counted = Number(trays ?? 0) * EGGS_PER_TRAY + Number(loose ?? 0);
+              const adding = !!e && mode !== "total";
+              const collected = adding ? e!.collected + counted : counted;
+              const brokenTotal = (adding ? e!.broken : 0) + Number(broken ?? 0);
               const byGrade = Object.fromEntries(GRADES.filter((k) => g[k] !== undefined && g[k] !== "").map((k) => [k, Number(g[k])]));
-              return save.mutateAsync({ eggs: { collected, broken: broken ?? 0, ...(Object.keys(byGrade).length ? { byGrade } : {}) }, ...(day.data?.version !== null && day.data?.version !== undefined ? { version: day.data.version } : {}) });
+              return save.mutateAsync({ eggs: { collected, broken: brokenTotal, ...(Object.keys(byGrade).length ? { byGrade } : {}) }, ...(day.data?.version !== null && day.data?.version !== undefined ? { version: day.data.version } : {}) });
             }}
           />
         </>

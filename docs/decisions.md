@@ -242,3 +242,14 @@ Each is cheap to change until the phase named.
 | D138 | Media storage | S3-compatible bucket (`S3_BUCKET`) or local disk for a single instance |
 | D139 | Accessibility | Muted text darkened to meet WCAG AA on the tinted backdrop; axe scan kept in apps/web/e2e/a11y.py |
 | D140 | Weather licence | `OPEN_METEO_API_KEY` uses the commercial endpoint |
+
+## Added with the persona review
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| D141 | Doubtful FCR | Flagged, not hidden: "feed_gaps" is a caution (bulk recording is fine); "implausibly_low" (broiler < 1.0 after day 14) is kept out of benchmarks and withholds EPEF |
+| D142 | Layers | No weight-based FCR or EPEF; feed per dozen eggs and eggs per hen housed |
+| D143 | Counting units | Eggs in trays of 30 plus loose, collections added through the day; feed in bags of the feed's bag size |
+| D144 | Daily sheet | One web screen for all flocks' day; only filled cells are sent, each row with its own version |
+| D145 | Profit tile | Profit only on sold batches; active batches show what has been spent |
+| D146 | Duplicate bills | Ask first when a same-amount bill was created automatically, or a hand-entered bill matches exactly |

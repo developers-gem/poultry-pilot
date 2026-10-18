@@ -155,6 +155,8 @@ export function createFeedService(d: { repos: Repositories; clock: Clock; audit:
           daysRemaining: cover.days,
           status: cover.status,
           reorderDays: item.reorderDays ?? 7,
+          // Farmers count feed in bags: the apps enter feed in bags of this size when it is set.
+          bagSizeKg: item.feed?.bagSizeKg ?? null,
         };
       });
       const totalKg = q3(rows.reduce((t, r) => t + r.quantityKg, 0));
@@ -185,6 +187,7 @@ export function createFeedService(d: { repos: Repositories; clock: Clock; audit:
           feedPerBirdKg: m.feedPerBirdKg,
           feedPerKgGainKg: m.feedPerKgGainKg,
           fcr: m.fcr,
+          fcrWarning: m.fcrWarning,
           feedCostMinor: m.feedCostMinor,
           feedCostPerBirdMinor: m.feedCostPerBirdMinor,
           eggsCollected: m.eggsCollected,

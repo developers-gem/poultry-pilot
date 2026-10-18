@@ -1,9 +1,9 @@
 {
-  "date": "2026-10-16",
+  "date": "2026-10-18",
   "currency": "INR",
   "items": [
     {
-      "itemId": "01a14298-5935-7672-b11e-c57a00a814ac",
+      "itemId": "01a14d6e-599a-776d-b7df-4c1c1c4b6bb2",
       "name": "Layer mash",
       "stage": "layer",
       "quantityKg": 885,
@@ -12,7 +12,8 @@
       "averageDailyUseKg": 115,
       "daysRemaining": 7,
       "status": "ok",
-      "reorderDays": 7
+      "reorderDays": 7,
+      "bagSizeKg": null
     }
   ],
   "totals": {

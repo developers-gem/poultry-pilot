@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useAuth, useFarm } from "../api/auth";
 import { authedRequest } from "../api/client";
-import { useFarmInfo, useFlocks, type Flock, type FlockMetrics } from "../api/farm";
+import { useFarmInfo, useFlocks, type Flock, type FlockMetrics, feedFigure } from "../api/farm";
 import { useFarmMutation } from "../api/hooks";
 import { Form } from "../components/forms";
 import { EmptyState, QueryState, StatSkeleton } from "../components/states";
@@ -106,7 +106,12 @@ export function LifecyclePage() {
                       <div><dt className="text-inksoft">Avg weight</dt><dd className="font-semibold">{x.averageWeightG ? `${num(x.averageWeightG)} g` : "—"}</dd></div>
                       <div><dt className="text-inksoft">Daily gain</dt><dd className="font-semibold">{x.dailyWeightGainG ? `${num(x.dailyWeightGainG, 1)} g` : "—"}</dd></div>
                       <div><dt className="text-inksoft">Feed used</dt><dd className="font-semibold">{num(x.feedConsumedKg)} kg</dd></div>
-                      <div><dt className="text-inksoft">Feed ratio</dt><dd className="font-semibold">{x.fcr ? x.fcr.toFixed(2) : "—"}</dd></div>
+                      {(() => {
+                        const ff = feedFigure(f.type, x);
+                        return <div title={ff.note ?? undefined}><dt className="text-inksoft">{ff.label}</dt><dd className={`font-semibold ${ff.note ? "text-amber-ink" : ""}`}>{ff.value}</dd></div>;
+                      })()}
+                      {(f.type === "layer" || f.type === "breeder") && x.eggsPerHenHoused ? <div><dt className="text-inksoft">Eggs per hen housed</dt><dd className="font-semibold">{x.eggsPerHenHoused.toFixed(1)}</dd></div> : null}
+                      {x.epef ? <div><dt className="text-inksoft">EPEF</dt><dd className="font-semibold">{x.epef}</dd></div> : null}
                       <div><dt className="text-inksoft">Weight produced</dt><dd className="font-semibold">{x.weightProducedKg ? `${num(x.weightProducedKg)} kg` : "—"}</dd></div>
                     </dl>
                     {can("money.read") ? (

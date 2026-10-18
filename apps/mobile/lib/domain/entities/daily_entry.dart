@@ -84,7 +84,8 @@ class PhotoRef with _$PhotoRef {
 /// A feed the farmer can pick (from the farm's feed stock).
 @freezed
 class FeedOption with _$FeedOption {
-  const factory FeedOption({required String itemId, required String name, required double quantityKg}) = _FeedOption;
+  /// [bagSizeKg]: feed is entered in bags of this size when set (how farmers count it).
+  const factory FeedOption({required String itemId, required String name, required double quantityKg, double? bagSizeKg}) = _FeedOption;
 }
 
 /// The sections of a day, in the order the entry screen shows them.

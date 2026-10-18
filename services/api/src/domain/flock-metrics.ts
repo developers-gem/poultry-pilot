@@ -6,6 +6,9 @@ import { ageDays, effectiveEvents, isInbound, isOutbound, population, type Ledge
  * A value that cannot be computed honestly is null, never 0.
  */
 
+/** Share of a flock's days that must have feed recorded before FCR is trusted. */
+export const FEED_COVERAGE_FOR_FCR = 0.8;
+
 export interface FeedEntry {
   date: string;
   quantityKg: number;
@@ -16,6 +19,8 @@ export interface FeedEntry {
 }
 
 export interface FlockMetricsInput {
+  /** Broiler, layer, ...: an FCR below 1.0 is only implausible for broilers. */
+  flockType?: string;
   placementDate?: string;
   hatchDate?: string;
   ageDaysAtPlacement?: number;
@@ -74,6 +79,24 @@ export interface FlockMetrics extends Population {
   /** liveWeight + weightOut − weightIn: the weight the birds gained on this farm. */
   weightProducedKg: number | null;
   /** Feed conversion ratio on a liveweight basis: feedConsumed ÷ (liveWeight + weightOut). The industry-standard FCR. */
+  /** The date the FCR is measured on (latest weigh-in while birds remain; asOf once all have left). */
+  fcrAsOf: string | null;
+  /** Days with feed recorded, out of the flock's days up to fcrAsOf. */
+  feedDaysRecorded: number;
+  feedDaysExpected: number;
+  /**
+   * FCR in doubt. "feed_gaps": feed on fewer than 80% of days (missing entries, or bulk recording, which is
+   * fine): shown with a caution. "implausibly_low": a broiler below 1.0 after day 14, so feed or weight is wrong:
+   * shown with a warning, kept out of benchmarks, and EPEF is not given.
+   */
+  fcrWarning: "feed_gaps" | "implausibly_low" | null;
+  /** European Production Efficiency Factor (broilers), at fcrAsOf. */
+  epef: number | null;
+  /** Eggs per hen housed (birds placed): the layer industry's cumulative production measure. */
+  eggsPerHenHoused: number | null;
+  /** kg of feed per dozen eggs. */
+  feedPerDozenEggsKg: number | null;
+  costPerBirdProducedMinor: number | null;
   fcr: number | null;
   /** feedConsumed ÷ weight gained (weightProduced): excludes the weight birds arrived with. */
   feedPerKgGainKg: number | null;
@@ -183,9 +206,61 @@ export function computeFlockMetrics(i: FlockMetricsInput): FlockMetrics {
   const feedWastedKg = Math.round(feed.filter((f) => f.kind === "wastage").reduce((t, f) => t + f.quantityKg, 0) * 1000) / 1000;
   const uncostedFeedKg = feed.filter((f) => f.costMinor === undefined).reduce((t, f) => t + f.quantityKg, 0);
   const feedMinor = feed.reduce((t, f) => t + (f.costMinor ?? 0), 0);
-  const liveBasisKg = liveWeightKg === null ? null : liveWeightKg + weightOutKg;
-  const fcr = liveBasisKg !== null && liveBasisKg > 0 && feedConsumedKg > 0 ? feedConsumedKg / liveBasisKg : null;
-  const feedPerKgGainKg = weightProducedKg !== null && weightProducedKg > 0 && feedConsumedKg > 0 ? feedConsumedKg / weightProducedKg : null;
+  // FCR must compare feed and weight on the SAME day. While birds are on the farm the only known weight is the
+  // latest weigh-in, so FCR is taken on that date: feed eaten up to it ÷ (live weight then + weight sold or moved
+  // out before it). Using today's feed against an older weight makes a healthy flock look far worse (every day
+  // since the weigh-in adds feed but no weight). Once every bird has left, sale weights give the whole cycle.
+  // Once every bird has left, the cycle ended on the day the last birds went out, not today: measuring age (and so
+  // EPEF) at today would make a finished batch look worse every day after its sale.
+  const lastOut = events.filter((e) => e.type === "sale" || e.type === "mortality" || e.type === "cull" || isOutbound(e.type)).map((e) => e.date).sort().at(-1);
+  const fcrAsOf = pop.alive > 0 ? (latest?.date ?? null) : (lastOut ?? i.asOf);
+  let fcr: number | null = null;
+  let feedPerKgGainKg: number | null = null;
+  let feedDaysExpected = 0;
+  let feedDaysRecorded = 0;
+  let fcrWarning: "feed_gaps" | "implausibly_low" | null = null;
+  const fcrAgeDaysAt = (date: string) => ageDays({ ...(i.hatchDate ? { hatchDate: i.hatchDate } : {}), ...(i.placementDate ? { placementDate: i.placementDate } : {}), ...(i.ageDaysAtPlacement !== undefined ? { ageDaysAtPlacement: i.ageDaysAtPlacement } : {}) }, date) ?? 0;
+  let fcrAgeDays: number | null = null;
+  let fcrSurvival: number | null = null;
+  if (fcrAsOf) {
+    const evAt = events.filter((e) => e.date <= fcrAsOf);
+    const popAt = population(evAt);
+    const liveAt = pop.alive > 0 ? (popAt.alive * (latest?.averageWeightG ?? 0)) / 1000 : 0;
+    let outAt = 0;
+    let inAt = 0;
+    for (const e of evAt) {
+      const birds = e.birds ?? 0;
+      if (e.type === "sale" || isOutbound(e.type)) outAt += e.totalLiveWeightKg ?? estimateKg(birds, e.date);
+      else if (e.type === "mortality" && i.includeMortalityWeight) outAt += estimateKg(birds, e.date);
+      else if (e.type === "placement") inAt += e.totalLiveWeightKg ?? (i.startingWeightG ? ((birds - (e.deadOnArrival ?? 0)) * i.startingWeightG) / 1000 : 0);
+      else if (isInbound(e.type)) inAt += e.totalLiveWeightKg ?? 0;
+    }
+    const feedAt = eaten.filter((f) => f.date <= fcrAsOf).reduce((t, f) => t + f.quantityKg, 0);
+    // FCR (feed per kg of bird) and EPEF measure meat birds. A layer's output is eggs: for layers and breeders the
+    // measure is feed per dozen eggs, and a weight-based FCR (e.g. 0.06) would only mislead.
+    const meatBird = i.flockType !== "layer" && i.flockType !== "breeder";
+    if (meatBird && liveAt + outAt > 0 && feedAt > 0) fcr = feedAt / (liveAt + outAt);
+    if (meatBird && liveAt + outAt - inAt > 0 && feedAt > 0) feedPerKgGainKg = feedAt / (liveAt + outAt - inAt);
+    // FCR is only as good as the feed record. Days with no feed recorded usually mean feed was not entered, which
+    // makes FCR look far better than it is (0.7 instead of 1.5). Farms that record feed in bulk (per delivery or
+    // bag) also have gaps but correct totals, so FCR is kept and flagged rather than hidden, and flagged values
+    // are kept out of alerts and benchmarks.
+    const start = i.placementDate ?? events.filter((e) => e.type === "placement").map((e) => e.date).sort()[0];
+    if (start && start <= fcrAsOf) {
+      feedDaysExpected = Math.round((Date.parse(`${fcrAsOf}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86_400_000) + 1;
+      feedDaysRecorded = new Set(eaten.filter((f) => f.date >= start && f.date <= fcrAsOf).map((f) => f.date)).size;
+    }
+    if (fcr !== null) {
+      if (feedDaysExpected >= 3 && feedDaysRecorded / feedDaysExpected < FEED_COVERAGE_FOR_FCR) fcrWarning = "feed_gaps";
+      else if (i.flockType === "broiler" && fcrAgeDaysAt(fcrAsOf) >= 14 && fcr < 1) fcrWarning = "implausibly_low";
+    }
+    fcrAgeDays = ageDays({ ...(i.hatchDate ? { hatchDate: i.hatchDate } : {}), ...(i.placementDate ? { placementDate: i.placementDate } : {}), ...(i.ageDaysAtPlacement !== undefined ? { ageDaysAtPlacement: i.ageDaysAtPlacement } : {}) }, fcrAsOf);
+    fcrSurvival = pct(popAt.birdsIn - popAt.mortality - popAt.culled, popAt.birdsIn);
+  }
+  // European Production Efficiency Factor (broilers): livability % × average weight (kg) ÷ (age in days × FCR) × 100.
+  const epefWeightKg = pop.alive > 0 ? (latest?.averageWeightG ?? 0) / 1000 : pop.sold > 0 ? weightOutKg / pop.sold : 0;
+  // EPEF amplifies FCR, so it is not given when FCR is implausible (feed or weight is wrong).
+  const epef = fcr && fcrWarning !== "implausibly_low" && fcrAgeDays && fcrAgeDays > 0 && fcrSurvival !== null && epefWeightKg > 0 ? Math.round((fcrSurvival * epefWeightKg) / (fcrAgeDays * fcr) * 100) : null;
   const eggsCollected = i.eggsCollected ?? 0;
 
   // ---- money
@@ -237,7 +312,14 @@ export function computeFlockMetrics(i: FlockMetricsInput): FlockMetrics {
     weightInKg,
     weightProducedKg,
     fcr,
+    fcrAsOf,
+    feedDaysRecorded,
+    feedDaysExpected,
+    fcrWarning,
     feedPerKgGainKg,
+    epef,
+    eggsPerHenHoused: eggsCollected > 0 && pop.birdsIn > 0 ? eggsCollected / pop.birdsIn : null,
+    feedPerDozenEggsKg: eggsCollected > 0 && feedConsumedKg > 0 ? feedConsumedKg / (eggsCollected / 12) : null,
     revenueMinor,
     cost,
     profitMinor,
@@ -246,6 +328,8 @@ export function computeFlockMetrics(i: FlockMetricsInput): FlockMetrics {
     projectedProfitMinor,
     projectedMarginPercent: projectedValue && projectedProfitMinor !== null ? (projectedProfitMinor / projectedValue) * 100 : null,
     costPerBirdMinor: pop.birdsIn > 0 ? Math.round(cost.totalMinor / pop.birdsIn) : null,
+    /** Cost per bird that is still alive or was sold (what a farmer means by "cost per bird"); placed birds that died raise it. */
+    costPerBirdProducedMinor: pop.alive + pop.sold > 0 ? Math.round(cost.totalMinor / (pop.alive + pop.sold)) : null,
     costPerKgProducedMinor: weightProducedKg !== null && weightProducedKg > 0 ? Math.round(cost.totalMinor / weightProducedKg) : null,
     costsComplete: uncostedFeedKg === 0,
   };

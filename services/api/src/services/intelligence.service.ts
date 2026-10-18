@@ -153,11 +153,13 @@ export function createIntelligenceService(d: { repos: Repositories; clock: Clock
       const pastFcr = new Map<string, number[]>();
       for (const f of closed) {
         const m = await d.flocks.metrics(ctx, f.id, {});
-        if (m.fcr !== null) pastFcr.set(f.type, [...(pastFcr.get(f.type) ?? []), m.fcr]);
+        if (m.fcr !== null && m.fcrWarning !== "implausibly_low") pastFcr.set(f.type, [...(pastFcr.get(f.type) ?? []), m.fcr]);
       }
       const keep = new Set<string>();
       for (const flock of await repos.flocks.find(ctx.farmId, { where: { status: "active" } }, tx)) {
         const m = await d.flocks.metrics(ctx, flock.id, {});
+        // Missing feed makes FCR look better, never worse, so it cannot raise a false high-FCR alert; only the
+        // benchmark (past flocks) excludes doubtful FCR, which would otherwise make later flocks look worse.
         if (m.fcr === null) continue;
         const past = baselineOf(pastFcr.get(flock.type) ?? [], rule.params["minPastFlocks"] ?? 2);
         const ref = rule.params["targetFcr"] ?? past?.mean;

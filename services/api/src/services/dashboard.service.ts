@@ -170,7 +170,7 @@ export function createDashboardService(d: {
       for (const f of closed) {
         const m = await d.flocks.metrics(ctx, f.id, {});
         const e = past.get(f.type) ?? { fcr: [], mortality: [] };
-        if (m.fcr !== null) e.fcr.push(m.fcr);
+        if (m.fcr !== null && m.fcrWarning !== "implausibly_low") e.fcr.push(m.fcr);
         if (m.mortalityRate !== null) e.mortality.push(m.mortalityRate);
         past.set(f.type, e);
       }

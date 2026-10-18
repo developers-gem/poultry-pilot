@@ -172,25 +172,57 @@ class BigStepper extends StatelessWidget {
 String _str(num? v) => v == null || v == 0 ? '' : (v % 1 == 0 ? v.toInt().toString() : v.toString());
 
 /// Feed: pick the feed (chips), then the kilograms. Yesterday's amount is one tap away.
+/// Feed given today, in BAGS when the feed has a bag size (how farmers count it), otherwise kg. Returns kg.
 Future<(double, String?)?> showFeedSheet(BuildContext context, {required double current, String? itemId, required List<FeedOption> options, double? yesterday, double otherKg = 0}) {
-  var text = _str(current);
   var chosen = itemId ?? options.firstOrNull?.itemId;
-  return showEntrySheet(context, title: 'Feed given today', onDone: () => (double.tryParse(text) ?? 0, chosen), builder: (ctx, set) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        if (options.isNotEmpty)
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(children: [
-              for (final o in options)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8, bottom: 10),
-                  child: ChoiceChip(label: Text('${o.name} · ${Fmt.number(o.quantityKg)} kg left'), selected: chosen == o.itemId, onSelected: (_) => set(() => chosen = o.itemId)),
+  double? bagOf(String? id) => options.where((o) => o.itemId == id).firstOrNull?.bagSizeKg;
+  var inBags = (bagOf(chosen) ?? 0) > 0;
+  String show(double kg) => inBags ? _str(kg / bagOf(chosen)!) : _str(kg);
+  var text = current > 0 ? show(current) : '';
+  double kgOf(String t) => feedKg(t, bagSizeKg: bagOf(chosen), inBags: inBags);
+  return showEntrySheet(context, title: 'Feed given today', onDone: () => (kgOf(text), chosen), builder: (ctx, set) {
+    final bag = bagOf(chosen);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (options.isNotEmpty)
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(children: [
+            for (final o in options)
+              Padding(
+                padding: const EdgeInsets.only(right: 8, bottom: 10),
+                child: ChoiceChip(
+                  label: Text('${o.name} · ${o.bagSizeKg != null && o.bagSizeKg! > 0 ? '${Fmt.number(o.quantityKg / o.bagSizeKg!, digits: 0)} bags' : '${Fmt.number(o.quantityKg)} kg'} left'),
+                  selected: chosen == o.itemId,
+                  onSelected: (_) => set(() {
+                    final kg = kgOf(text);
+                    chosen = o.itemId;
+                    inBags = (o.bagSizeKg ?? 0) > 0;
+                    text = kg > 0 ? show(kg) : '';
+                  }),
                 ),
-            ]),
+              ),
+          ]),
+        ),
+      if (bag != null && bag > 0)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: SegmentedButton<bool>(
+            segments: [ButtonSegment(value: true, label: Text('Bags of ${Fmt.number(bag)} kg')), const ButtonSegment(value: false, label: Text('kg'))],
+            selected: {inBags},
+            style: const ButtonStyle(minimumSize: WidgetStatePropertyAll(Size(0, kTarget))),
+            onSelectionChanged: (s) => set(() {
+              final kg = kgOf(text);
+              inBags = s.first;
+              text = kg > 0 ? show(kg) : '';
+            }),
           ),
-        if (otherKg > 0) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('${Fmt.number(otherKg, digits: 1)} kg more was entered separately today (FeedWise).', style: const TextStyle(color: AppColors.inkSoft))),
-        QuickChips(items: [if (yesterday != null && yesterday > 0) ('Same as yesterday (${Fmt.number(yesterday, digits: 1)} kg)', yesterday), if (yesterday != null && yesterday > 0) ('+5%', (yesterday * 1.05).roundToDouble())], onPick: (v) => set(() => text = _str(v))),
-        NumberPad(text: text, unit: 'kg', onChanged: (t) => set(() => text = t)),
-      ]));
+        ),
+      if (otherKg > 0) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('${Fmt.number(otherKg, digits: 1)} kg more was entered separately today (FeedWise).', style: const TextStyle(color: AppColors.inkSoft))),
+      QuickChips(items: [if (yesterday != null && yesterday > 0) ('Same as yesterday (${inBags ? '${show(yesterday)} bags' : '${Fmt.number(yesterday, digits: 1)} kg'})', inBags ? yesterday / bag! : yesterday)], onPick: (v) => set(() => text = _str(v))),
+      NumberPad(text: text, unit: inBags ? 'bags' : 'kg', onChanged: (t) => set(() => text = t)),
+      if (inBags && text.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text('$text bags × ${Fmt.number(bag!)} kg = ${Fmt.number(kgOf(text), digits: 1)} kg', textAlign: TextAlign.center, style: const TextStyle(color: AppColors.inkSoft))),
+    ]);
+  });
 }
 
 /// Water in litres.
@@ -202,30 +234,79 @@ Future<double?> showWaterSheet(BuildContext context, {double? current, double? y
       ]));
 }
 
-/// Eggs: collected (including broken) and broken, on one keypad.
+/// Eggs as farmers count them: trays (30) plus loose eggs, and broken. Eggs are collected two or three times a
+/// day, so once some are recorded the sheet ADDS this collection to the day (the morning count is never typed
+/// again, nor overwritten); "Set the day's total" corrects it. Returns the day's totals.
+const eggsPerTray = 30;
+
+/// The day's egg totals after entering [trays] and [loose] eggs and [broken]: added to what is already recorded
+/// when [adding] (a second collection), or replacing it (correcting the day's total). Pure, unit-tested.
+(int, int) eggDayTotals({required int haveEggs, required int haveBroken, required bool adding, required int trays, required int loose, required int broken}) {
+  final count = trays * eggsPerTray + loose;
+  return adding ? (haveEggs + count, haveBroken + broken) : (count, broken);
+}
+
+/// Kilograms from what was typed: bags × bag size, or kg as typed. Pure, unit-tested.
+double feedKg(String typed, {double? bagSizeKg, required bool inBags}) => (double.tryParse(typed) ?? 0) * (inBags && bagSizeKg != null && bagSizeKg > 0 ? bagSizeKg : 1);
+
 Future<(int, int)?> showEggsSheet(BuildContext context, {int? collected, int? broken, int? yesterday}) {
-  var c = _str(collected);
-  var b = _str(broken);
-  var editing = 0; // 0 collected, 1 broken
-  return showEntrySheet(context, title: 'Eggs collected', onDone: () => c.isEmpty ? null : (int.tryParse(c) ?? 0, int.tryParse(b) ?? 0), builder: (ctx, set) => Column(children: [
-        SegmentedButton<int>(
-          segments: const [ButtonSegment(value: 0, label: Text('Collected')), ButtonSegment(value: 1, label: Text('Broken'))],
-          selected: {editing},
-          style: const ButtonStyle(minimumSize: WidgetStatePropertyAll(Size(0, kTarget))),
-          onSelectionChanged: (s) => set(() => editing = s.first),
+  final have = collected ?? 0;
+  final haveBroken = broken ?? 0;
+  var adding = have > 0;
+  var trays = '';
+  var loose = '';
+  var br = '';
+  var editing = 0; // 0 trays, 1 loose, 2 broken
+  int n(String t) => int.tryParse(t) ?? 0;
+  int thisCount() => n(trays) * eggsPerTray + n(loose);
+  (int, int) totals() => eggDayTotals(haveEggs: have, haveBroken: haveBroken, adding: adding, trays: n(trays), loose: n(loose), broken: n(br));
+  return showEntrySheet(context, title: 'Eggs collected', onDone: () => trays.isEmpty && loose.isEmpty && br.isEmpty ? null : totals(), builder: (ctx, set) {
+    final (dayEggs, dayBroken) = totals();
+    return Column(children: [
+      if (have > 0)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: SegmentedButton<bool>(
+            segments: [ButtonSegment(value: true, label: Text('Add a collection (have ${Fmt.number(have)})')), const ButtonSegment(value: false, label: Text("Set the day's total"))],
+            selected: {adding},
+            style: const ButtonStyle(minimumSize: WidgetStatePropertyAll(Size(0, kTarget))),
+            onSelectionChanged: (s) => set(() => adding = s.first),
+          ),
         ),
-        const SizedBox(height: 10),
-        if (editing == 0) QuickChips(items: [if (yesterday != null && yesterday > 0) ('Same as yesterday ($yesterday)', yesterday)], onPick: (v) => set(() => c = _str(v))),
-        NumberPad(text: editing == 0 ? c : b, decimal: false, unit: editing == 0 ? 'eggs' : 'broken', onChanged: (t) => set(() {
-              if (editing == 0) {
-                c = t;
-              } else {
-                b = t;
-              }
+      SegmentedButton<int>(
+        segments: const [ButtonSegment(value: 0, label: Text('Trays')), ButtonSegment(value: 1, label: Text('Loose')), ButtonSegment(value: 2, label: Text('Broken'))],
+        selected: {editing},
+        style: const ButtonStyle(minimumSize: WidgetStatePropertyAll(Size(0, kTarget))),
+        onSelectionChanged: (s) => set(() => editing = s.first),
+      ),
+      const SizedBox(height: 10),
+      if (editing == 0 && !adding && yesterday != null && yesterday > 0)
+        QuickChips(items: [('Same as yesterday (${Fmt.number(yesterday)})', yesterday)], onPick: (v) => set(() {
+              trays = '${v.toInt() ~/ eggsPerTray}';
+              loose = '${v.toInt() % eggsPerTray}';
             })),
-        const SizedBox(height: 6),
-        Text('Collected ${c.isEmpty ? '0' : c} · broken ${b.isEmpty ? '0' : b}', style: const TextStyle(color: AppColors.inkSoft)),
-      ]));
+      NumberPad(
+        text: [trays, loose, br][editing],
+        decimal: false,
+        unit: ['trays of $eggsPerTray', 'loose eggs', 'broken'][editing],
+        onChanged: (t) => set(() {
+          if (editing == 0) {
+            trays = t;
+          } else if (editing == 1) {
+            loose = t;
+          } else {
+            br = t;
+          }
+        }),
+      ),
+      const SizedBox(height: 6),
+      Text(
+        '${adding ? 'This collection' : 'Collected'}: ${n(trays)} trays + ${n(loose)} = ${Fmt.number(thisCount())} eggs${n(br) > 0 ? ' · ${n(br)} broken' : ''}${adding ? '\nDay total: ${Fmt.number(dayEggs)} eggs, $dayBroken broken' : ''}',
+        textAlign: TextAlign.center,
+        style: const TextStyle(color: AppColors.inkSoft),
+      ),
+    ]);
+  });
 }
 
 /// Deaths: a counter per cause (tap +/−); no typing.

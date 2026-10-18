@@ -72,7 +72,8 @@ const FlockBase = z.object({
 const customNeedsName = <T extends { type?: string; customTypeName?: string }>(f: T) => f.type !== "custom" || !!f.customTypeName;
 
 /** Creating with `placement` places the birds at once (status active); without it the flock is planned. */
-export const CreateFlockRequest = FlockBase.extend({ id: Id.optional(), placement: Placement.optional() })
+/** flockCode is optional on create: left out, the farm numbers it (e.g. B-2610-1 for the first broiler batch of Oct 2026). */
+export const CreateFlockRequest = FlockBase.extend({ id: Id.optional(), flockCode: FlockBase.shape.flockCode.optional(), placement: Placement.optional() })
   .strict()
   .refine(customNeedsName, { message: "Name the custom poultry type", path: ["customTypeName"] });
 
@@ -198,6 +199,11 @@ export const FlockMetricsView = z.object({
   weightProducedKg: z.number().nullable(),
   /** Liveweight FCR: feed eaten ÷ (live weight + weight sold or moved out). */
   fcr: z.number().nullable(),
+  /** Days with feed recorded out of the flock's days so far; FCR is flagged below 80%. */
+  feedDaysRecorded: z.number().int(),
+  feedDaysExpected: z.number().int(),
+  /** FCR in doubt: "feed_gaps" (a caution: entries missing or recorded in bulk) or "implausibly_low" (feed or weight wrong; EPEF withheld, not benchmarked). */
+  fcrWarning: z.enum(["feed_gaps", "implausibly_low"]).nullable(),
   /** Feed eaten ÷ weight gained on this farm (excludes the weight birds arrived with). */
   feedPerKgGainKg: z.number().nullable(),
   currency: z.string(),

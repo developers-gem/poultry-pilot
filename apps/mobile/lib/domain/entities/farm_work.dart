@@ -49,11 +49,18 @@ class TodayWork with _$TodayWork {
 
 @freezed
 class FlockSummary with _$FlockSummary {
+  const FlockSummary._();
+
+  /// Layers and breeders: judged by eggs (feed per dozen), not by a weight-based FCR.
+  bool get isLaying => type == 'layer' || type == 'breeder';
+
   const factory FlockSummary({required String id, required String houseId, required String name, required String flockCode, required String type, String? breed, String? placementDate, int? placementCount, required String status, int? currentBirdCount}) = _FlockSummary;
 }
 
 @freezed
 class FlockDetail with _$FlockDetail {
+  const FlockDetail._();
+
   const factory FlockDetail({
     required FlockSummary flock,
     int? ageDays,
@@ -67,9 +74,26 @@ class FlockDetail with _$FlockDetail {
     required double feedConsumedKg,
     double? feedPerBirdKg,
     double? fcr,
+    /// The weigh-in date FCR is measured at (feed up to then ÷ weight then).
+    String? fcrAsOf,
+    /// FCR in doubt: "feed_gaps" (feed on few days) or "implausibly_low" (feed or weight is wrong).
+    String? fcrWarning,
+    @Default(0) int feedDaysRecorded,
+    @Default(0) int feedDaysExpected,
+    int? epef,
+    /// Layers: kg of feed per dozen eggs, and eggs per hen housed (layers have no weight-based FCR).
+    double? feedPerDozenEggsKg,
+    double? eggsPerHenHoused,
     required int eggsCollected,
     required String stage,
   }) = _FlockDetail;
+
+  /// Why FCR should not be trusted, in the farmer's words (null when it is fine).
+  String? get fcrNote => switch (fcrWarning) {
+        'feed_gaps' => 'Feed is recorded on $feedDaysRecorded of $feedDaysExpected days, so FCR may be too low. Fine if you enter feed in bulk.',
+        'implausibly_low' => 'FCR is implausibly low for broilers: check the feed entries and the weights.',
+        _ => null,
+      };
 }
 
 @freezed

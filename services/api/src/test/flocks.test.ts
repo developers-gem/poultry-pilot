@@ -365,8 +365,8 @@ describe("server-side calculations end to end", () => {
     expect(m.mortalityRate).toBeCloseTo(2.525252, 5);
     expect(m.survivalRate).toBeCloseTo(96.969697, 5);
     expect(m.dailyWeightGainG).toBeCloseTo(56, 6);
-    expect(m.fcr).toBeCloseTo(3400 / 2000, 6); // liveweight FCR: 1120 kg live + 880 kg sold
-    expect(m.feedPerKgGainKg).toBeCloseTo(3400 / 1960.4, 6); // net of the 39.6 kg the chicks arrived with
+    expect(m.fcr).toBeCloseTo(3400 / 1920, 6); // liveweight FCR on the last weigh-in: 960 birds × 2.0 kg (the sale came after it)
+    expect(m.feedPerKgGainKg).toBeCloseTo(3400 / (1920 - 39.6), 5); // net of the 39.6 kg the chicks arrived with
     expect(m.feedCostPerBirdMinor).toBe(6364); // ₹63,000 of costed feed / 990 birds
     expect(m.marginPercent).toBeCloseTo(-6.404959, 5);
     expect(m.cost.totalMinor).toBe(10_300_000);

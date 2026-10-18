@@ -1,19 +1,19 @@
 {
-  "date": "2026-10-16",
-  "today": "2026-10-16",
-  "editWindowStart": "2026-10-15",
+  "date": "2026-10-18",
+  "today": "2026-10-18",
+  "editWindowStart": "2026-10-17",
   "flocks": [
     {
-      "flockId": "01a14298-5911-7560-9ec1-e653643bfbbe",
+      "flockId": "01a14d6e-5978-7090-9eaf-4e01c3d4cc8d",
       "flockCode": "L1",
       "name": "Layers",
       "type": "layer",
-      "houseId": "01a14298-590c-775c-901e-55516bce6d14",
+      "houseId": "01a14d6e-5973-73fb-a20d-5877d787d395",
       "houseName": "House A",
       "expectedBirds": 996,
       "laying": true,
       "record": {
-        "id": "01a14298-5931-7086-96ac-0d17e496a394",
+        "id": "01a14d6e-5997-71dc-a98d-fbc4d891c959",
         "version": 0,
         "summary": {
           "mortality": 1,
@@ -25,7 +25,10 @@
           "averageWeightG": null,
           "observations": 0,
           "photos": 0
-        }
+        },
+        "recordedByName": "Asha Verma",
+        "lastChangedByName": "Asha Verma",
+        "updatedAt": "2026-10-18T05:13:59.959Z"
       },
       "previous": {
         "mortality": 1,

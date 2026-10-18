@@ -13,6 +13,7 @@ export const pages: Record<string, ComponentType> = {
   "/chicks": lazyRouteComponent(() => import("./Chicks"), "ChicksPage"),
   "/hatchery": lazyRouteComponent(() => import("./Hatchery"), "HatcheryPage"),
   "/eggs": lazyRouteComponent(() => import("./Eggs"), "EggsPage"),
+  "/daily": lazyRouteComponent(() => import("./DailySheet"), "default"),
   "/feed": lazyRouteComponent(() => import("./Feed"), "FeedPage"),
   "/health": lazyRouteComponent(() => import("./Health"), "HealthPage"),
   "/biosecurity": lazyRouteComponent(() => import("./Biosecurity"), "BiosecurityPage"),

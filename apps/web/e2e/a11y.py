@@ -1,8 +1,9 @@
 import json
 from collections import defaultdict
 from playwright.sync_api import sync_playwright
-ROUTES = ["/", "/auth", "/dashboard","/flocks","/lifecycle","/weights","/chicks","/hatchery","/eggs","/feed","/health","/biosecurity","/calendar","/weather","/money","/expenses","/market","/training","/facts","/news","/glossary","/farm-profile","/alerts"]
-AXE = open("apps/web/node_modules/axe-core/axe.min.js").read()
+ROUTES = ["/", "/auth", "/dashboard","/flocks","/lifecycle","/weights","/chicks","/hatchery","/eggs","/daily","/feed","/health","/biosecurity","/calendar","/weather","/money","/expenses","/market","/training","/facts","/news","/glossary","/farm-profile","/alerts"]
+import os
+AXE = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "node_modules", "axe-core", "axe.min.js")).read()
 summary = defaultdict(lambda: {"impact": None, "routes": set(), "nodes": 0, "help": ""})
 with sync_playwright() as p:
     b = p.chromium.launch()
