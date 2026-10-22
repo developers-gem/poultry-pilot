@@ -121,7 +121,7 @@ export default function DeleteAccount() {
                                         autoComplete="email"
                                         value={email}
                                         onChange={(event) => setEmail(event.target.value)}
-                                        placeholder="you@example.com"
+                                        placeholder="Your Mail ID   "
                                         className="w-full rounded-2xl border border-[#e1e6f3] bg-white/80 py-3.5 pl-11 pr-4 text-sm outline-none transition placeholder:text-[#a0a9bf] focus:border-[#8ba0ff] focus:ring-4 focus:ring-[#8ba0ff]/15"
                                     />
                                 </div>
