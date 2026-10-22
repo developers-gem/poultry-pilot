@@ -50,6 +50,79 @@ export function Landing() {
           ))}
         </div>
       </main>
+            {/* Footer */}
+     
+<footer className="border-t border-white/80 bg-white/45 backdrop-blur-xl">
+  <div className="mx-auto max-w-[1440px] px-5 py-8 sm:px-8 lg:px-10">
+    <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+
+      {/* Brand */}
+      <a
+        href="/"
+        className="group flex items-center justify-center gap-3 md:justify-start"
+      >
+        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#6384f8] via-[#648de9] to-[#9274e8] text-sm font-extrabold text-white shadow-md shadow-indigo-200/50 transition-transform duration-300 group-hover:scale-105">
+          PP
+        </span>
+
+        <span className="flex flex-col">
+          <span className="text-base font-bold tracking-tight text-[#171a35]">
+            PoultryPilot
+          </span>
+          <span className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.2em] text-[#697493]">
+            Smarter poultry farming
+          </span>
+        </span>
+      </a>
+
+      {/* Legal Links */}
+      <nav
+        aria-label="Legal links"
+        className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3"
+      >
+        <a
+          href="/privacy-policy"
+          className="text-sm font-medium text-[#485477] transition-colors duration-200 hover:text-[#6384f8]"
+        >
+          Privacy Policy
+        </a>
+
+        <span className="hidden h-4 w-px bg-[#d9deed] sm:block" />
+
+        <a
+          href="/terms-and-conditions"
+          className="text-sm font-medium text-[#485477] transition-colors duration-200 hover:text-[#6384f8]"
+        >
+          Terms &amp; Conditions
+        </a>
+
+        <span className="hidden h-4 w-px bg-[#d9deed] sm:block" />
+
+        <a
+          href="mailto:support@poultrypilot.com"
+          className="text-sm font-medium text-[#485477] transition-colors duration-200 hover:text-[#6384f8]"
+        >
+          Contact Support
+        </a>
+      </nav>
+    </div>
+
+    {/* Bottom Bar */}
+    <div className="mt-7 border-t border-[#dfe4f1]/80 pt-5">
+      <div className="flex flex-col items-center justify-between gap-3 text-center sm:flex-row sm:text-left">
+        <p className="text-xs leading-6 text-[#697493]">
+          © {new Date().getFullYear()} PoultryPilot Technologies. All rights reserved.
+        </p>
+
+        <p className="text-xs text-[#697493]">
+          Built for healthier flocks and smarter farms.
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>
+
     </div>
   );
 }
+

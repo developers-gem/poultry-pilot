@@ -9,6 +9,9 @@ import { AuthPage } from "./pages/Auth";
 import { CreateFarm } from "./pages/CreateFarm";
 import { Landing } from "./pages/Landing";
 import { SystemStatus } from "./pages/SystemStatus";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsAndConditions from "./pages/TermsAndConditions";
+import DeleteAccount from "./pages/DeleteAccount";
 
 function Root() {
   return (
@@ -80,8 +83,11 @@ const auth = createRoute({ getParentRoute: () => root, path: "/auth", component:
 const status = createRoute({ getParentRoute: () => root, path: "/status", component: SystemStatus });
 const app = createRoute({ getParentRoute: () => root, id: "app", component: SignedIn });
 const appRoutes = Object.entries(pages).map(([path, component]) => createRoute({ getParentRoute: () => app, path, component: component as () => JSX.Element }));
+const privacyPolicy = createRoute({ getParentRoute: () => root, path: "/privacy-policy", component: PrivacyPolicy, });
+const terms = createRoute({ getParentRoute: () => root, path: "/terms-and-conditions", component: TermsAndConditions, });
+const deleteAccount = createRoute({ getParentRoute: () => root, path: "/delete",  component: DeleteAccount,});
 
-export const router = createRouter({ routeTree: root.addChildren([landing, auth, status, app.addChildren(appRoutes)]), defaultPreload: "intent", scrollRestoration: true });
+export const router = createRouter({ routeTree: root.addChildren([landing, auth, status, privacyPolicy, terms, deleteAccount, app.addChildren(appRoutes)]), defaultPreload: "intent", scrollRestoration: true });
 
 // Routes are built from the page registry, so links are checked by a test (every nav link resolves to a page)
 // rather than by the router's path types.
