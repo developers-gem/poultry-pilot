@@ -1,29 +1,29 @@
 node_modules
-dist
-coverage
-*.log
-.DS_Store
+# dist
+# coverage
+# *.log
+# .DS_Store
 
-# Secrets and local environment. Only *.example files are committed.
-# The ! exceptions must come AFTER the ignore patterns, or they are overridden.
-**/.env
-**/.env.*
-!**/.env.example
-!**/.env.*.example
+# # Secrets and local environment. Only *.example files are committed.
+# # The ! exceptions must come AFTER the ignore patterns, or they are overridden.
+# **/.env
+# **/.env.*
+# !**/.env.example
+# !**/.env.*.example
 
-# Generated
-packages/contracts/openapi.json
+# # Generated
+# packages/contracts/openapi.json
 
-# Flutter / mobile
-apps/mobile/.dart_tool/
-apps/mobile/build/
-apps/mobile/.flutter-plugins
-apps/mobile/.flutter-plugins-dependencies
-apps/mobile/config/*.json
-!apps/mobile/config/*.example.json
-apps/mobile/lib/api/generated/
-apps/mobile/android/local.properties
-apps/mobile/ios/Flutter/Generated.xcconfig
-apps/mobile/ios/Pods/
-state.json
-services/api/data/
+# # Flutter / mobile
+# apps/mobile/.dart_tool/
+# apps/mobile/build/
+# apps/mobile/.flutter-plugins
+# apps/mobile/.flutter-plugins-dependencies
+# apps/mobile/config/*.json
+# !apps/mobile/config/*.example.json
+# apps/mobile/lib/api/generated/
+# apps/mobile/android/local.properties
+# apps/mobile/ios/Flutter/Generated.xcconfig
+# apps/mobile/ios/Pods/
+# state.json
+# services/api/data/
