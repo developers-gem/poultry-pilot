@@ -9,7 +9,7 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
-    "test:watch": "vitest",
+    "dev": "pnpm --parallel --filter @poultrypilot/api --filter @poultrypilot/web dev",
     "dev:api": "pnpm --filter @poultrypilot/api dev",
     "dev:web": "pnpm --filter @poultrypilot/web dev",
     "openapi": "pnpm --filter @poultrypilot/contracts openapi",
