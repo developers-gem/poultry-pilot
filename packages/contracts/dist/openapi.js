@@ -27,6 +27,8 @@ const S = {
     LogoutRequest: registry.register("LogoutRequest", V.LogoutRequest),
     VerifyEmailRequest: registry.register("VerifyEmailRequest", V.VerifyEmailRequest),
     ForgotPasswordRequest: registry.register("ForgotPasswordRequest", V.ForgotPasswordRequest),
+    CheckEmailRequest: registry.register("CheckEmailRequest", V.CheckEmailRequest),
+    DeleteAccountRequest: registry.register("DeleteAccountRequest", V.DeleteAccountRequest),
     ResetPasswordRequest: registry.register("ResetPasswordRequest", V.ResetPasswordRequest),
     ChangePasswordRequest: registry.register("ChangePasswordRequest", V.ChangePasswordRequest),
     TokenPair: registry.register("TokenPair", V.TokenPair),
@@ -118,6 +120,8 @@ post("/auth/google", "Sign in with a Google ID token", bodyOf(S.GoogleLoginReque
 post("/auth/refresh", "Rotate a refresh token; reuse of an old token ends the session", bodyOf(S.RefreshRequest), { 200: json(S.TokenPair, "New token pair"), 401: errors[401] });
 post("/auth/logout", "End the current session (bearer token) or the session of a refresh token", bodyOf(S.LogoutRequest), { 204: { description: "Signed out" } });
 post("/auth/forgot-password", "Email a password reset link; never reveals whether the account exists", bodyOf(S.ForgotPasswordRequest), { 202: json(z.object({ message: z.string() }), "Accepted"), 429: errors[429] });
+post("/auth/check-email", "Check whether a user account exists for an email address", bodyOf(S.CheckEmailRequest), { 200: json(z.object({ exists: z.boolean(), email: z.string(), fullName: z.string() }), "Account exists"), 404: json(S.ErrorEnvelope, "No account found") });
+post("/auth/delete-account", "Permanently delete an account by registered email", bodyOf(S.DeleteAccountRequest), { 200: json(z.object({ success: z.boolean(), message: z.string() }), "Account deleted"), 404: json(S.ErrorEnvelope, "No account found") });
 post("/auth/reset-password", "Set a new password with an emailed token; signs out every session", bodyOf(S.ResetPasswordRequest), { 204: { description: "Password reset" }, 422: json(S.ErrorEnvelope, "Invalid or expired token") });
 post("/auth/change-password", "Change password; signs out every other session", bodyOf(S.ChangePasswordRequest), {
     200: json(z.object({ otherSessionsSignedOut: z.number() }), "Changed"),

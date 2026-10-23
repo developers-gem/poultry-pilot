@@ -1,5 +1,7 @@
 import {
   ChangePasswordRequest,
+  CheckEmailRequest,
+  DeleteAccountRequest,
   ForgotPasswordRequest,
   GoogleLoginRequest,
   LoginRequest,
@@ -53,6 +55,18 @@ export function authRoutes(auth: AuthService, limiter: RequestHandler): Router {
   r.post("/forgot-password", limiter, validate("body", ForgotPasswordRequest), async (req, res) => {
     await auth.forgotPassword(req.body.email);
     res.status(202).json({ message: "If an account exists for that email, a reset link has been sent." });
+  });
+  r.post("/check-email", limiter, validate("body", CheckEmailRequest), async (req, res) => {
+    const user = await auth.checkEmail(req.body.email);
+    if (!user) {
+      res.status(404).json({ error: { code: "USER_NOT_FOUND", message: "No account found with this email address." } });
+      return;
+    }
+    res.json({ exists: true, email: user.email, fullName: user.fullName });
+  });
+  r.post("/delete-account", limiter, validate("body", DeleteAccountRequest), async (req, res) => {
+    await auth.deleteAccountByEmail(req.body.email);
+    res.json({ success: true, message: "Your account has been successfully deleted." });
   });
   r.post("/reset-password", limiter, validate("body", ResetPasswordRequest), async (req, res) => {
     await auth.resetPassword(req.body.token, req.body.newPassword, clientMeta(req));

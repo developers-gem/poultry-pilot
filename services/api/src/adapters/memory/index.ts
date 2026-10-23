@@ -280,6 +280,13 @@ export function createMemoryRepositories(): { repos: Repositories; store: Memory
         store.users.put(id, next);
         return clone(next);
       },
+      async delete(id) {
+        store.sessions.rows.forEach((s, sid) => { if (s.userId === id) store.sessions.rows.delete(sid); });
+        store.refreshTokens.rows.forEach((r, rid) => { if (r.userId === id) store.refreshTokens.rows.delete(rid); });
+        store.oneTimeTokens.rows.forEach((t, tid) => { if (t.userId === id) store.oneTimeTokens.rows.delete(tid); });
+        store.memberships.rows.forEach((m, mid) => { if (m.userId === id) store.memberships.rows.delete(mid); });
+        return store.users.rows.delete(id);
+      },
     },
     sessions: {
       async create(rec) {

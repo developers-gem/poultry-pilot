@@ -471,6 +471,23 @@ export function createAuthService(d: AuthDeps) {
       await d.audit.record(ctxOf(principal.userId, meta, principal.sessionId), { action: "session.revoked_others", entity: "user", entityId: principal.userId, after: { revoked } }, {});
       return { revoked };
     },
+
+    async checkEmail(emailRaw: string): Promise<{ id: string; email: string; fullName: string } | null> {
+      const user = await repos.users.findByEmail(emailRaw.toLowerCase());
+      if (!user) return null;
+      return { id: user.id, email: user.email, fullName: user.fullName };
+    },
+
+    async deleteAccountByEmail(emailRaw: string): Promise<{ success: boolean }> {
+      const user = await repos.users.findByEmail(emailRaw.toLowerCase());
+      if (!user) {
+        throw new AppError("NOT_FOUND", "No account found with this email address.");
+      }
+      await repos.tx.run(async (tx) => {
+        await repos.users.delete(user.id, tx);
+      });
+      return { success: true };
+    },
   };
 }
 

@@ -179,6 +179,20 @@ export declare const ForgotPasswordRequest: z.ZodObject<{
 }, {
     email: string;
 }>;
+export declare const CheckEmailRequest: z.ZodObject<{
+    email: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    email: string;
+}, {
+    email: string;
+}>;
+export declare const DeleteAccountRequest: z.ZodObject<{
+    email: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    email: string;
+}, {
+    email: string;
+}>;
 export declare const ResetPasswordRequest: z.ZodObject<{
     token: z.ZodString;
     newPassword: z.ZodEffects<z.ZodString, string, string>;

@@ -79,6 +79,7 @@ export interface UsersRepo {
   findByGoogleSub(sub: string, tx?: Tx): Promise<UserRecord | null>;
   create(rec: UserRecord, tx?: Tx): Promise<void>;
   update(id: string, patch: Partial<UserRecord>, tx?: Tx): Promise<UserRecord | null>;
+  delete(id: string, tx?: Tx): Promise<boolean>;
 }
 
 export interface SessionsRepo {

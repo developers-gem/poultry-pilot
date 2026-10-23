@@ -35,6 +35,8 @@ export const RefreshRequest = z.object({ refreshToken: Token });
 export const LogoutRequest = z.object({ refreshToken: Token.optional() });
 export const VerifyEmailRequest = z.object({ token: Token });
 export const ForgotPasswordRequest = z.object({ email: Email });
+export const CheckEmailRequest = z.object({ email: Email });
+export const DeleteAccountRequest = z.object({ email: Email });
 export const ResetPasswordRequest = z.object({ token: Token, newPassword: Password });
 /** PUT /me: the signed-in person's own name and phone. */
 export const UpdateProfileRequest = z.object({ fullName: NonEmptyText(120), phone: z.string().trim().max(30).optional() }).strict();

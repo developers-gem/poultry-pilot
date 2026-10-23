@@ -748,6 +748,8 @@ var RefreshRequest = z3.object({ refreshToken: Token });
 var LogoutRequest = z3.object({ refreshToken: Token.optional() });
 var VerifyEmailRequest = z3.object({ token: Token });
 var ForgotPasswordRequest = z3.object({ email: Email });
+var CheckEmailRequest = z3.object({ email: Email });
+var DeleteAccountRequest = z3.object({ email: Email });
 var ResetPasswordRequest = z3.object({ token: Token, newPassword: Password });
 var UpdateProfileRequest = z3.object({ fullName: NonEmptyText(120), phone: z3.string().trim().max(30).optional() }).strict();
 var ChangePasswordRequest = z3.object({ currentPassword: z3.string().min(1).max(200), newPassword: Password });
@@ -2098,6 +2100,14 @@ function createMongoRepositories(connection = mongoose.connection) {
       async update(id, patch, tx) {
         const doc = await UserModel.findOneAndUpdate({ _id: id }, { ...toUpdate2(patch), $inc: { version: 1 } }, { new: true, ...s(tx) }).lean();
         return fromDoc2(doc);
+      },
+      async delete(id, tx) {
+        const res = await UserModel.deleteOne({ _id: id }, s(tx));
+        await SessionModel.deleteMany({ userId: id }, s(tx));
+        await RefreshTokenModel.deleteMany({ userId: id }, s(tx));
+        await OneTimeTokenModel.deleteMany({ userId: id }, s(tx));
+        await MembershipModel.deleteMany({ userId: id }, s(tx)).setOptions({ crossFarm: true });
+        return res.deletedCount > 0;
       }
     },
     sessions: {
@@ -2803,6 +2813,18 @@ function authRoutes(auth, limiter) {
   r.post("/forgot-password", limiter, validate("body", ForgotPasswordRequest), async (req, res) => {
     await auth.forgotPassword(req.body.email);
     res.status(202).json({ message: "If an account exists for that email, a reset link has been sent." });
+  });
+  r.post("/check-email", limiter, validate("body", CheckEmailRequest), async (req, res) => {
+    const user = await auth.checkEmail(req.body.email);
+    if (!user) {
+      res.status(404).json({ error: { code: "USER_NOT_FOUND", message: "No account found with this email address." } });
+      return;
+    }
+    res.json({ exists: true, email: user.email, fullName: user.fullName });
+  });
+  r.post("/delete-account", limiter, validate("body", DeleteAccountRequest), async (req, res) => {
+    await auth.deleteAccountByEmail(req.body.email);
+    res.json({ success: true, message: "Your account has been successfully deleted." });
   });
   r.post("/reset-password", limiter, validate("body", ResetPasswordRequest), async (req, res) => {
     await auth.resetPassword(req.body.token, req.body.newPassword, clientMeta(req));
@@ -5990,6 +6012,8 @@ var S = {
   LogoutRequest: registry.register("LogoutRequest", LogoutRequest),
   VerifyEmailRequest: registry.register("VerifyEmailRequest", VerifyEmailRequest),
   ForgotPasswordRequest: registry.register("ForgotPasswordRequest", ForgotPasswordRequest),
+  CheckEmailRequest: registry.register("CheckEmailRequest", CheckEmailRequest),
+  DeleteAccountRequest: registry.register("DeleteAccountRequest", DeleteAccountRequest),
   ResetPasswordRequest: registry.register("ResetPasswordRequest", ResetPasswordRequest),
   ChangePasswordRequest: registry.register("ChangePasswordRequest", ChangePasswordRequest),
   TokenPair: registry.register("TokenPair", TokenPair),
@@ -6079,6 +6103,8 @@ post("/auth/google", "Sign in with a Google ID token", bodyOf(S.GoogleLoginReque
 post("/auth/refresh", "Rotate a refresh token; reuse of an old token ends the session", bodyOf(S.RefreshRequest), { 200: json(S.TokenPair, "New token pair"), 401: errors[401] });
 post("/auth/logout", "End the current session (bearer token) or the session of a refresh token", bodyOf(S.LogoutRequest), { 204: { description: "Signed out" } });
 post("/auth/forgot-password", "Email a password reset link; never reveals whether the account exists", bodyOf(S.ForgotPasswordRequest), { 202: json(z28.object({ message: z28.string() }), "Accepted"), 429: errors[429] });
+post("/auth/check-email", "Check whether a user account exists for an email address", bodyOf(S.CheckEmailRequest), { 200: json(z28.object({ exists: z28.boolean(), email: z28.string(), fullName: z28.string() }), "Account exists"), 404: json(S.ErrorEnvelope, "No account found") });
+post("/auth/delete-account", "Permanently delete an account by registered email", bodyOf(S.DeleteAccountRequest), { 200: json(z28.object({ success: z28.boolean(), message: z28.string() }), "Account deleted"), 404: json(S.ErrorEnvelope, "No account found") });
 post("/auth/reset-password", "Set a new password with an emailed token; signs out every session", bodyOf(S.ResetPasswordRequest), { 204: { description: "Password reset" }, 422: json(S.ErrorEnvelope, "Invalid or expired token") });
 post("/auth/change-password", "Change password; signs out every other session", bodyOf(S.ChangePasswordRequest), {
   200: json(z28.object({ otherSessionsSignedOut: z28.number() }), "Changed"),
@@ -12719,6 +12745,21 @@ function createAuthService(d) {
       const revoked = await repos.sessions.revokeAllForUser(principal.userId, clock.now(), "user_revoked", principal.sessionId);
       await d.audit.record(ctxOf5(principal.userId, meta, principal.sessionId), { action: "session.revoked_others", entity: "user", entityId: principal.userId, after: { revoked } }, {});
       return { revoked };
+    },
+    async checkEmail(emailRaw) {
+      const user = await repos.users.findByEmail(emailRaw.toLowerCase());
+      if (!user) return null;
+      return { id: user.id, email: user.email, fullName: user.fullName };
+    },
+    async deleteAccountByEmail(emailRaw) {
+      const user = await repos.users.findByEmail(emailRaw.toLowerCase());
+      if (!user) {
+        throw new AppError("NOT_FOUND", "No account found with this email address.");
+      }
+      await repos.tx.run(async (tx) => {
+        await repos.users.delete(user.id, tx);
+      });
+      return { success: true };
     }
   };
 }

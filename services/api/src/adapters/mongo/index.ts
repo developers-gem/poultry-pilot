@@ -199,6 +199,14 @@ export function createMongoRepositories(connection = mongoose.connection): Repos
         const doc = await UserModel.findOneAndUpdate({ _id: id }, { ...toUpdate(patch), $inc: { version: 1 } }, { new: true, ...s(tx) }).lean();
         return fromDoc<UserRecord | null>(doc);
       },
+      async delete(id, tx) {
+        const res = await UserModel.deleteOne({ _id: id }, s(tx));
+        await SessionModel.deleteMany({ userId: id }, s(tx));
+        await RefreshTokenModel.deleteMany({ userId: id }, s(tx));
+        await OneTimeTokenModel.deleteMany({ userId: id }, s(tx));
+        await MembershipModel.deleteMany({ userId: id }, s(tx)).setOptions({ crossFarm: true } as never);
+        return res.deletedCount > 0;
+      },
     },
     sessions: {
       async create(rec, tx) {
