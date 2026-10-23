@@ -1,0 +1,178 @@
+/**
+ * Named actions checked by API middleware AND inside services.
+ * Clients use the same map only to hide controls; the server is authoritative.
+ */
+export const ACTIONS = [
+    // farm administration
+    "farm.read",
+    "farm.update_settings",
+    "farm.delete",
+    "member.read",
+    "member.invite",
+    "member.change_role",
+    "member.remove",
+    "audit.read",
+    // production
+    "production.read",
+    "production.record", // create daily records, mortality, eggs, feed issue, weigh-ins
+    "production.edit_own_recent", // edit own entries for today and yesterday (farm-local)
+    "production.edit_any",
+    "production.delete",
+    "flock.manage", // create/place/transfer/close flocks, houses
+    "flock.sell",
+    // health
+    "health.read",
+    "health.record_observation",
+    "health.manage", // vet visits, treatments, medicines, programmes
+    "health.vaccinate", // record vaccinations given
+    // biosecurity
+    "biosecurity.read",
+    "biosecurity.record",
+    "biosecurity.manage",
+    // money & market
+    "money.read",
+    "money.record",
+    "money.delete",
+    "market.read",
+    "market.manage",
+    "payment.record",
+    // hatchery
+    "hatchery.read",
+    "hatchery.record", // candling, readings, transfer, hatch, grading
+    "hatchery.manage", // set and cancel batches
+    // inventory (feed, medicine, supplies)
+    "inventory.read",
+    "inventory.issue", // record use and wastage
+    "inventory.manage", // catalog, purchases, stock counts
+    "alert.manage", // acknowledge alerts, run checks
+    "task.read",
+    "task.complete", // start and finish tasks
+    "task.manage", // create, assign, edit, cancel and reopen tasks
+    // content
+    "content.read",
+];
+const ALL = ACTIONS;
+const except = (...remove) => new Set(ALL.filter((a) => !remove.includes(a)));
+const WORKER = [
+    "farm.read",
+    "hatchery.read",
+    "hatchery.record",
+    "inventory.read",
+    "inventory.issue",
+    "production.read",
+    "production.record",
+    "production.edit_own_recent",
+    "health.read",
+    "health.record_observation",
+    "biosecurity.read",
+    "biosecurity.record",
+    "content.read",
+    "task.read",
+    "task.complete",
+];
+/**
+ * What each role may do. Member-management actions are further limited by ROLE_RANK:
+ * nobody can add, change or remove someone at or above their own rank (owners excepted).
+ */
+export const ROLE_PERMISSIONS = {
+    owner: new Set(ALL),
+    admin: except("farm.delete"),
+    farm_manager: new Set([
+        "farm.read",
+        "member.read",
+        "member.invite",
+        "member.change_role",
+        "member.remove",
+        "audit.read",
+        "production.read",
+        "production.record",
+        "production.edit_own_recent",
+        "production.edit_any",
+        "production.delete",
+        "flock.manage",
+        "flock.sell",
+        "health.read",
+        "health.record_observation",
+        "health.manage",
+        "health.vaccinate",
+        "biosecurity.read",
+        "biosecurity.record",
+        "biosecurity.manage",
+        "money.read",
+        "money.record",
+        "market.read",
+        "market.manage",
+        "payment.record",
+        "inventory.read",
+        "inventory.issue",
+        "inventory.manage",
+        "alert.manage",
+        "hatchery.read",
+        "hatchery.record",
+        "hatchery.manage",
+        "content.read",
+        "task.read",
+        "task.complete",
+        "task.manage",
+    ]),
+    supervisor: new Set([...WORKER, "member.read", "production.edit_any", "biosecurity.manage", "alert.manage", "health.vaccinate", "task.manage"]),
+    worker: new Set(WORKER),
+    accountant: new Set([
+        "farm.read",
+        "production.read",
+        "money.read",
+        "money.record",
+        "money.delete",
+        "market.read",
+        "payment.record",
+        "inventory.read",
+        "inventory.manage",
+        "hatchery.read",
+        "content.read",
+        "task.read",
+    ]),
+    vet: new Set([
+        "farm.read",
+        "production.read",
+        "health.read",
+        "health.record_observation",
+        "health.manage",
+        "health.vaccinate",
+        "biosecurity.read",
+        "inventory.read",
+        "inventory.issue",
+        "hatchery.read",
+        "content.read",
+        "task.read",
+        "task.complete",
+    ]),
+};
+export function can(role, action) {
+    return ROLE_PERMISSIONS[role].has(action);
+}
+export function permissionsFor(role) {
+    return ACTIONS.filter((a) => ROLE_PERMISSIONS[role].has(a));
+}
+/** Authority for member management. Specialist roles (accountant, vet) sit between supervisor and worker. */
+export const ROLE_RANK = {
+    owner: 100,
+    admin: 80,
+    farm_manager: 60,
+    supervisor: 40,
+    accountant: 30,
+    vet: 30,
+    worker: 20,
+};
+/**
+ * Can `actor` give someone the role `role`, or act on a member who currently holds `role`?
+ * Owners can manage anyone, including other owners. Everyone else only manages strictly lower ranks,
+ * so a farm manager cannot create an admin, and an admin cannot remove an owner.
+ */
+export function canManageRole(actor, role) {
+    return actor === "owner" || ROLE_RANK[actor] > ROLE_RANK[role];
+}
+/** Roles `actor` may assign, highest first. Clients use this to fill the role picker. */
+export function assignableRoles(actor) {
+    return Object.keys(ROLE_RANK).filter((r) => canManageRole(actor, r));
+}
+//# sourceMappingURL=permissions.js.map

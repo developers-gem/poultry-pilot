@@ -1,0 +1,46 @@
+/** Stable, machine-readable error codes mapped to HTTP status. Clients branch on `code`, never on `message`. */
+export declare const ERROR_CODES: {
+    readonly VALIDATION_FAILED: 400;
+    readonly INVALID_JSON: 400;
+    readonly UNAUTHENTICATED: 401;
+    readonly INVALID_CREDENTIALS: 401;
+    readonly TOKEN_EXPIRED: 401;
+    readonly TOKEN_REUSED: 401;
+    readonly SESSION_REVOKED: 401;
+    readonly ACCOUNT_DISABLED: 403;
+    readonly EMAIL_NOT_VERIFIED: 403;
+    readonly ROLE_HIERARCHY: 403;
+    readonly FORBIDDEN: 403;
+    readonly NOT_FOUND: 404;
+    readonly EMAIL_TAKEN: 409;
+    readonly ALREADY_MEMBER: 409;
+    readonly VERSION_CONFLICT: 409;
+    readonly DUPLICATE: 409;
+    /** Looks like something already recorded (e.g. the same bill twice); resend with allowDuplicate after checking. */
+    readonly POSSIBLE_DUPLICATE: 409;
+    readonly IDEMPOTENCY_IN_PROGRESS: 409;
+    readonly PAYLOAD_TOO_LARGE: 413;
+    readonly IDEMPOTENCY_KEY_REUSED: 422;
+    readonly LAST_OWNER: 422;
+    readonly INVALID_STATE_TRANSITION: 422;
+    readonly INSUFFICIENT_BIRDS: 422;
+    readonly CAPACITY_EXCEEDED: 422;
+    readonly WITHDRAWAL_ACTIVE: 422;
+    readonly INSUFFICIENT_FUNDS: 422;
+    readonly WEATHER_UNAVAILABLE: 503;
+    readonly CHECKLIST_INCOMPLETE: 422;
+    readonly INSUFFICIENT_STOCK: 422;
+    readonly FLOCK_CLOSED: 422;
+    readonly OVERPAYMENT: 422;
+    readonly UNKNOWN_COMMAND: 422;
+    readonly INVITE_INVALID: 422;
+    readonly TOKEN_INVALID: 422;
+    readonly SAME_PASSWORD: 422;
+    readonly CURRENT_PASSWORD_INCORRECT: 422;
+    readonly ACCOUNT_LOCKED: 429;
+    readonly RATE_LIMITED: 429;
+    readonly INTERNAL: 500;
+    readonly NOT_IMPLEMENTED: 501;
+    readonly SERVICE_UNAVAILABLE: 503;
+};
+export type ErrorCode = keyof typeof ERROR_CODES;
